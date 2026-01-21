@@ -47,6 +47,9 @@ public class RelationServiceImpl implements RelationService {
     private final Cache<Long, List<Long>> flwsTopCache;
     private final Cache<Long, List<Long>> fansTopCache;
     private final UserMapper userMapper;
+
+    private static final int IDX_FOLLOWER = 2; // (2 - 1) * 4, 下标从 4 开始
+    private static final int IDX_FOLLOWING = 1; // 下标从 0 开始
     
 
     /**
@@ -84,7 +87,7 @@ public class RelationServiceImpl implements RelationService {
     public boolean follow(long fromUserId, long toUserId) {
         // Lua 脚本令牌桶限流
         Long ok = redis.execute(tokenScript, List.of("rl:follow:" + fromUserId), "100", "1");
-        if (ok == 0L) {
+        if (ok == null || ok == 0L) {
             return false;
         }
 
@@ -273,12 +276,12 @@ public class RelationServiceImpl implements RelationService {
      * @param userId 用户ID
      * @return 是否为大V
      */
-    private boolean isBigV(long userId) {
+    private boolean isBigV(long userId, int idx) {
         byte[] raw = redis.execute((RedisCallback<byte[]>) c -> c.stringCommands().get(("ucnt:" + userId).getBytes(StandardCharsets.UTF_8)));
         if (raw == null || raw.length < 20) return false;
         long n = 0;
-        int off = 2 * 4;
-        for (int i = 0; i < 4; i++) n = (n << 8) | (raw[off + i] & 0xFFL);
+        int off = (idx - 1) * 4;
+        for (int i = 0; i < 4; i++) n = (n << 8) | (raw[off + i] & 0xFFL); // &0xFFL 确保每一部分都被当作无符号数处理
         return n >= 500_000L;
     }
 
@@ -295,32 +298,30 @@ public class RelationServiceImpl implements RelationService {
             Cache<Long, List<Long>> localCache,
             long userId
     ) {
-        // 1. 先查本地缓存 (L1)
-        List<Long> top = localCache != null ? localCache.getIfPresent(userId) : null;
-        if (top != null && !top.isEmpty()) {
-            // 本地缓存通常只存 Top N (例如前500)，如果 offset 在范围内则直接返回
-            if (offset < top.size()) {
-                int to = Math.min(offset + limit, top.size());
-                return new ArrayList<>(top.subList(offset, to));
-            }
-            // 如果请求的 offset 超过了本地缓存范围，继续查 Redis
-        }
-
-        // 2. 再查 Redis (L2)
         Set<String> cached = redis.opsForZSet().reverseRange(key, offset, offset + limit - 1L);
         if (cached != null && !cached.isEmpty()) {
             return toLongList(cached);
         }
 
-        // 3. 最后查 DB 回填
+        List<Long> top = localCache != null ? localCache.getIfPresent(userId) : null;
+        if (top != null && !top.isEmpty()) {
+            int from = Math.min(offset, top.size());
+            int to = Math.min(offset + limit, top.size());
+            return new ArrayList<>(top.subList(from, to));
+        }
+
         int need = Math.max(1, limit + offset);
         Map<Long, Map<String, Object>> rows = rowsFetcher.apply(Math.min(need, 1000));
         if (rows != null && !rows.isEmpty()) {
             fillZSet(key, rows, idField, tsField, null);
             redis.expire(key, Duration.ofHours(2));
 
-            // 回填后尝试更新本地缓存（仅针对大V）
-            if (localCache != null && isBigV(userId)) {
+            int idx = switch (idField){
+                case "fromUserId" -> IDX_FOLLOWER;
+                case "toUserId" -> IDX_FOLLOWING;
+                default -> 2; // 给个默认值
+            };
+            if (localCache != null && isBigV(userId, idx)) {
                 maybeUpdateTopCache(userId, key, localCache);
             }
 
@@ -339,21 +340,17 @@ public class RelationServiceImpl implements RelationService {
                                          IntFunction<Map<Long, Map<String, Object>>> rowsFetcher,
                                          String idField,
                                          String tsField) {
-
         double max = cursor == null ? Double.POSITIVE_INFINITY : cursor.doubleValue();
-        Set<String> cached = redis.opsForZSet().reverseRangeByScore(key, Double.NEGATIVE_INFINITY, max, 0, limit);
-
+        Set<String> cached = redis.opsForZSet().reverseRangeByScore(key, max, Double.NEGATIVE_INFINITY, 0, limit);
         if (cached != null && !cached.isEmpty()) {
             return toLongList(cached);
         }
-
         int need = Math.max(limit, 100);
         Map<Long, Map<String, Object>> rows = rowsFetcher.apply(Math.min(need, 1000));
-
         if (rows != null && !rows.isEmpty()) {
             fillZSet(key, rows, idField, tsField, cursor);
             redis.expire(key, Duration.ofHours(2));
-            Set<String> filled = redis.opsForZSet().reverseRangeByScore(key, Double.NEGATIVE_INFINITY, max, 0, limit);
+            Set<String> filled = redis.opsForZSet().reverseRangeByScore(key, max, Double.NEGATIVE_INFINITY, 0, limit);
             return filled == null ? Collections.emptyList() : toLongList(filled);
         }
         return Collections.emptyList();
