@@ -68,8 +68,9 @@ public class StorageController {
 
         int expiresIn = 600; // 10 分钟
         String putUrl = ossStorageService.generatePresignedPutUrl(objectKey, request.contentType(), expiresIn);
+        String publicUrl = ossStorageService.publicUrl(objectKey);
         Map<String, String> headers = Map.of("Content-Type", request.contentType());
-        return new StoragePresignResponse(objectKey, putUrl, headers, expiresIn);
+        return new StoragePresignResponse(objectKey, putUrl, publicUrl, headers, expiresIn);
     }
 
     private String normalizeExt(String ext, String contentType, String scene) {

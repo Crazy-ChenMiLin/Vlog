@@ -19,44 +19,52 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- 显式定义Spring AI版本，确保兼容性 -->
+        <spring-ai.version>1.0.3</spring-ai.version>
     </properties>
 
     <repositories>
+        <!-- 保留必要仓库，优化配置顺序 -->
+        <repository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+
         <repository>
             <id>spring-milestones</id>
             <name>Spring Milestones</name>
             <url>https://repo.spring.io/milestone</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
         </repository>
 
+        <!-- 保留snapshot仓库但明确禁用releases -->
         <repository>
             <id>spring-snapshots</id>
             <name>Spring Snapshots</name>
             <url>https://repo.spring.io/snapshot</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
+            <releases><enabled>false</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
         </repository>
 
         <repository>
-            <name>Central Portal Snapshots</name>
             <id>central-portal-snapshots</id>
+            <name>Central Portal Snapshots</name>
             <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
+            <releases><enabled>false</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
         </repository>
     </repositories>
 
     <dependencyManagement>
         <dependencies>
-            <!-- Spring AI 依赖版本统一管理（BOM），用于锁定 Spring AI 相关依赖版本 -->
+            <!-- 优化：使用properties定义版本，提高可维护性 -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
-                <version>1.0.3</version>
+                <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -180,11 +188,11 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- 阿里云 OSS SDK：对象存储直传/签名/上传下载 -->
+        <!-- MinIO SDK：S3 兼容对象存储直传/签名/上传下载 -->
         <dependency>
-            <groupId>com.aliyun.oss</groupId>
-            <artifactId>aliyun-sdk-oss</artifactId>
-            <version>3.17.3</version>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.17</version>
         </dependency>
 
         <!-- 测试：Spring Boot 测试套件（JUnit、Mock、Test utilities） -->
@@ -238,11 +246,41 @@
 
     <build>
         <plugins>
+            <!-- 关键修复：添加显式版本号 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.2.4</version> <!-- 与父POM版本严格一致 -->
                 <configuration>
                     <mainClass>com.tongji.ZhiGuangApplication</mainClass>
+                    <!-- 启用分层构建，优化Docker构建 -->
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- 添加Maven编译插件，确保JDK21兼容性 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.30</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
         </plugins>

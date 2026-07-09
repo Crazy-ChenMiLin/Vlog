@@ -64,56 +64,78 @@ public class FeedCacheInvalidationListener {
      */
     @EventListener
     public void onCounterChanged(CounterEvent event) {
+        // ==================== 步骤1：过滤无效事件（只处理我们关心的） ====================
+        // 1.1 判断：是不是【知文】的事件？不是 → 直接退出，不干活
         if (!"knowpost".equals(event.getEntityType())) {
             return;
         }
-
+        // 1.2 获取事件类型：like=点赞，fav=收藏，view=浏览...
         String metric = event.getMetric();
         if ("like".equals(metric) || "fav".equals(metric)) {
+            // ==================== 步骤2：拿到事件的核心数据 ====================
+            // 2.1 被点赞的知文ID（比如 10086）
             String eid = event.getEntityId();
             int delta = event.getDelta();
-
+            // ==================== 步骤3：更新【作者】的总计数 ====================
             try {
+                // 3.2 根据知文ID，去数据库查这条知文的完整信息
                 KnowPost post = knowPostMapper.findById(Long.valueOf(eid));
+                // 3.3 如果知文存在 + 有作者
                 if (post != null && post.getCreatorId() != null) {
+                    // 3.4 拿到作者ID
                     long owner = post.getCreatorId();
+                    // 3.5 点赞 → 作者的【总收到点赞数】+delta
                     if ("like".equals(metric)) {
                         userCounterService.incrementLikesReceived(owner, delta);
                     }
+                    // 3.6 收藏 → 作者的【总收到收藏数】+delta
                     if ("fav".equals(metric)) {
                         userCounterService.incrementFavsReceived(owner, delta);
                     }
                 }
             } catch (Exception ignored) {
             }
+            // ==================== 步骤4：核心！反向索引 → 找到所有包含该知文的Feed页面 ====================
+            // 4.1 计算当前小时（缓存按小时分桶，防止key太多）
 
             long hourSlot = System.currentTimeMillis() / 3600000L;
+            // 4.2 新建集合：存放所有受影响的缓存页面Key
             Set<String> keys = new LinkedHashSet<>();
+            // 4.3 查Redis：当前小时内，哪些Feed页面包含这条知文
             Set<String> cur = redis.opsForSet().members("feed:public:index:" + eid + ":" + hourSlot);
             if (cur != null) {
                 keys.addAll(cur);
             }
-
+            // 4.4 查Redis：上一小时内，哪些Feed页面包含这条知文（兼容跨小时缓存）
             Set<String> prev = redis.opsForSet().members("feed:public:index:" + eid + ":" + (hourSlot - 1));
             if (prev != null) {
                 keys.addAll(prev);
             }
+            // 4.5 没有任何缓存页面 → 直接结束
             if (keys.isEmpty()) {
                 return;
             }
-
+            // ==================== 步骤5：遍历所有受影响页面 → 更新两级缓存 ====================
             for (String key : keys) {
+                // ========== 子步骤5.1：更新 L1 本地缓存（Caffeine） ==========
+                // 5.1.1 从本地缓存获取这个页面的数据
                 FeedPageResponse local = feedPublicCache.getIfPresent(key);
                 if (local != null) {
                     FeedPageResponse updatedLocal = adjustPageCounts(local, eid, metric, delta, true);
+                    // 5.1.4 把新数据放回本地缓存（替换旧数据）
                     feedPublicCache.put(key, updatedLocal);
                 }
 
+                // ========== 子步骤5.2：更新 L2 Redis 缓存 ==========
+                // 5.2.1 从Redis获取这个页面的JSON字符串
                 String cached = redis.opsForValue().get(key);
                 if (cached != null) {
                     try {
+                        // 5.2.3 【格式转换】JSON字符串 → FeedPageResponse对象（无反射！）
                         FeedPageResponse resp = objectMapper.readValue(cached, FeedPageResponse.class);
                         FeedPageResponse updated = adjustPageCounts(resp, eid, metric, delta, false);
+                        // 5.2.5 写回Redis，保留原来的过期时间（不重置TTL）
+                        //时间不重置
                         writePageJsonKeepingTtl(key, updated);
                     } catch (Exception ignored) {}
                 } else {

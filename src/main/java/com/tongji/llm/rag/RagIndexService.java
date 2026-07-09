@@ -44,6 +44,7 @@ public class RagIndexService {
     }
 
     public int reindexSinglePost(long postId) {
+        // 步骤1：查知文详情（比如帖子123的标题、内容链接、指纹）
         KnowPostDetailRow row = knowPostMapper.findDetailById(postId);
         if (row == null) {
             log.warn("Post {} not found", postId);
@@ -51,26 +52,27 @@ public class RagIndexService {
         }
 
         // 仅索引公开的已发布知文
+        // 步骤2：只处理“公开+已发布”的知文（私密/草稿不存）
         if (!"published".equalsIgnoreCase(row.getStatus()) || !"public".equalsIgnoreCase(row.getVisible())) {
             log.warn("Post {} is not public/published, skip indexing", postId);
             return 0;
         }
 
-        // 内容地址缺失则无法抓取正文
+        // 步骤3：没内容链接，下载不了正文，直接跳过
         if (!StringUtils.hasText(row.getContentUrl())) {
             log.warn("Post {} missing contentUrl or not found", postId);
             return 0;
         }
 
-        // 指纹检测：如未变化则跳过重建
-        String currentSha = row.getContentSha256();
-        String currentEtag = row.getContentEtag();
+        // 步骤4：指纹校验（关键！避免重复干活）
+        String currentSha = row.getContentSha256();// 内容的“指纹1”
+        String currentEtag = row.getContentEtag();// 内容的“指纹2”
         if (isUpToDate(postId, currentSha, currentEtag)) {
             log.info("Post {} already indexed with same fingerprint, skip", postId);
             return 0;
         }
 
-        // 抓取 Markdown 正文
+        // 步骤5：下载知文的Markdown正文（比如从链接下载“Java入门.md”的内容）
         String text = fetchContent(row.getContentUrl());
         if (!StringUtils.hasText(text)) {
             log.warn("Post {} content empty", postId);
@@ -78,11 +80,14 @@ public class RagIndexService {
         }
 
         // 先按 Markdown 标题切段，再做固定长度切片（带重叠）
+        // 步骤6：把正文切成小块（切片）
         List<String> chunks = chunkMarkdown(text);
         // 幂等 upsert：先删除旧切片
+        // 步骤7：先删旧卡片（避免旧内容残留）
         deleteExistingChunks(postId);
 
         // 组装 Document（文本 + 业务元数据），用于向量写入与检索过滤
+        // 步骤8：给每个小块加“标签”（元数据），组装成Document（向量库能识别的格式）
         List<Document> docs = new ArrayList<>(chunks.size());
         for (int i = 0; i < chunks.size(); i++) {
             String cid = postId + "#" + i;
