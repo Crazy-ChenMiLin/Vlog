@@ -67,7 +67,7 @@ public class SearchServiceImpl implements SearchService {
                         // 召回与加权：先构造 bool 查询，再用 function_score 做互动数据加权
                         .query(qb -> qb.functionScore(fs -> fs
                                 .query(qb2 -> qb2.bool(bq -> {
-                                    bq.must(m -> m.multiMatch(mm -> mm.query(q)
+                                    bq.must(m -> m.multiMatch(mm   -> mm.query(q)
                                             .fields("title^3", "body")));
                                     bq.filter(f -> f.term(t -> t.field("status")
                                             .value(v -> v.stringValue("published"))));

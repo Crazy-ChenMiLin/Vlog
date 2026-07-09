@@ -5,6 +5,12 @@ package com.tongji.counter.service;
  *
  * <p>支持维护关注数、粉丝数、发文数、获赞数、获收藏数，并提供全量重建。</p>
  */
+
+//delta是delta 就是“变化量/增量”。
+//在 incrementXxx(userId, delta) 里，delta 表示这次要给计数加多少或减多少：
+//delta = +1 表示增加 1
+//delta = -1 表示减少 1
+
 public interface UserCounterService {
     /** 增量更新关注数 */
     void incrementFollowings(long userId, int delta);

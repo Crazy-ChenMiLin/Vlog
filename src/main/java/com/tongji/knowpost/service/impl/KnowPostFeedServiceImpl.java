@@ -116,6 +116,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         // L2: 二级缓存，Redis 片段缓存，组装
         FeedPageResponse fromCache = assembleFromCache(idsKey, hasMoreKey, safePage, safeSize, currentUserIdNullable);
         if (fromCache != null) {
+            //缓存命中！存到本地缓存，给下一次查询用
             feedPublicCache.put(localPageKey, fromCache);
             // 对返回列表中的每个条目进行热度统计
             if (fromCache.items() != null) {
@@ -152,6 +153,9 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             // 数据库回源：读取 size+1 以判断是否有下一页，后裁剪为当前页
             int offset = (safePage - 1) * safeSize;
             List<KnowPostFeedRow> rows = mapper.listFeedPublic(safeSize + 1, offset);
+
+
+
             boolean hasMore = rows.size() > safeSize;
             if (hasMore) {
                 rows = rows.subList(0, safeSize);

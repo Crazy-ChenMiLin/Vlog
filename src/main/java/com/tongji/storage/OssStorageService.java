@@ -1,21 +1,22 @@
 package com.tongji.storage;
 
-import com.aliyun.oss.OSS;
-import com.aliyun.oss.OSSClientBuilder;
-import com.aliyun.oss.model.PutObjectRequest;
-import com.aliyun.oss.HttpMethod;
-import com.aliyun.oss.model.GeneratePresignedUrlRequest;
 import com.tongji.storage.config.OssProperties;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
+import io.minio.BucketExistsArgs;
+import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
+import java.net.URI;
 import java.time.Instant;
-import java.net.URL;
-import java.util.Date;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -33,25 +34,44 @@ public class OssStorageService {
         }
         String objectKey = props.getFolder() + "/" + userId + "-" + Instant.now().toEpochMilli() + ext;
 
-        OSS client = new OSSClientBuilder().build(props.getEndpoint(), props.getAccessKeyId(), props.getAccessKeySecret());
-
+        MinioClient client = buildClient();
         try {
-            PutObjectRequest request = new PutObjectRequest(props.getBucket(), objectKey, file.getInputStream());
-            client.putObject(request);
-        } catch (IOException e) {
+            ensureBucketExists(client);
+            client.putObject(PutObjectArgs.builder()
+                    .bucket(props.getBucket())
+                    .object(objectKey)
+                    .stream(file.getInputStream(), file.getSize(), -1)
+                    .contentType(file.getContentType())
+                    .build());
+        } catch (Exception e) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "头像文件读取失败");
-        } finally {
-            client.shutdown();
         }
 
         return publicUrl(objectKey);
     }
 
-    private String publicUrl(String objectKey) {
-        if (props.getPublicDomain() != null && !props.getPublicDomain().isBlank()) {
-            return props.getPublicDomain().replaceAll("/$", "") + "/" + objectKey;
+    public String publicUrl(String objectKey) {
+        String base = StringUtils.hasText(props.getPublicDomain()) ? props.getPublicDomain() : props.getEndpoint();
+        base = trimTrailingSlash(base);
+        if (!StringUtils.hasText(base)) {
+            return objectKey;
         }
-        return "https://" + props.getBucket() + "." + props.getEndpoint() + "/" + objectKey;
+        return base + publicObjectPath(base, objectKey);
+    }
+
+    private String publicObjectPath(String base, String objectKey) {
+        return hasPath(base)
+                ? "/" + objectKey
+                : "/" + props.getBucket() + "/" + objectKey;
+    }
+
+    private boolean hasPath(String base) {
+        try {
+            String path = URI.create(base).getPath();
+            return path != null && !path.isBlank() && !"/".equals(path);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     /**
@@ -65,24 +85,58 @@ public class OssStorageService {
      */
     public String generatePresignedPutUrl(String objectKey, String contentType, int expiresInSeconds) {
         ensureConfigured();
-        OSS client = new OSSClientBuilder().build(props.getEndpoint(), props.getAccessKeyId(), props.getAccessKeySecret());
+        MinioClient client = buildClient();
         try {
-            Date expiration = new Date(System.currentTimeMillis() + expiresInSeconds * 1000L);
-            GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(props.getBucket(), objectKey, HttpMethod.PUT);
-            request.setExpiration(expiration);
-            if (contentType != null && !contentType.isBlank()) {
-                request.setContentType(contentType);
-            }
-            URL url = client.generatePresignedUrl(request);
-            return url.toString();
-        } finally {
-            client.shutdown();
+            ensureBucketExists(client);
+            Map<String, String> extraHeaders = (contentType == null || contentType.isBlank())
+                    ? Map.of()
+                    : Map.of("Content-Type", contentType);
+            return client.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.PUT)
+                            .bucket(props.getBucket())
+                            .object(objectKey)
+                            .expiry((int) Math.max(1, expiresInSeconds))
+                            .extraHeaders(extraHeaders)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "对象存储预签名失败");
         }
     }
 
     private void ensureConfigured() {
-        if (props.getEndpoint() == null || props.getAccessKeyId() == null || props.getAccessKeySecret() == null || props.getBucket() == null) {
+        if (!StringUtils.hasText(props.getEndpoint())
+                || !StringUtils.hasText(props.getAccessKeyId())
+                || !StringUtils.hasText(props.getAccessKeySecret())
+                || !StringUtils.hasText(props.getBucket())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "对象存储未配置");
         }
+    }
+
+    private MinioClient buildClient() {
+        return MinioClient.builder()
+                .endpoint(trimTrailingSlash(props.getEndpoint()))
+                .credentials(props.getAccessKeyId(), props.getAccessKeySecret())
+                .build();
+    }
+
+    private void ensureBucketExists(MinioClient client) {
+        try {
+            boolean exists = client.bucketExists(BucketExistsArgs.builder()
+                    .bucket(props.getBucket())
+                    .build());
+            if (!exists) {
+                client.makeBucket(MakeBucketArgs.builder()
+                        .bucket(props.getBucket())
+                        .build());
+            }
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "对象存储桶不可用");
+        }
+    }
+
+    private String trimTrailingSlash(String endpoint) {
+        return endpoint == null ? null : endpoint.replaceAll("/$", "");
     }
 }

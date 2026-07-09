@@ -27,6 +27,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -45,6 +46,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final ObjectMapper objectMapper;
     private final OssProperties ossProperties;
     private final CounterService counterService;
+    //点赞数量+1
     private final UserCounterService userCounterService;
     private final StringRedisTemplate redis;
     @Qualifier("feedPublicCache")
@@ -190,6 +192,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
+        //额外来自另一个service的点赞数量的更新
         try {
             userCounterService.incrementPosts(creatorId, 1);
         } catch (Exception ignored) {}
@@ -295,13 +298,35 @@ public class KnowPostServiceImpl implements KnowPostService {
     }
 
     private String publicUrl(String objectKey) {
-        String publicDomain = ossProperties.getPublicDomain();
-
-        if (publicDomain != null && !publicDomain.isBlank()) {
-            return publicDomain.replaceAll("/$", "") + "/" + objectKey;
+        String base = ossProperties.getPublicDomain();
+        if (base == null || base.isBlank()) {
+            base = ossProperties.getEndpoint();
+        }
+        base = trimTrailingSlash(base);
+        if (base == null || base.isBlank()) {
+            return objectKey;
         }
 
-        return "https://" + ossProperties.getBucket() + "." + ossProperties.getEndpoint() + "/" + objectKey;
+        return base + publicObjectPath(base, objectKey);
+    }
+
+    private String publicObjectPath(String base, String objectKey) {
+        return hasPath(base)
+                ? "/" + objectKey
+                : "/" + ossProperties.getBucket() + "/" + objectKey;
+    }
+
+    private boolean hasPath(String base) {
+        try {
+            String path = URI.create(base).getPath();
+            return path != null && !path.isBlank() && !"/".equals(path);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private String trimTrailingSlash(String value) {
+        return value == null ? null : value.replaceAll("/$", "");
     }
 
     /**
