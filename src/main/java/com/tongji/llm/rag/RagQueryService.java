@@ -41,7 +41,7 @@ public class RagQueryService {
         // 轻量保障：如索引不存在或指纹未变更则跳过，否则重建
         indexService.ensureIndexed(postId);
 
-        //2选1，目前未融合！
+        //2种目前融合！
         String originalQuestion = question;
         String hypotheticalAnswer = hydeService.generateHypotheticalAnswer(originalQuestion);
 
