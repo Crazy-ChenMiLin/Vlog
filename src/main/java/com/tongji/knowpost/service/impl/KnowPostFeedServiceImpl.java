@@ -162,6 +162,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             }
 
             // 构建基础列表（计数已填充），liked/faved 置为 null 以免污染用户维度缓存
+//不写带有用户维度 liked/faved
             List<FeedItemResponse> items = mapRowsToItems(rows, null, false);
 
             FeedPageResponse respForCache = new FeedPageResponse(items, safePage, safeSize, hasMore);
@@ -175,6 +176,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             feedPublicCache.put(localPageKey, respForCache);
 
             // 返回时覆盖用户维度状态，不写回缓存
+ //写带有用户维度 liked/faved
             List<FeedItemResponse> enriched = enrich(items, currentUserIdNullable);
             log.info("feed.public source=db localPageKey={} page={} size={} hasMore={}", localPageKey, safePage, safeSize, hasMore);
             // 释放单航班锁，允许后续请求正常进入
@@ -252,6 +254,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     private FeedPageResponse assembleFromCache(String idsKey, String hasMoreKey, int page, int size, Long uid) {
         // 需要展示知文的 ID 列表
         List<String> idList = redis.opsForList().range(idsKey, 0, size - 1);
+        // 需要展示知文的: Redis String 取 hasMore 标记
         String hasMoreStr = redis.opsForValue().get(hasMoreKey);
         if (idList == null || idList.isEmpty()) {
             return null;
@@ -281,6 +284,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             }
         }
 
+        //enrichment
         List<FeedItemResponse> enriched = new ArrayList<>(idList.size());
         for (int i = 0; i < idList.size(); i++) {
             FeedItemResponse base = items.get(i);
