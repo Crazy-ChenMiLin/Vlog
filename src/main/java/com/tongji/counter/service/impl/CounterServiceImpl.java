@@ -118,12 +118,16 @@ public class CounterServiceImpl implements CounterService {
         String bmKey = CounterKeys.bitmapKey(metric, etype, eid, chunk);
         List<String> keys = List.of(bmKey);
         List<String> args = List.of(String.valueOf(bit), add ? "add" : "remove");
+        // 1. Redis 位图原子操作（SETBIT）
         Long changed = redis.execute(toggleScript, keys, args.toArray());
         boolean ok = changed == 1L;
+        // 只有状态真正变化时才发事件
         if (ok) {
             int delta = add ? 1 : -1;
+        // 2. 发到 Kafka（给 CounterAggregationConsumer 异步聚合计数）
             // 产出计数事件（异步聚合），分区按实体维度保证同实体事件顺序
             eventProducer.publish(CounterEvent.of(etype, eid, metric, idx, uid, delta));
+        // 3. 发 Spring 进程内事件（给 FeedCacheInvalidationListener 同步更新缓存）
             // 本地事件：触发缓存失效/旁路更新等快速路径
             eventPublisher.publishEvent(CounterEvent.of(etype, eid, metric, idx, uid, delta));
         }
