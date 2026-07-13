@@ -102,21 +102,29 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         FeedPageResponse local = feedPublicCache.getIfPresent(localPageKey);
 
         if (local != null && local.items() != null) {
+            recordPageHotKeys(local);
             // 对返回列表中的每个条目进行热度统计
-            for (FeedItemResponse item : local.items()) {
-                recordItemHotKey(item.id());
-            }
-
             log.info("feed.public source=local localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
             List<FeedItemResponse> enrichedLocal = enrich(local.items(), currentUserIdNullable);
 
             return new FeedPageResponse(enrichedLocal, local.page(), local.size(), local.hasMore());
         }
 
-        // L2: 二级缓存，Redis 片段缓存，组装
-        FeedPageResponse fromCache = assembleFromCache(idsKey, hasMoreKey, safePage, safeSize, currentUserIdNullable);
+        // L2: Redis page cache.
+        FeedPageResponse fromPageCache = readPageCache(localPageKey);
+        if (fromPageCache != null) {
+            feedPublicCache.put(localPageKey, fromPageCache);
+            recordPageHotKeys(fromPageCache);
+            log.info("feed.public source=page localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
+            List<FeedItemResponse> enriched = enrich(fromPageCache.items(), currentUserIdNullable);
+            return new FeedPageResponse(enriched, fromPageCache.page(), fromPageCache.size(), fromPageCache.hasMore());
+        }
+
+        // L3: Redis fragment cache, then enrich per user before returning.
+        FeedPageResponse fromCache = assembleFromCache(idsKey, hasMoreKey, safePage, safeSize);
         if (fromCache != null) {
-            //缓存命中！存到本地缓存，给下一次查询用
+            // L3 hit: backfill L2 and L1 with the shared base page.
+            writePageCache(localPageKey, fromCache);
             feedPublicCache.put(localPageKey, fromCache);
             // 对返回列表中的每个条目进行热度统计
             if (fromCache.items() != null) {
@@ -124,8 +132,9 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                     recordItemHotKey(item.id());
                 }
             }
-            log.info("feed.public source=3tier localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
-            return fromCache;
+            log.info("feed.public source=fragment localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
+            List<FeedItemResponse> enriched = enrich(fromCache.items(), currentUserIdNullable);
+            return new FeedPageResponse(enriched, fromCache.page(), fromCache.size(), fromCache.hasMore());
         }
 
         // 当上述两级缓存都没有数据，说明需要回源查数据库
@@ -136,8 +145,24 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         Object lock = singleFlight.computeIfAbsent(idsKey, k -> new Object());
         synchronized (lock) {
             // 重查 L2 缓存，避免重复回源
-            FeedPageResponse again = assembleFromCache(idsKey, hasMoreKey, safePage, safeSize, currentUserIdNullable);
+            FeedPageResponse pageAgain = readPageCache(localPageKey);
+            if (pageAgain != null) {
+                feedPublicCache.put(localPageKey, pageAgain);
+                if (pageAgain.items() != null) {
+                    for (FeedItemResponse item : pageAgain.items()) {
+                        recordItemHotKey(item.id());
+                    }
+                }
+                log.info("feed.public source=page(after-flight) localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
+                singleFlight.remove(idsKey);
+                List<FeedItemResponse> enriched = enrich(pageAgain.items(), currentUserIdNullable);
+                return new FeedPageResponse(enriched, pageAgain.page(), pageAgain.size(), pageAgain.hasMore());
+            }
+
+            // Recheck L3 after the single-flight lock.
+            FeedPageResponse again = assembleFromCache(idsKey, hasMoreKey, safePage, safeSize);
             if (again != null) {
+                writePageCache(localPageKey, again);
                 feedPublicCache.put(localPageKey, again);
                 // 对返回列表中的每个条目进行热度统计
                 if (again.items() != null) {
@@ -145,9 +170,10 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                         recordItemHotKey(item.id());
                     }
                 }
-                log.info("feed.public source=3tier(after-flight) localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
+                log.info("feed.public source=fragment(after-flight) localPageKey={} page={} size={}", localPageKey, safePage, safeSize);
                 singleFlight.remove(idsKey);
-                return again;
+                List<FeedItemResponse> enriched = enrich(again.items(), currentUserIdNullable);
+                return new FeedPageResponse(enriched, again.page(), again.size(), again.hasMore());
             }
 
             // 数据库回源：读取 size+1 以判断是否有下一页，后裁剪为当前页
@@ -172,7 +198,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             Duration frTtl = Duration.ofSeconds(baseTtl + jitter);
 
             // 写入片段缓存与本地缓存
-            writeCaches(localPageKey, idsKey, hasMoreKey, safeSize, rows, items, hasMore, frTtl);
+            writeCaches(localPageKey, idsKey, hasMoreKey, safePage, safeSize, rows, items, hasMore, frTtl);
             feedPublicCache.put(localPageKey, respForCache);
 
             // 返回时覆盖用户维度状态，不写回缓存
@@ -180,8 +206,8 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             List<FeedItemResponse> enriched = enrich(items, currentUserIdNullable);
             log.info("feed.public source=db localPageKey={} page={} size={} hasMore={}", localPageKey, safePage, safeSize, hasMore);
             // 释放单航班锁，允许后续请求正常进入
-            singleFlight.remove(idsKey);
 
+            singleFlight.remove(idsKey);
             return new FeedPageResponse(enriched, safePage, safeSize, hasMore);
         }
     }
@@ -238,6 +264,36 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         return out;
     }
 
+    private void recordPageHotKeys(FeedPageResponse page) {
+        if (page.items() == null) {
+            return;
+        }
+        for (FeedItemResponse item : page.items()) {
+            recordItemHotKey(item.id());
+        }
+    }
+
+    private FeedPageResponse readPageCache(String pageKey) {
+        try {
+            String pageJson = redis.opsForValue().get(pageKey);
+            if (pageJson == null) {
+                return null;
+            }
+            FeedPageResponse page = objectMapper.readValue(pageJson, FeedPageResponse.class);
+            return page.items() == null ? null : page;
+        } catch (Exception e) {
+            log.warn("feed.public L2 page cache read failed pageKey={}", pageKey, e);
+            return null;
+        }
+    }
+
+    private void writePageCache(String pageKey, FeedPageResponse page) {
+        try {
+            String pageJson = objectMapper.writeValueAsString(page);
+            redis.opsForValue().set(pageKey, pageJson, Duration.ofSeconds(20 + ThreadLocalRandom.current().nextInt(11)));
+        } catch (Exception ignored) {}
+    }
+
     /**
      * 从 Redis 片段缓存组装页面：
      * - idsKey：列表 ID 顺序
@@ -248,10 +304,9 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
      * @param hasMoreKey Redis 软缓存 hasMore Key
      * @param page 页码
      * @param size 每页大小
-     * @param uid 当前用户 ID（用于 liked/faved）
      * @return 组装完成的页面；不存在时返回 null
      */
-    private FeedPageResponse assembleFromCache(String idsKey, String hasMoreKey, int page, int size, Long uid) {
+    private FeedPageResponse assembleFromCache(String idsKey, String hasMoreKey, int page, int size) {
         // 需要展示知文的 ID 列表
         List<String> idList = redis.opsForList().range(idsKey, 0, size - 1);
         // 需要展示知文的: Redis String 取 hasMore 标记
@@ -285,7 +340,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         }
 
         //enrichment
-        List<FeedItemResponse> enriched = new ArrayList<>(idList.size());
+        List<FeedItemResponse> baseItems = new ArrayList<>(idList.size());
         for (int i = 0; i < idList.size(); i++) {
             FeedItemResponse base = items.get(i);
             if (base == null) {
@@ -296,11 +351,8 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             Long likeCount = counts.getOrDefault("like", 0L);
             Long favoriteCount = counts.getOrDefault("fav", 0L);
 
-            // 用户维度状态实时计算，不落入片段缓存以避免用户数据污染
-            boolean liked = uid != null && counterService.isLiked("knowpost", base.id(), uid);
-            boolean faved = uid != null && counterService.isFaved("knowpost", base.id(), uid);
-
-            enriched.add(new FeedItemResponse(
+            // Shared caches never store user-specific liked/faved flags.
+            baseItems.add(new FeedItemResponse(
                     base.id(),
                     base.title(),
                     base.description(),
@@ -311,15 +363,15 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                     base.tagJson(),
                     likeCount,
                     favoriteCount,
-                    liked,
-                    faved,
+                    null,
+                    null,
                     base.isTop())
             );
         }
         // hasMore 优先使用软缓存值；若缺失，则以“满页”作为兜底判断
         boolean hasMore = hasMoreStr != null ? "1".equals(hasMoreStr) : (idList.size() == size);
 
-        return new FeedPageResponse(enriched, page, size, hasMore);
+        return new FeedPageResponse(baseItems, page, size, hasMore);
     }
 
     /**
@@ -337,7 +389,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
      * @param hasMore 是否还有更多
      * @param frTtl 片段缓存 TTL
      */
-    private void writeCaches(String pageKey, String idsKey, String hasMoreKey, int size, List<KnowPostFeedRow> rows, List<FeedItemResponse> items, boolean hasMore, Duration frTtl) {
+    private void writeCaches(String pageKey, String idsKey, String hasMoreKey, int page, int size, List<KnowPostFeedRow> rows, List<FeedItemResponse> items, boolean hasMore, Duration frTtl) {
         List<String> idVals = new ArrayList<>();
 
         for (KnowPostFeedRow r : rows) {
@@ -371,6 +423,8 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                 redis.opsForValue().set(itemKey, itemJson, frTtl);
             } catch (Exception ignored) {}
         }
+
+        writePageCache(pageKey, new FeedPageResponse(items, page, size, hasMore));
     }
 
     /**

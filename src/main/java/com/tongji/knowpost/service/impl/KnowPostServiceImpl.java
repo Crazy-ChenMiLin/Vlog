@@ -622,6 +622,7 @@ public class KnowPostServiceImpl implements KnowPostService {
                         continue;
                     }
                     feedPublicCache.invalidate(localPageKey);
+                    redis.delete(localPageKey);
                     redis.opsForSet().remove(indexKey, localPageKey);
                 }
             } catch (Exception e) {
