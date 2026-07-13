@@ -146,6 +146,39 @@ class KnowPostServiceImplTest {
 
         assertThat(feedPublicCache.getIfPresent(pageKey)).isNull();
         verify(setOperations, times(2)).members(indexKey);
+        verify(ragIndexService).deletePost(postId);
+    }
+
+    @Test
+    void updateVisibilityDeletesRagChunksWhenPostBecomesPrivate() {
+        long postId = 790L;
+        when(mapper.updateVisibility(postId, 1L, "private")).thenReturn(1);
+
+        service.updateVisibility(1L, postId, "private");
+
+        verify(ragIndexService).deletePost(postId);
+        verify(ragIndexService, never()).ensureIndexed(postId);
+    }
+
+    @Test
+    void updateVisibilityEnsuresIndexWhenPostBecomesPublic() {
+        long postId = 791L;
+        when(mapper.updateVisibility(postId, 1L, "public")).thenReturn(1);
+
+        service.updateVisibility(1L, postId, "public");
+
+        verify(ragIndexService).ensureIndexed(postId);
+        verify(ragIndexService, never()).deletePost(postId);
+    }
+
+    @Test
+    void updateMetadataDeletesRagChunksWhenVisibilityIsNotPublic() {
+        long postId = 792L;
+        when(mapper.updateMetadata(any())).thenReturn(1);
+
+        service.updateMetadata(1L, postId, "title", null, List.of(), List.of(), "followers", false, "desc");
+
+        verify(ragIndexService).deletePost(postId);
     }
 
     @Test

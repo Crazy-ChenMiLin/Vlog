@@ -1,6 +1,8 @@
 package com.tongji.llm.rag;
 
 import lombok.RequiredArgsConstructor;
+import com.tongji.common.exception.BusinessException;
+import com.tongji.common.exception.ErrorCode;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.document.Document;
@@ -36,6 +38,9 @@ public class RagQueryService {
 
         // 检索上下文：先宽召回，再按 postId 做服务端过滤
         List<String> contexts = searchContexts(String.valueOf(postId), question, Math.max(1, topK));
+        if (contexts.isEmpty()) {
+            return Flux.just("未找到与问题相关的知文内容，请换一种问法或稍后再试。");
+        }
         // 组装上下文文本，分隔符用于提示词中分块标识
         String context = String.join("\n\n---\n\n", contexts);
 
@@ -64,9 +69,17 @@ public class RagQueryService {
      */
     private List<String> searchContexts(String postId, String query, int topK) {
         int fetchK = Math.max(topK * 3, 20); // 宽召回：扩大初始检索集合
-        List<Document> docs = vectorStore.similaritySearch(
-                SearchRequest.builder().query(query).topK(fetchK).build() // 语义相似检索
-        );
+        List<Document> docs;
+        try {
+            docs = vectorStore.similaritySearch(
+                    SearchRequest.builder().query(query).topK(fetchK).build()
+            );
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.RAG_RETRIEVAL_FAILED, "知识检索暂时不可用");
+        }
+        if (docs == null || docs.isEmpty()) {
+            return List.of();
+        }
         List<String> out = new ArrayList<>(topK);
         for (Document d : docs) {
             Object pid = d.getMetadata().get("postId");

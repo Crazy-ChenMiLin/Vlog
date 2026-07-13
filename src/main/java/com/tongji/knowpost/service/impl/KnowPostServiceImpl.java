@@ -170,6 +170,10 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
 
+        if (visible != null && !"public".equals(visible)) {
+            ragIndexService.deletePost(id);
+        }
+
         // 元数据变更后写入 Outbox 事件，驱动搜索索引更新
         try {
             long outId = idGen.nextId();
@@ -247,6 +251,16 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
 
+        if ("public".equals(visible)) {
+            try {
+                ragIndexService.ensureIndexed(id);
+            } catch (Exception e) {
+                log.warn("Pre-index after visibility update failed, post {}: {}", id, e.getMessage());
+            }
+        } else {
+            ragIndexService.deletePost(id);
+        }
+
         invalidateCache(id);
     }
 
@@ -261,6 +275,8 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
+
+        ragIndexService.deletePost(id);
 
         // 写入 Outbox 事件，驱动搜索索引软删
         try {
