@@ -116,6 +116,7 @@ public class FeedCacheInvalidationListener {
                 return;
             }
             // ==================== 步骤5：遍历所有受影响页面 → 更新两级缓存 ====================
+            //更新本地缓存
             for (String key : keys) {
                 // ========== 子步骤5.1：更新 L1 本地缓存（Caffeine） ==========
                 // 5.1.1 从本地缓存获取这个页面的数据

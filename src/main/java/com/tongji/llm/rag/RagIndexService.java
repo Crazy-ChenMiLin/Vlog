@@ -6,6 +6,8 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPostDetailRow;
 import com.tongji.config.EsProperties;
+import com.tongji.common.exception.BusinessException;
+import com.tongji.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +50,7 @@ public class RagIndexService {
         KnowPostDetailRow row = knowPostMapper.findDetailById(postId);
         if (row == null) {
             log.warn("Post {} not found", postId);
+            deletePost(postId);
             return 0;
         }
 
@@ -55,6 +58,7 @@ public class RagIndexService {
         // 步骤2：只处理“公开+已发布”的知文（私密/草稿不存）
         if (!"published".equalsIgnoreCase(row.getStatus()) || !"public".equalsIgnoreCase(row.getVisible())) {
             log.warn("Post {} is not public/published, skip indexing", postId);
+            deletePost(postId);
             return 0;
         }
 
@@ -75,8 +79,7 @@ public class RagIndexService {
         // 步骤5：下载知文的Markdown正文（比如从链接下载“Java入门.md”的内容）
         String text = fetchContent(row.getContentUrl());
         if (!StringUtils.hasText(text)) {
-            log.warn("Post {} content empty", postId);
-            return 0;
+            throw new BusinessException(ErrorCode.RAG_INDEX_FAILED, "知文正文为空或无法读取");
         }
 
         // 先按 Markdown 标题切段，再做固定长度切片（带重叠）
@@ -84,7 +87,7 @@ public class RagIndexService {
         List<String> chunks = chunkMarkdown(text);
         // 幂等 upsert：先删除旧切片
         // 步骤7：先删旧卡片（避免旧内容残留）
-        deleteExistingChunks(postId);
+        deletePost(postId);
 
         // 组装 Document（文本 + 业务元数据），用于向量写入与检索过滤
         // 步骤8：给每个小块加“标签”（元数据），组装成Document（向量库能识别的格式）
@@ -105,8 +108,8 @@ public class RagIndexService {
             // 批量写入向量库
             vectorStore.add(docs);
         } catch (Exception e) {
-            log.error("VectorStore add failed: {}", e.getMessage());
-            return 0;
+            log.error("VectorStore add failed for post {}: {}", postId, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.RAG_INDEX_FAILED, "知识索引写入失败");
         }
         // 返回本次写入的切片数量
         return docs.size();
@@ -154,16 +157,22 @@ public class RagIndexService {
     /**
      * 删除旧切片：按 metadata.postId 精确删除，确保 upsert 幂等
      */
-    private void deleteExistingChunks(long postId) {
+    public void deletePost(long postId) {
         try {
-            if (!StringUtils.hasText(esProps.getIndex())) return;
+            if (!StringUtils.hasText(esProps.getIndex())) {
+                throw new BusinessException(ErrorCode.RAG_INDEX_FAILED, "未配置向量索引名称");
+            }
             es.deleteByQuery(d -> d
                     .index(esProps.getIndex())
                     .query(q -> q.term(t -> t
                             .field("metadata.postId")
                             .value(v -> v.stringValue(String.valueOf(postId))))));
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Delete old chunks failed for post {}: {}", postId, e.getMessage());
+            log.error("Delete chunks failed for post {} from index {}: {}",
+                    postId, esProps.getIndex(), e.getMessage(), e);
+            throw new BusinessException(ErrorCode.RAG_INDEX_FAILED, "旧知识切片删除失败");
         }
     }
 
@@ -179,7 +188,7 @@ public class RagIndexService {
         try {
             return http.getForObject(url, String.class);
         } catch (Exception e) {
-            log.error("Fetch content failed: {}", e.getMessage());
+            log.error("Fetch content failed from {}: {}", url, e.getMessage(), e);
             return null;
         }
     }
