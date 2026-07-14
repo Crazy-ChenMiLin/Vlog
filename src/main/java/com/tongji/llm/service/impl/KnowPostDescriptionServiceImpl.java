@@ -5,7 +5,7 @@ import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -31,10 +31,8 @@ public class KnowPostDescriptionServiceImpl implements KnowPostDescriptionServic
                     .prompt()
                     .system(system)
                     .user(user)
-                    .options(DeepSeekChatOptions.builder()
-                            .model("deepseek-chat")
+                    .options(OpenAiChatOptions.builder()
                             .temperature(0.8)
-                            .maxTokens(120)
                             .build())
                     .call()
                     .content();

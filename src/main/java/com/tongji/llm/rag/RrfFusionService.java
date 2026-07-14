@@ -17,7 +17,7 @@ import java.util.Map;
  * 那么它更可能是用户需要的内容。
  */
 @Component
-public class RrfFusion {
+public class RrfFusionService {
 
 
     /**
