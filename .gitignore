@@ -7,6 +7,10 @@ zhiguang_be/
 .agents/
 .workbuddy/
 
+# RAG local notes / change docs
+头像缓存失效方案.md
+知光知识社区_RAG改动文档_v2.md
+
 # Local config / secrets
 **/application.yml
 **/application-*.yml

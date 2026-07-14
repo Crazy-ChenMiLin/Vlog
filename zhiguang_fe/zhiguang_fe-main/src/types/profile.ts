@@ -15,7 +15,7 @@ export type ProfileUpdateRequest = {
 export type ProfileResponse = {
   id: number;
   nickname: string;
-  avatar: string;
+  avatar?: string | null;
   bio?: string;
   zgId?: string;
   gender?: Gender;

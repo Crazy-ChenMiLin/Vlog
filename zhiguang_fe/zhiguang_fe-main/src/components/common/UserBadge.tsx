@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import styles from "./UserBadge.module.css";
 
 type UserBadgeProps = {
@@ -9,11 +10,22 @@ type UserBadgeProps = {
 const getInitial = (value: string) => value.trim().charAt(0).toUpperCase() || "?";
 
 const UserBadge = ({ name, alias, avatarUrl }: UserBadgeProps) => {
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUrl]);
+
   return (
     <div className={styles.badge}>
       <div className={styles.avatar}>
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="avatar" className={styles.avatarImg} />
+        {avatarUrl && !avatarLoadFailed ? (
+          <img
+            src={avatarUrl}
+            alt="avatar"
+            className={styles.avatarImg}
+            onError={() => setAvatarLoadFailed(true)}
+          />
         ) : (
           getInitial(name)
         )}

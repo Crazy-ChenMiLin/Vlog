@@ -28,7 +28,7 @@ import type { Gender } from "@/types/profile";
 export type AuthUserResponse = {
   id: number;
   nickname: string;
-  avatar: string;
+  avatar?: string | null;
   phone: string;
   email?: string;
   // 新增字段，与后端 auth/me 响应保持一致
