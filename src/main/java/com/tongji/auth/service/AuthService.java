@@ -113,7 +113,9 @@ public class AuthService {
                 .phone(request.identifierType() == IdentifierType.PHONE ? identifier : null)
                 .email(request.identifierType() == IdentifierType.EMAIL ? identifier : null)
                 .nickname(generateNickname())
-                .avatar("https://static.zhiguang.cn/default-avatar.png")
+                // 未上传头像时保持为空，由客户端显示昵称首字兜底。
+                // 不写入不可控的固定域名，避免域名失效后所有新用户都显示破图。
+                .avatar(null)
                 .bio(null)
                 .tagsJson("[]")
                 .build();
