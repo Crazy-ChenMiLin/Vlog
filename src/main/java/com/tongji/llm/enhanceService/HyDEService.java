@@ -1,8 +1,7 @@
 package com.tongji.llm.enhanceService;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
@@ -11,11 +10,10 @@ import org.springframework.util.StringUtils;
 /**
  * HyDE 查询转换服务：生成一段接近知识库正文的假设性答案，仅用于向量检索。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class HyDEService {
-    private static final Logger log = LoggerFactory.getLogger(HyDEService.class);
-
     private final ChatClient chatClient;
 
     /**
