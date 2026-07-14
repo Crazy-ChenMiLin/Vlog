@@ -2,6 +2,8 @@ package com.tongji.knowpost.api;
 
 import com.tongji.llm.rag.RagIndexService;
 import com.tongji.llm.rag.RagQueryService;
+import com.tongji.llm.rag.RagDebugService;
+import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -26,6 +28,7 @@ public class KnowPostRagController {
 
     private final RagIndexService indexService;
     private final RagQueryService ragQueryService;
+    private final RagDebugService ragDebugService;
 
     /**
      * 单篇知文 RAG 问答，保持默认 SSE message 以兼容现有前端。
@@ -37,6 +40,14 @@ public class KnowPostRagController {
             @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK,
             @RequestParam(value = "maxTokens", defaultValue = "1024") @Min(128) @Max(4096) int maxTokens) {
         return ragQueryService.streamAnswerFlux(id, question.trim(), topK, maxTokens);
+    }
+
+    @GetMapping("/{id}/qa/debug")
+    public RagRetrievalDebugDTO qaDebug(
+            @PathVariable("id") @Positive long id,
+            @RequestParam("question") @NotBlank @Size(max = 500) String question,
+            @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK) {
+        return ragDebugService.debugRetrieval(id, question.trim(), topK);
     }
 
     /**
