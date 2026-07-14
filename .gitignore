@@ -21,6 +21,9 @@ src/main/resources/application-*.yml
 #1
 docs-user/
 
+# Local RAG experiments/tests
+src/test/java/com/tongji/llm/
+
 # Eclipse
 .apt_generated
 .classpath
