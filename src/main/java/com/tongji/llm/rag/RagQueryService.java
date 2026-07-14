@@ -1,6 +1,7 @@
 package com.tongji.llm.rag;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.rag.config.RagProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -19,15 +20,30 @@ import java.util.List;
 public class RagQueryService {
     private final ChatClient chatClient;
     private final RagRetrievalService retrievalService;
+    private final RagProperties ragProperties;
 
-    public Flux<String> streamAnswerFlux(long postId, String question, int topK, int maxTokens) {
-        RagRetrievalResultDTO retrieval = retrievalService.retrieve(postId, question, topK);
+    public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
+        RagRetrievalResultDTO retrieval = retrievalService.retrieveForPost(postId, question, topK);
+        return streamAnswerInternal(retrieval, question,
+                "未找到与问题相关的当前文章内容，请换一种问法后再试。");
+    }
+
+    public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
+        RagRetrievalResultDTO retrieval = retrievalService.retrieveGlobal(question, topK);
+        return streamAnswerInternal(retrieval, question,
+                "未找到与问题相关的知识库内容，请换一种问法后再试。");
+    }
+
+    private Flux<String> streamAnswerInternal(
+            RagRetrievalResultDTO retrieval,
+            String question,
+            String emptyResultMessage) {
         List<String> contexts = retrieval.fusedDocs().stream()
                 .map(Document::getText)
                 .filter(StringUtils::hasText)
                 .toList();
         if (contexts.isEmpty()) {
-            return Flux.just("未找到与问题相关的当前文章内容，请换一种问法后再试。");
+            return Flux.just(emptyResultMessage);
         }
 
         String context = String.join("\n\n---\n\n", contexts);
@@ -41,6 +57,7 @@ public class RagQueryService {
                 .user(user)
                 .options(OpenAiChatOptions.builder()
                         .temperature(0.2)
+                        .maxCompletionTokens(ragProperties.getAnswer().getMaxTokens())
                         .build())
                 .stream()
                 .content();

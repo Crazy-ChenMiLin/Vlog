@@ -3,10 +3,11 @@ package com.tongji.llm.DTO;
 import java.util.List;
 
 /**
- * Read-only view of the three retrieval stages used by single-post RAG.
+ * Read-only view of the three retrieval stages used by single-post or global RAG.
  */
 public record RagRetrievalDebugDTO(
-        long postId,
+        String scope,
+        Long postId,
         String question,
         String hypotheticalAnswer,
         double similarityThreshold,
@@ -16,6 +17,7 @@ public record RagRetrievalDebugDTO(
 ) {
     public record RetrievedChunk(
             int rank,
+            String postId,
             String chunkId,
             String title,
             Integer position,
