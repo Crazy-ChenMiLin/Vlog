@@ -17,7 +17,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 
 /**
- * 负责单篇文章的原问题检索、HyDE 检索和 RRF 融合。
+ * 负责单篇或全库的原问题检索、HyDE 检索和 RRF 融合。
  */
 @Slf4j
 @Service
@@ -30,20 +30,28 @@ public class RagRetrievalService {
     private final HyDEService hydeService;
     private final RrfFusionService rrfFusion;
 
-    public RagRetrievalResultDTO retrieve(long postId, String question, int topK) {
+    public RagRetrievalResultDTO retrieveForPost(long postId, String question, int topK) {
         indexService.ensureIndexed(postId);
+        return retrieveInternal(postId, question, topK);
+    }
 
+    public RagRetrievalResultDTO retrieveGlobal(String question, int topK) {
+        return retrieveInternal(null, question, topK);
+    }
+
+    private RagRetrievalResultDTO retrieveInternal(Long postId, String question, int topK) {
         String hypotheticalAnswer = hydeService.generateHypotheticalAnswer(question);
-        List<Document> originalDocs = searchDocuments(String.valueOf(postId), question, topK);
+        List<Document> originalDocs = searchDocuments(postId, question, topK);
         List<Document> hydeDocs = StringUtils.hasText(hypotheticalAnswer)
-                ? searchDocuments(String.valueOf(postId), hypotheticalAnswer, topK)
+                ? searchDocuments(postId, hypotheticalAnswer, topK)
                 : List.of();
         List<Document> fusedDocs = hydeDocs.isEmpty()
                 ? originalDocs.stream().limit(topK).toList()
                 : rrfFusion.fuse(List.of(originalDocs, hydeDocs), topK);
 
-        log.info("RAG retrieval postId={} original={} hyde={} fused={}",
-                postId, chunkIds(originalDocs), chunkIds(hydeDocs), chunkIds(fusedDocs));
+        String scope = postId == null ? "global" : "post:" + postId;
+        log.info("RAG retrieval scope={} original={} hyde={} fused={}",
+                scope, chunkIds(originalDocs), chunkIds(hydeDocs), chunkIds(fusedDocs));
         return new RagRetrievalResultDTO(
                 hypotheticalAnswer,
                 MIN_SIMILARITY_SCORE,
@@ -53,17 +61,19 @@ public class RagRetrievalService {
         );
     }
 
-    private List<Document> searchDocuments(String postId, String query, int topK) {
+    private List<Document> searchDocuments(Long postId, String query, int topK) {
         try {
-            var postFilter = new FilterExpressionBuilder().eq("postId", postId).build();
-            List<Document> docs = vectorStore.similaritySearch(
-                    SearchRequest.builder()
-                            .query(query)
-                            .topK(topK)
-                            .similarityThreshold(MIN_SIMILARITY_SCORE)
-                            .filterExpression(postFilter)
-                            .build()
-            );
+            var requestBuilder = SearchRequest.builder()
+                    .query(query)
+                    .topK(topK)
+                    .similarityThreshold(MIN_SIMILARITY_SCORE);
+            if (postId != null) {
+                var postFilter = new FilterExpressionBuilder()
+                        .eq("postId", String.valueOf(postId))
+                        .build();
+                requestBuilder.filterExpression(postFilter);
+            }
+            List<Document> docs = vectorStore.similaritySearch(requestBuilder.build());
             if (docs == null || docs.isEmpty()) {
                 return List.of();
             }
