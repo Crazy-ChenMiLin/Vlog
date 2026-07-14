@@ -19,9 +19,23 @@ import java.util.stream.IntStream;
 public class RagDebugService {
     private final RagRetrievalService retrievalService;
 
-    public RagRetrievalDebugDTO debugRetrieval(long postId, String question, int topK) {
-        RagRetrievalResultDTO result = retrievalService.retrieve(postId, question, topK);
+    public RagRetrievalDebugDTO debugPostRetrieval(long postId, String question, int topK) {
+        RagRetrievalResultDTO result = retrievalService.retrieveForPost(postId, question, topK);
+        return toDebugResult("post", postId, question, result);
+    }
+
+    public RagRetrievalDebugDTO debugGlobalRetrieval(String question, int topK) {
+        RagRetrievalResultDTO result = retrievalService.retrieveGlobal(question, topK);
+        return toDebugResult("global", null, question, result);
+    }
+
+    private RagRetrievalDebugDTO toDebugResult(
+            String scope,
+            Long postId,
+            String question,
+            RagRetrievalResultDTO result) {
         return new RagRetrievalDebugDTO(
+                scope,
                 postId,
                 question,
                 result.hypotheticalAnswer(),
@@ -42,6 +56,7 @@ public class RagDebugService {
         Map<String, Object> metadata = document.getMetadata();
         return new RagRetrievalDebugDTO.RetrievedChunk(
                 rank,
+                stringValue(metadata.get("postId")),
                 stringValue(metadata.get("chunkId")),
                 stringValue(metadata.get("title")),
                 integerValue(metadata.get("position")),
