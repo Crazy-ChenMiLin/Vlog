@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -29,6 +30,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class RagIndexService {
     private static final Logger log = LoggerFactory.getLogger(RagIndexService.class);
+    private static final String INDEX_VERSION = "utf8-v1";
     // 向量库封装（Elasticsearch VectorStore），负责写入/检索向量
     private final VectorStore vectorStore;
     // 数据访问：根据 postId 查询知文详情（含 contentUrl、指纹等）
@@ -100,6 +102,7 @@ public class RagIndexService {
             meta.put("position", i);
             meta.put("contentEtag", currentEtag);
             meta.put("contentSha256", currentSha);
+            meta.put("indexVersion", INDEX_VERSION);
             meta.put("contentUrl", row.getContentUrl());
             meta.put("title", row.getTitle());
             docs.add(new Document(chunks.get(i), meta));
@@ -141,6 +144,10 @@ public class RagIndexService {
             if (!(metaObj instanceof Map<?, ?> meta)) return false;
             String indexedSha = asString(meta.get("contentSha256"));
             String indexedEtag = asString(meta.get("contentEtag"));
+            String indexVersion = asString(meta.get("indexVersion"));
+            if (!Objects.equals(INDEX_VERSION, indexVersion)) {
+                return false;
+            }
             if (StringUtils.hasText(currentSha) && StringUtils.hasText(indexedSha)) {
                 return Objects.equals(currentSha, indexedSha);
             }
@@ -186,7 +193,8 @@ public class RagIndexService {
      */
     private String fetchContent(String url) {
         try {
-            return http.getForObject(url, String.class);
+            byte[] bytes = http.getForObject(url, byte[].class);
+            return bytes == null ? null : new String(bytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
             log.error("Fetch content failed from {}: {}", url, e.getMessage(), e);
             return null;
