@@ -1,4 +1,4 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.enhanceService;
 
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

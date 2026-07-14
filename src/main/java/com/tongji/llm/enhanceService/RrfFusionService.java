@@ -1,4 +1,4 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.enhanceService;
 
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
