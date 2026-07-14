@@ -113,3 +113,40 @@
     display: none;
   }
 }
+
+@media (max-width: 600px) {
+  .sidebar {
+    gap: 8px;
+    min-width: 0;
+    padding: 10px 12px;
+    overflow: hidden;
+  }
+
+  .logo {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 14px;
+  }
+
+  .nav {
+    min-width: 0;
+    flex: 1;
+    gap: 2px;
+    justify-content: space-between;
+  }
+
+  .link {
+    min-width: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 2px;
+    padding: 5px 2px;
+    font-size: 11px;
+  }
+
+  .link svg {
+    width: 20px;
+    height: 20px;
+  }
+}

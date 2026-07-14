@@ -84,6 +84,7 @@ a {
 
 .app-shell {
   width: min(1400px, 100%);
+  min-width: 0;
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;

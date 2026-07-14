@@ -4,6 +4,11 @@ const getBaseUrl = () => {
   return envBase?.replace(/\/$/, "") ?? "";
 };
 
+export const resolveApiUrl = (path: string) => {
+  const baseUrl = getBaseUrl();
+  return baseUrl ? `${baseUrl}${path}` : path;
+};
+
 export type ApiFetchOptions = {
   method?: string;
   headers?: Record<string, string>;
@@ -24,7 +29,6 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<TResponse>(path: string, options: ApiFetchOptions = {}): Promise<TResponse> {
-  const baseUrl = getBaseUrl();
   const { method = "GET", headers = {}, body, accessToken, signal } = options;
 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
@@ -69,7 +73,7 @@ export async function apiFetch<TResponse>(path: string, options: ApiFetchOptions
     }
   }
 
-  const url = baseUrl ? `${baseUrl}${path}` : path;
+  const url = resolveApiUrl(path);
   const response = await fetch(url, {
     method,
     headers: mergedHeaders,

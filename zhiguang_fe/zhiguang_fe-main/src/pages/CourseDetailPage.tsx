@@ -14,6 +14,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import FollowButton from "@/components/common/FollowButton";
+import { useRagStream } from "@/features/rag/useRagStream";
+import { resolveApiUrl } from "@/services/apiClient";
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,12 +36,16 @@ const CourseDetailPage = () => {
   const [isTouch, setIsTouch] = useState(false);
   // RAG 问答状态
   const [ragQuestion, setRagQuestion] = useState<string>("");
-  const [ragAnswer, setRagAnswer] = useState<string>("");
-  const [ragLoading, setRagLoading] = useState<boolean>(false);
-  const [ragError, setRagError] = useState<string | null>(null);
-  const ragESRef = useRef<EventSource | null>(null);
-  const [ragTopK, setRagTopK] = useState<number>(5);
-  const [ragMaxTokens, setRagMaxTokens] = useState<number>(1024);
+  const [ragValidationError, setRagValidationError] = useState<string | null>(null);
+  const ragTopK = 5;
+  const {
+    answer: ragAnswer,
+    loading: ragLoading,
+    error: ragStreamError,
+    start: startRagStream,
+    stop: stopRag
+  } = useRagStream();
+  const ragError = ragValidationError ?? ragStreamError;
   // 从头像 URL 推断作者 ID（示例：.../avatars/3-xxxx.jpg → 3）
   const parseAvatarUserId = (url?: string): number | undefined => {
     if (!url) return undefined;
@@ -149,48 +155,13 @@ const CourseDetailPage = () => {
     const q = ragQuestion.trim();
     if (!q) return;
     if (detail && detail.visible !== "public") {
-      setRagError("仅公开知文支持问答");
+      setRagValidationError("仅公开知文支持问答");
       return;
     }
-    setRagError(null);
-    setRagAnswer("");
-    // 关闭之前的连接
-    if (ragESRef.current) {
-      try { ragESRef.current.close(); } catch {}
-      ragESRef.current = null;
-    }
-    const url = `/api/v1/knowposts/${id}/qa/stream?question=${encodeURIComponent(q)}&topK=${ragTopK}&maxTokens=${ragMaxTokens}`;
-    const es = new EventSource(url);
-    ragESRef.current = es;
-    setRagLoading(true);
-    es.onmessage = (e) => {
-      setRagAnswer((prev) => prev + (e.data ?? ""));
-    };
-    es.onerror = () => {
-      setRagLoading(false);
-      // 不展示“连接中断或后端异常”，静默关闭连接
-      try { es.close(); } catch {}
-      ragESRef.current = null;
-    };
+    setRagValidationError(null);
+    const query = new URLSearchParams({ question: q, topK: String(ragTopK) });
+    startRagStream(resolveApiUrl(`/api/v1/knowposts/${id}/qa/stream?${query.toString()}`));
   };
-
-  const stopRag = () => {
-    if (ragESRef.current) {
-      try { ragESRef.current.close(); } catch {}
-      ragESRef.current = null;
-    }
-    setRagLoading(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      // 页面卸载时关闭 SSE
-      if (ragESRef.current) {
-        try { ragESRef.current.close(); } catch {}
-        ragESRef.current = null;
-      }
-    };
-  }, []);
 
   return (
     <AppLayout
