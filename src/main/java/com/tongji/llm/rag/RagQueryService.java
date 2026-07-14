@@ -1,7 +1,6 @@
 package com.tongji.llm.rag;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
-import com.tongji.llm.rag.config.RagProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -20,7 +19,6 @@ import java.util.List;
 public class RagQueryService {
     private final ChatClient chatClient;
     private final RagRetrievalService retrievalService;
-    private final RagProperties ragProperties;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
         RagRetrievalResultDTO retrieval = retrievalService.retrieveForPost(postId, question, topK);
@@ -57,7 +55,6 @@ public class RagQueryService {
                 .user(user)
                 .options(OpenAiChatOptions.builder()
                         .temperature(0.2)
-                        .maxCompletionTokens(ragProperties.getAnswer().getMaxTokens())
                         .build())
                 .stream()
                 .content();

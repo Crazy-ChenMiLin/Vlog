@@ -7,6 +7,7 @@ import com.tongji.common.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -62,6 +63,18 @@ public class GlobalExceptionHandler {
         Map<String, Object> body = new HashMap<>();
         body.put("code", ErrorCode.BAD_REQUEST.getCode());
         body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    /**
+     * 缺少必填查询参数时统一返回 HTTP 400。
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingRequestParameter(
+            MissingServletRequestParameterException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", ErrorCode.BAD_REQUEST.getCode());
+        body.put("message", "缺少必填参数：" + ex.getParameterName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
