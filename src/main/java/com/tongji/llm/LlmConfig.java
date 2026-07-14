@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class LlmConfig {
     @Bean
-    public ChatClient chatClient(@Qualifier("deepSeekChatModel") ChatModel chatModel) {
+    public ChatClient chatClient(@Qualifier("openAiChatModel") ChatModel chatModel) {
         return ChatClient.builder(chatModel).build();
     }
 }

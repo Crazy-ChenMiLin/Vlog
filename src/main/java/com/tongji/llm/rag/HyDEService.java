@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -35,10 +35,8 @@ public class HyDEService {
                     .prompt()
                     .system(system)
                     .user(user)
-                    .options(DeepSeekChatOptions.builder()
-                            .model("deepseek-chat")
+                    .options(OpenAiChatOptions.builder()
                             .temperature(0.3)
-                            .maxTokens(180)
                             .build())
                     .call()
                     .content();
