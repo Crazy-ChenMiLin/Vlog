@@ -80,6 +80,7 @@ const CourseCard = ({
   const [detail, setDetail] = useState<KnowpostDetailResponse | null>(null);
   const [menuLoading, setMenuLoading] = useState(false);
   const [menuError, setMenuError] = useState<string | null>(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -106,6 +107,10 @@ const CourseCard = ({
   };
 
   // 点击卡片其他区域收起菜单
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [teacher.avatarUrl]);
+
   useEffect(() => {
     if (!menuOpen) return;
     const onDocClick = (e: MouseEvent) => {
@@ -210,8 +215,13 @@ const CourseCard = ({
 
       <div className={styles.meta}>
         <div className={styles.teacher}>
-          {teacher.avatarUrl ? (
-            <img className={styles.teacherAvatarImg} src={teacher.avatarUrl} alt={teacher.name} />
+          {teacher.avatarUrl && !avatarLoadFailed ? (
+            <img
+              className={styles.teacherAvatarImg}
+              src={teacher.avatarUrl}
+              alt={teacher.name}
+              onError={() => setAvatarLoadFailed(true)}
+            />
           ) : (
             <div className={styles.teacherAvatar}>{teacher.avatarText ?? (teacher.name?.charAt(0) || "?")}</div>
           )}
