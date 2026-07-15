@@ -1,54 +1,67 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import MainHeader from "@/components/layout/MainHeader";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import { knowpostService } from "@/services/knowpostService";
+import type { FeedItem } from "@/types/knowpost";
 import AuthStatus from "@/features/auth/AuthStatus";
 import GlobalRagChat from "@/components/rag/GlobalRagChat";
 import styles from "./HomePage.module.css";
 
+const PAGE_SIZE = 20;
+
 const HomePage = () => {
-  const [items, setItems] = useState<Array<{
-    id: string;
-    title: string;
-    description: string;
-    coverImage?: string;
-    tags: string[];
-    tagJson?: string;
-    authorAvatar?: string;
-    authorAvator?: string;
-    authorNickname: string;
-    likeCount?: number;
-    favoriteCount?: number;
-    liked?: boolean;
-    faved?: boolean;
-  }>>([]);
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const loadPage = useCallback(async (nextPage: number, append = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const resp = await knowpostService.feed(nextPage, PAGE_SIZE);
+      setItems(prev => append ? [...prev, ...(resp.items ?? [])] : (resp.items ?? []));
+      setPage(resp.page ?? nextPage);
+      setHasMore(Boolean(resp.hasMore));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "加载失败";
+      setError(msg);
+    } finally {
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const resp = await knowpostService.feed(1, 20);
-        if (!cancelled) {
-          setItems(resp.items ?? []);
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "加载失败";
-        if (!cancelled) setError(msg);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await loadPage(1);
     };
-    run();
+    if (!cancelled) {
+      void run();
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadPage]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      void loadPage(page + 1, true);
+    }
+  };
 
   return (
     <AppLayout
@@ -91,8 +104,24 @@ const HomePage = () => {
             </div>
           ))}
         </div>
-        {loading ? <div className={styles.feedState}>加载中…</div> : null}
+        {loading ? <div className={styles.feedState}>加载中...</div> : null}
         {!loading && items.length === 0 ? <div className={styles.feedState}>暂无内容</div> : null}
+        {!loading && items.length > 0 ? (
+          <div className={styles.feedActions}>
+            {hasMore ? (
+              <button
+                type="button"
+                className={styles.loadMoreButton}
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "加载中..." : "加载更多"}
+              </button>
+            ) : (
+              <span className={styles.feedEnd}>已经到底了</span>
+            )}
+          </div>
+        ) : null}
       </section>
     </AppLayout>
   );

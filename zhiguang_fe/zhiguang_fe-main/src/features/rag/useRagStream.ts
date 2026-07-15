@@ -2,6 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const CONNECTION_ERROR = "无法连接问答服务，请确认后端已启动后重试。";
 
+type StartOptions = {
+  method?: "GET" | "POST";
+  body?: unknown;
+  onMeta?: (meta: unknown) => void;
+};
+
+const getStoredAccessToken = (): string | null => {
+  try {
+    const raw = localStorage.getItem("zhiguang_auth_tokens");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { accessToken?: string };
+    return parsed.accessToken ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export const useRagStream = () => {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +33,7 @@ export const useRagStream = () => {
     setLoading(false);
   }, []);
 
-  const start = useCallback((url: string) => {
+  const start = useCallback((url: string, options: StartOptions = {}) => {
     stop();
     answerRef.current = "";
     setAnswer("");
@@ -38,13 +55,22 @@ export const useRagStream = () => {
       while (match?.index !== undefined) {
         const eventBlock = buffer.slice(0, match.index);
         buffer = buffer.slice(match.index + match[0].length);
-        const dataLines = eventBlock
-          .split(/\r?\n/)
+        const lines = eventBlock.split(/\r?\n/);
+        const eventType = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() || "message";
+        const dataLines = lines
           .filter((line) => line.startsWith("data:"))
           .map((line) => line.slice(5));
         if (dataLines.length) {
           const payload = dataLines.join("\n");
-          appendChunk(payload === "" ? "\n" : payload);
+          if (eventType === "meta") {
+            try {
+              options.onMeta?.(JSON.parse(payload));
+            } catch {
+              options.onMeta?.(payload);
+            }
+          } else if (eventType === "message") {
+            appendChunk(payload === "" ? "\n" : payload);
+          }
         }
         match = buffer.match(/\r?\n\r?\n/);
       }
@@ -53,8 +79,18 @@ export const useRagStream = () => {
 
     void (async () => {
       try {
+        const headers: Record<string, string> = { Accept: "text/event-stream" };
+        if (options.method === "POST") {
+          headers["Content-Type"] = "application/json";
+          const token = getStoredAccessToken();
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+          }
+        }
         const response = await fetch(url, {
-          headers: { Accept: "text/event-stream" },
+          method: options.method ?? "GET",
+          headers,
+          body: options.body ? JSON.stringify(options.body) : undefined,
           credentials: "include",
           signal: controller.signal
         });
