@@ -108,3 +108,33 @@ CREATE TABLE IF NOT EXISTS follower (
     KEY idx_to_created (to_user_id, created_at, from_user_id, rel_status),
     KEY idx_from (from_user_id, to_user_id, rel_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS rag_conversation (
+    id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    scope VARCHAR(16) NOT NULL,
+    post_id BIGINT UNSIGNED NULL,
+    title VARCHAR(128) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    KEY ix_rag_conversation_user_updated (user_id, updated_at),
+    KEY ix_rag_conversation_user_scope_updated (user_id, scope, updated_at),
+    KEY ix_rag_conversation_user_post_updated (user_id, post_id, updated_at),
+    CONSTRAINT fk_rag_conversation_user FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT fk_rag_conversation_post FOREIGN KEY (post_id) REFERENCES know_posts(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS rag_message (
+    id BIGINT UNSIGNED NOT NULL,
+    conversation_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    role VARCHAR(16) NOT NULL,
+    content MEDIUMTEXT NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    KEY ix_rag_message_conversation_created (conversation_id, created_at),
+    KEY ix_rag_message_user_created (user_id, created_at),
+    CONSTRAINT fk_rag_message_conversation FOREIGN KEY (conversation_id) REFERENCES rag_conversation(id) ON DELETE CASCADE,
+    CONSTRAINT fk_rag_message_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
