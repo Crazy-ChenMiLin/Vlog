@@ -57,6 +57,7 @@ const GlobalRagChat = () => {
 
     setLocalError(null);
     setSubmittedQuestion(normalizedQuestion);
+    setQuestion("");
     start(resolveApiUrl("/api/v1/knowposts/qa/chat/stream"), {
       method: "POST",
       body: {
