@@ -1,9 +1,12 @@
 package com.tongji.knowpost.api;
 
+import com.tongji.auth.token.JwtService;
+import com.tongji.knowpost.api.dto.RagChatStreamRequest;
+import com.tongji.llm.DTO.RagRetrievalDebugDTO;
+import com.tongji.llm.rag.RagDebugService;
 import com.tongji.llm.rag.RagIndexService;
 import com.tongji.llm.rag.RagQueryService;
-import com.tongji.llm.rag.RagDebugService;
-import com.tongji.llm.DTO.RagRetrievalDebugDTO;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -11,10 +14,14 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +36,7 @@ public class KnowPostRagController {
     private final RagIndexService indexService;
     private final RagQueryService ragQueryService;
     private final RagDebugService ragDebugService;
+    private final JwtService jwtService;
 
     /**
      * 单篇知文 RAG 问答，保持默认 SSE message 以兼容现有前端。
@@ -49,6 +57,21 @@ public class KnowPostRagController {
             @RequestParam("question") @NotBlank @Size(max = 500) String question,
             @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK) {
         return ragQueryService.streamGlobalAnswerFlux(question.trim(), topK);
+    }
+
+    @PostMapping(value = "/qa/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatStream(
+            @Valid @RequestBody RagChatStreamRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        long userId = jwtService.extractUserId(jwt);
+        return ragQueryService.streamChatAnswerFlux(
+                userId,
+                request.conversationId(),
+                request.scope(),
+                request.postId(),
+                request.question().trim(),
+                request.safeTopK()
+        );
     }
 
     @GetMapping("/{id}/qa/debug")
