@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-在现有 RAG 流程基础上加入“会话记忆 + 查询改写”，让用户可以进行连续追问。
+在现有 RAG 流程基础上加入“会话记忆 + 查询改写”，让用户可以连续追问，并且支持跨设备继续同一个会话。
 
 当前流程：
 
@@ -40,7 +40,7 @@ fusedDocs 负责最终知识上下文
 
 Memory 版接口必须登录，因为会话必须和用户绑定。
 
-会话需要区分两种 scope：
+会话区分两种 scope：
 
 ```text
 global：全库问答
@@ -51,7 +51,7 @@ post：单篇文章问答
 
 ```json
 {
-  "conversationId": "userId_snowflakeId",
+  "id": "335888888888888888",
   "userId": "123",
   "scope": "global",
   "postId": null,
@@ -61,11 +61,11 @@ post：单篇文章问答
 }
 ```
 
-如果是单篇文章对话：
+单篇文章对话：
 
 ```json
 {
-  "conversationId": "123_335888888888888888",
+  "id": "335999999999999999",
   "userId": "123",
   "scope": "post",
   "postId": "335239846949949440",
@@ -85,42 +85,62 @@ conversationId 存在但查不到：拒绝，404
 scope/postId 与会话记录不一致：拒绝
 ```
 
-注意：`conversationId = userId + "_" + snowflakeId` 只是方便识别，真正的权限校验必须看后端保存的 conversation metadata。
+注意：权限校验必须看数据库里的 `user_id`，不能只依赖前端传参。
 
-## 3. 文件版 Memory 存储
+## 3. 数据库存储
 
-第一版先不进 DB，使用 JSONL 文件落地，后续可平滑迁移到数据库。
+第一版直接落到 MySQL，不使用 JSONL 文件。
 
-会话列表：
-
-```text
-data/rag-conversations/users/{userId}/conversations.jsonl
-```
-
-每行一个 conversation：
-
-```jsonl
-{"conversationId":"123_1","userId":"123","scope":"global","postId":null,"title":"全库问答","createdAt":"...","updatedAt":"..."}
-{"conversationId":"123_2","userId":"123","scope":"post","postId":"335239846949949440","title":"Redis 缓存观测样例","createdAt":"...","updatedAt":"..."}
-```
-
-消息文件：
+原因：
 
 ```text
-data/rag-conversations/users/{userId}/messages/{conversationId}.jsonl
+需要登录态 userId 隔离
+需要跨设备继续会话
+需要多会话列表
+需要 global/post scope 隔离
+后续可能增加删除、分页、标题、搜索
 ```
 
-每行一条 message：
+两张表即可：
 
-```jsonl
-{"messageId":"10","conversationId":"123_1","role":"user","content":"Redis 缓存是什么？","createdAt":"..."}
-{"messageId":"11","conversationId":"123_1","role":"assistant","content":"Redis 缓存是...","createdAt":"..."}
+```text
+rag_conversation：会话元数据
+rag_message：会话消息
 ```
+
+### 3.1 rag_conversation
+
+字段：
+
+```text
+id：会话 ID，雪花 ID
+user_id：会话归属用户
+scope：global / post
+post_id：scope=post 时绑定文章，scope=global 时为空
+title：会话标题，第一版可以使用默认标题
+created_at：创建时间
+updated_at：最后更新时间
+```
+
+### 3.2 rag_message
+
+字段：
+
+```text
+id：消息 ID，雪花 ID
+conversation_id：所属会话
+user_id：消息归属用户，用于查询和安全兜底
+role：user / assistant
+content：消息内容
+created_at：创建时间
+```
+
+第一版不加 `token_count`。这里避免和模型接口里的 `max_tokens` / `max_completion_tokens` 混淆；之前中转站不支持的是模型请求参数，不是数据库统计字段。
 
 读取策略：
 
 ```text
-Query Rewrite 只读取最近 6 条 message
+Query Rewrite 读取最近 6 条 message
 Final Answer 第一版也带最近 6 条 message
 ```
 
@@ -143,18 +163,7 @@ nextId()
 nextIdString()
 ```
 
-用于生成：
-
-```text
-conversationId 内部雪花部分
-messageId
-```
-
-`conversationId` 格式建议：
-
-```text
-{userId}_{snowflakeId}
-```
+项目已有 `com.tongji.knowpost.id.SnowflakeIdGenerator`，后续可以抽到 `common.id.IdService`，供 RAG 会话和其他业务统一使用。
 
 ### 4.2 RagConversationMemoryService
 
@@ -165,12 +174,13 @@ createConversation(userId, scope, postId)
 validateConversation(userId, conversationId, scope, postId)
 loadRecentMessages(userId, conversationId, limit)
 appendMessage(userId, conversationId, role, content)
+touchConversation(conversationId)
 ```
 
 注意：
 
 ```text
-它负责 JSONL 文件读写
+它负责 DB 读写
 它负责会话归属和 scope/postId 校验
 它不负责检索
 它不负责调用大模型
@@ -224,8 +234,7 @@ Redis 缓存击穿是什么？
 新增 memory 版方法，示例：
 
 ```text
-streamGlobalChatAnswerFlux(userId, conversationId, originalQuestion, topK)
-streamPostChatAnswerFlux(userId, conversationId, postId, originalQuestion, topK)
+streamChatAnswerFlux(userId, conversationId, scope, postId, originalQuestion, topK)
 ```
 
 职责：
@@ -240,7 +249,7 @@ streamPostChatAnswerFlux(userId, conversationId, postId, originalQuestion, topK)
 7. 回答完成后保存 user message 和 assistant message
 ```
 
-注意：`RagRetrievalService` 不应该注入 memory，也不应该知道 JSONL 文件。
+注意：`RagRetrievalService` 不应该注入 memory，也不应该知道 DB 表。
 
 ### 4.5 RagRetrievalService
 
@@ -275,7 +284,7 @@ standaloneQuestionDocs
 hydeStandaloneQuestionDocs
 ```
 
-但 DTO 字段是否重命名可以单独评估，避免一次改动太大。
+DTO 字段是否重命名可以单独评估，避免一次改动太大。
 
 ## 5. Controller / 接口设计
 
@@ -313,7 +322,7 @@ SSE 响应建议：
 
 ```text
 event: meta
-data: {"conversationId":"123_335888888888888888"}
+data: {"conversationId":"335888888888888888"}
 
 event: message
 data: Redis
@@ -412,11 +421,12 @@ HyDE 失败：
 继续 RAG
 ```
 
-Memory 文件读取失败：
+Conversation 校验失败：
 
 ```text
-如果 conversationId 为空：创建失败则返回错误
-如果 conversationId 已存在：读取失败返回错误，避免串读或丢失权限边界
+不属于当前用户：403
+查不到会话：404
+scope/postId 不匹配：拒绝
 ```
 
 Final Answer 失败：
@@ -514,15 +524,15 @@ RAG 仍然可以回答
 第一版暂不做：
 
 ```text
-DB 持久化
 会话标题自动总结
 会话列表前端 UI
 消息删除
+消息状态
+token_count 统计
 rerank 模型
 Self-RAG
 多源召回
 长期 memory 摘要
 ```
 
-这些可以在文件版 memory 稳定后逐步加入。
-
+这些可以在 DB 版 memory 稳定后逐步加入。
