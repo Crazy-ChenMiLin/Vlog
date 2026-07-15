@@ -120,11 +120,16 @@
   width: 50px;
   height: 28px;
   padding: 0 5px;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--rag-ink);
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 6px;
   outline: none;
+}
+
+.topKControl option {
+  color: var(--rag-ink);
+  background: #ffffff;
 }
 
 .topKControl select:focus-visible,
