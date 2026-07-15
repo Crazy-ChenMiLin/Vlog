@@ -69,6 +69,24 @@ export const ArrowRightIcon = createIcon(
   </>
 );
 
+export const ChatBubbleIcon = createIcon(
+  <>
+    <path d="M5.2 17.8 4 21l3.6-1.1a8.7 8.7 0 0 0 4.2 1.1c4.5 0 8.2-3 8.2-6.8s-3.7-6.8-8.2-6.8-8.2 3-8.2 6.8c0 1.3.5 2.6 1.6 3.6z" />
+    <path d="M8.6 14h.1M12 14h.1M15.4 14h.1" />
+  </>
+);
+
+export const CloseIcon = createIcon(
+  <>
+    <path d="m7 7 10 10" />
+    <path d="M17 7 7 17" />
+  </>
+);
+
+export const MinimizeIcon = createIcon(
+  <path d="M6.5 12h11" />
+);
+
 export const HeartIcon = createIcon(
   <>
     <path d="M12 19c-4.8-2.7-7.5-5.6-7.5-9a4.5 4.5 0 0 1 8.2-2.4h.6A4.5 4.5 0 0 1 19.5 10c0 3.4-2.7 6.3-7.5 9z" />
