@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.llm.rag.mapper.RagConversationMapper">
+    <insert id="insert">
+        INSERT INTO rag_conversation (id, user_id, scope, post_id, title, created_at, updated_at)
+        VALUES (#{id}, #{userId}, #{scope}, #{postId}, #{title}, NOW(3), NOW(3))
+    </insert>
+
+    <select id="findById" resultType="com.tongji.llm.rag.model.RagConversation">
+        SELECT
+            id,
+            user_id AS userId,
+            scope,
+            post_id AS postId,
+            title,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM rag_conversation
+        WHERE id = #{id}
+    </select>
+
+    <update id="touch">
+        UPDATE rag_conversation
+        SET updated_at = NOW(3)
+        WHERE id = #{id} AND user_id = #{userId}
+    </update>
+</mapper>
