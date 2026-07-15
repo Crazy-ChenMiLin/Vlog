@@ -1,6 +1,7 @@
 package com.tongji.llm.rag;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.Conflicts;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.tongji.knowpost.mapper.KnowPostMapper;
@@ -171,6 +172,8 @@ public class RagIndexService {
             }
             es.deleteByQuery(d -> d
                     .index(esProps.getIndex())
+                    .conflicts(Conflicts.Proceed)
+                    .refresh(true)
                     .query(q -> q.term(t -> t
                             .field("metadata.postId")
                             .value(v -> v.stringValue(String.valueOf(postId))))));
