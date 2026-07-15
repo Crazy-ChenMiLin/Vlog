@@ -283,6 +283,34 @@ public class CounterServiceImpl implements CounterService {
         return out;
     }
 
+    @Override
+    public void initZeroCountsIfAbsent(String entityType, String entityId, List<String> metrics) {
+        if (entityType == null || entityType.isBlank() || entityId == null || entityId.isBlank()) {
+            return;
+        }
+        if (metrics == null || metrics.isEmpty()) {
+            return;
+        }
+
+        byte[] zeroSds = new byte[CounterSchema.SCHEMA_LEN * CounterSchema.FIELD_SIZE];
+        boolean hasSupportedMetric = false;
+        for (String metric : metrics) {
+            Integer idx = CounterSchema.NAME_TO_IDX.get(metric);
+            if (idx == null) {
+                continue;
+            }
+            writeInt32BE(zeroSds, idx * CounterSchema.FIELD_SIZE, 0L);
+            hasSupportedMetric = true;
+        }
+        if (!hasSupportedMetric) {
+            return;
+        }
+
+        String sdsKey = CounterKeys.sdsKey(entityType, entityId);
+        redis.execute((RedisCallback<Boolean>) connection ->
+                connection.stringCommands().setNX(sdsKey.getBytes(StandardCharsets.UTF_8), zeroSds));
+    }
+
     /**
      * 是否点赞判定：基于分片位图在分片内做位测试。
      * 毫秒级读取，不依赖计数快照。
