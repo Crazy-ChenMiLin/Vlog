@@ -198,6 +198,11 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
         //额外来自另一个service的点赞数量的更新
         try {
+            counterService.initZeroCountsIfAbsent("knowpost", String.valueOf(id), List.of("like", "fav"));
+        } catch (Exception e) {
+            log.warn("Init counters after publish failed, post {}: {}", id, e.getMessage());
+        }
+        try {
             userCounterService.incrementPosts(creatorId, 1);
         } catch (Exception ignored) {}
 
