@@ -39,6 +39,41 @@
   color: var(--color-text-muted);
 }
 
+.feedActions {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 24px;
+}
+
+.loadMoreButton {
+  min-width: 132px;
+  height: 40px;
+  border: 1px solid rgba(255, 126, 54, 0.35);
+  border-radius: 8px;
+  background: #fffaf4;
+  color: #ff6f2a;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.loadMoreButton:hover:not(:disabled) {
+  background: #fff2e6;
+  border-color: rgba(255, 126, 54, 0.55);
+  transform: translateY(-1px);
+}
+
+.loadMoreButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.feedEnd {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 .masonry {
   column-count: 4;
   column-gap: 24px;
