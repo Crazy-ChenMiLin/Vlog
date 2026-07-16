@@ -102,8 +102,8 @@ const GlobalRagChat = () => {
                 <SparkIcon width={18} height={18} />
               </span>
               <div>
-                <h2 id="global-rag-title" className={styles.title}>知光智能版</h2>
-                <span className={styles.scope}>知识库问答助手</span>
+                <h2 id="global-rag-title" className={styles.title}>知光知识库</h2>
+                <span className={styles.scope}>全库智能问答</span>
               </div>
             </div>
 
@@ -121,7 +121,7 @@ const GlobalRagChat = () => {
                 type="button"
                 className={styles.windowButton}
                 onClick={() => setExpanded(false)}
-                aria-label="收起客服咨询"
+                aria-label="收起知识问答"
                 title="收起"
               >
                 <MinimizeIcon width={16} height={16} aria-hidden="true" />
@@ -130,7 +130,7 @@ const GlobalRagChat = () => {
                 type="button"
                 className={styles.windowButton}
                 onClick={() => setExpanded(false)}
-                aria-label="关闭客服咨询"
+                aria-label="关闭知识问答"
                 title="关闭"
               >
                 <CloseIcon width={16} height={16} aria-hidden="true" />
@@ -139,24 +139,28 @@ const GlobalRagChat = () => {
           </header>
 
           <div className={styles.greeting}>
-            <strong>你好！我是知光小助手</strong>
-            <span>很高兴为你服务，有什么可以帮到你？</span>
+            <strong>你好！我是知光知识库助手</strong>
+            <span>可以向我提问知识库里的技术内容。</span>
           </div>
 
           <div ref={answerViewportRef} className={styles.answerViewport} aria-live="polite">
             {!submittedQuestion ? (
               <div className={styles.emptyState}>
-                <span>你可以问我：</span>
-                <button type="button" onClick={() => useSuggestion("如何快速开始使用知光？")}>
-                  如何快速开始使用知光？
+                <span>试试这些全库问题：</span>
+                <button type="button" onClick={() => useSuggestion("Redis 缓存穿透怎么解决？")}>
+                  Redis 缓存穿透怎么解决？
                   <ArrowRightIcon width={14} height={14} aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => useSuggestion("知文支持哪些格式？")}>
-                  知文支持哪些格式？
+                <button type="button" onClick={() => useSuggestion("RAG 的 rerank 是什么？")}>
+                  RAG 的 rerank 是什么？
                   <ArrowRightIcon width={14} height={14} aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => useSuggestion("如何加入会员？")}>
-                  如何加入会员？
+                <button type="button" onClick={() => useSuggestion("Spring Boot 事务传播是什么？")}>
+                  Spring Boot 事务传播是什么？
+                  <ArrowRightIcon width={14} height={14} aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => useSuggestion("Elasticsearch 倒排索引是什么？")}>
+                  Elasticsearch 倒排索引是什么？
                   <ArrowRightIcon width={14} height={14} aria-hidden="true" />
                 </button>
               </div>
@@ -196,7 +200,7 @@ const GlobalRagChat = () => {
               onKeyDown={handleKeyDown}
               maxLength={500}
               rows={2}
-              placeholder="请输入你的问题..."
+              placeholder="请输入知识库问题..."
               aria-label="输入知识库问题"
             />
             <div className={styles.actions}>
@@ -230,11 +234,11 @@ const GlobalRagChat = () => {
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
         aria-controls="global-rag-panel"
-        aria-label={expanded ? "收起客服咨询" : "展开客服咨询"}
-        title={expanded ? "收起客服咨询" : "客服咨询"}
+        aria-label={expanded ? "收起知识问答" : "展开知识问答"}
+        title={expanded ? "收起知识问答" : "知识问答"}
       >
         <ChatBubbleIcon width={24} height={24} aria-hidden="true" />
-        <span className={styles.floatLabel}>客服咨询</span>
+        <span className={styles.floatLabel}>知识问答</span>
       </button>
     </div>
   );
