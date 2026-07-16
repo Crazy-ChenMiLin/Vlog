@@ -1,35 +1,217 @@
-# 项目文档
-<div style="display: flex; gap: 10px;">
-  <img src="http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/11a8438f.png" width="250" />
-  <img src="http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/4035ca79.png" width="250" />
-  <img src="http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/40b80f25.png" width="250" />
+# 知光 Zhiguang 后端
+
+知光是一个知识获取与分享社区，支持知文发布、关注关系、点赞收藏、Feed 流、全文搜索、对象存储直传，以及面向知识库的 RAG 智能问答。项目目标不是简单 CRUD，而是围绕“内容社区 + 高并发读写 + AI 检索增强”做工程化拆分。
+
+- 前端仓库：https://github.com/G-Pegasus/zhiguang_fe
+- 后端仓库：https://github.com/G-Pegasus/zhiguang_be
+- 后端技术栈：Java 21、Spring Boot、Spring Security、Spring AI、MyBatis、MySQL、Redis、Kafka、Elasticsearch、MinIO/OSS、Canal
+- 前端技术栈：React、Vite
+
+## 核心能力
+
+| 模块 | 能力 |
+|---|---|
+| 认证系统 | JWT 双令牌，RS256 签名，Redis 刷新令牌白名单，支持会话撤销 |
+| 发布系统 | Markdown/图片/视频对象存储直传，预签名上传，AI 摘要生成 |
+| 计数系统 | Redis 位图/计数结构，Lua 原子更新，Kafka 异步聚合，异常时按需重建 |
+| 关系系统 | 关注/取关，Outbox + Canal + Kafka 异步同步计数和缓存 |
+| Feed 流 | Caffeine 本地缓存 + Redis 页面缓存 + Redis 片段缓存，热点探测和 single-flight |
+| 搜索系统 | Elasticsearch 关键词检索、标签过滤、search_after 分页、completion suggester |
+| RAG 问答 | 全库/单篇知识问答，多路召回、HyDE、RRF、rerank、调试评测闭环 |
+
+## RAG 智能问答
+
+知光 RAG 链路：
+
+```text
+用户问题
+-> 问题改写 / standaloneQuestion
+-> 原始向量召回 + HyDE 召回
+-> RRF 融合候选集
+-> NVIDIA rerank 模型重排
+-> questionIntent + sectionType 轻量后处理
+-> TopK 上下文给大模型流式回答
+```
+
+### 索引侧优化
+
+原始 chunk 只有正文，rerank 模型难以区分“核心概念”“测试问题”“面试模板”等章节。后续将 chunk 从纯文本升级为结构化对象：
+
+```java
+record RagChunk(String text, String sectionTitle, String sectionType) {}
+```
+
+索引入库时将以下 metadata 写入 Elasticsearch：
+
+- `title`
+- `sectionTitle`
+- `sectionType`
+- `postId`
+- `chunkId`
+- `position`
+- `indexVersion`
+
+当前 `sectionType` 包括：
+
+| sectionType | 含义 |
+|---|---|
+| `CONCEPT` | 核心概念 |
+| `SOLUTION` | 解决方案/排查 |
+| `INTERVIEW_TEMPLATE` | 面试回答模板 |
+| `TEST_QUESTION` | 测试问题 |
+| `BACKGROUND` | 背景 |
+| `PITFALL` | 常见误区 |
+| `OTHER` | 其他 |
+
+### rerank 侧优化
+
+rerank 输入从“正文”增强为：
+
+```text
+标题：...
+章节：...
+章节类型：...
+正文：
+...
+```
+
+同时加入轻量后处理：
+
+```text
+finalScore = rerankScore + sectionBoost(questionIntent, sectionType)
+```
+
+示例意图：
+
+| questionIntent | 典型问题 | 偏好 |
+|---|---|---|
+| `EXPLAIN` | 是什么、有什么用、原理、区别 | 提升 `CONCEPT`，降低 `TEST_QUESTION` |
+| `SOLUTION` | 怎么解决、怎么排查、注意什么 | 提升 `SOLUTION` / `CONCEPT` |
+| `INTERVIEW` | 面试怎么回答 | 提升 `INTERVIEW_TEMPLATE` |
+| `TEST` | 测试问题、评估、召回率 | 提升 `TEST_QUESTION` |
+
+### 评测结果
+
+使用 20 个问题评测 fused Top1 与 rerank Top1 的章节适配度：
+
+```text
+变好数：10
+变差数：1
+不变数：9
+优化率：50%
+劣化率：5%
+净优化率：45%
+```
+
+RRF 反例诊断：
+
+```text
+TEST_QUESTION rerankScore = 17.0625, boost = -0.35, finalScore = 16.7125
+CONCEPT       rerankScore = 15.9297, boost = +0.35, finalScore = 16.2797
+```
+
+结论：当前方案有效，但仍需继续暴露分数并微调权重，避免个别解释型问题被测试题列表抢占 Top1。
+
+相关脚本：
+
+```text
+scripts/codex_compare_rag_debug.py
+scripts/codex_reindex_rag_test_posts.py
+```
+
+## 本地运行
+
+要求：
+
+- JDK 21
+- Maven 3.9+
+- MySQL 8
+- Redis 7
+- Kafka
+- Elasticsearch 8
+- MinIO 或兼容 OSS
+
+启动：
+
+```bash
+mvn spring-boot:run
+```
+
+测试：
+
+```bash
+mvn test
+mvn -DskipTests compile
+```
+
+## Docker 编排
+
+仓库提供基础 Docker 编排模板：
+
+```text
+Dockerfile
+docker-compose.yml
+.env.example
+```
+
+首次部署：
+
+```bash
+cp .env.example .env
+# 修改 .env 中的数据库、Redis、Kafka、ES、MinIO、AI API Key 等配置
+docker compose up -d --build
+```
+
+查看日志：
+
+```bash
+docker compose logs -f zhiguang-be
+```
+
+重新部署后端：
+
+```bash
+docker compose up -d --build zhiguang-be
+```
+
+### 云服务器部署注意
+
+1. 不要把真实 `.env`、密钥、API Key 提交到 Git。
+2. MySQL、Redis、Kafka、Elasticsearch、MinIO 可使用本 compose 启动，也可替换成 1Panel 已有服务。
+3. 如果使用外部 Kafka，注意 `advertised.listeners` 必须和后端实际连接地址一致。
+4. Kafka 单机测试环境不要把 `message.max.bytes` 等配置放到几百 MB，容易造成 broker 内存压力。
+5. RAG 相关依赖包括 Elasticsearch 向量索引、OpenAI-compatible embedding、NVIDIA rerank API，部署前必须确认网络和 Key 可用。
+
+## 主要接口
+
+RAG debug：
+
+```text
+GET /api/v1/knowposts/qa/debug?question=...&topK=10
+```
+
+单篇重建索引：
+
+```text
+POST /api/v1/knowposts/{id}/rag/reindex
+```
+
+全库问答流：
+
+```text
+GET /api/v1/knowposts/qa/stream?question=...&topK=5
+```
+
+更多接口见：
+
+```text
+docs/
+```
+
+## 项目截图
+
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+  <img src="https://free.picui.cn/free/2026/03/29/69c8db2c32d74.png" width="600" />
+  <img src="https://free.picui.cn/free/2026/03/29/69c8db2ead009.png" width="600" />
+  <img src="https://free.picui.cn/free/2026/03/29/69c8db2b93e32.png" width="600" />
 </div>
-
-![文档1](http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/43eb8fe1.png)
-![文档2](http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/42b24575.png)
-
-# 项目前端页面展示
-<div style="display: flex; gap: 10px;">
-  <img src="https://free.picui.cn/free/2026/03/29/69c8db2c32d74.png" width="800" />
-  <img src="https://free.picui.cn/free/2026/03/29/69c8db2ead009.png" width="800" />
-  <img src="https://free.picui.cn/free/2026/03/29/69c8db2b93e32.png" width="800" />
-  <img src="https://free.picui.cn/free/2026/03/29/69c8db2b89818.png" width="800" />
-  <img src="https://free.picui.cn/free/2026/03/29/69c8db2bd181e.png" width="800" />
-  <img src="https://free.picui.cn/free/2026/03/29/69c8db2c30a4b.png" width="800" />
-</div>
-
-# 知光平台-知识获取与分享社区
-后端 & 前端开发（前端采用 AI 辅助开发）
-- **后端地址**：https://github.com/G-Pegasus/zhiguang_be
-- **前端地址**：https://github.com/G-Pegasus/zhiguang_fe
-- **项目概述**：知识社区 APP（后续考虑支持付费），支持发布知识、点赞/收藏、关注取关、首页 Feed 展示与对象存储直传，AI 生成摘要等等。项目各模块进行了充分详细的设计以满足高并发和高可用需求
-- **技术栈**：后端 Java 21 + Spring Boot + Spring Security + Spring AI + RAG + MyBatis + MySQL + Redis + Kafka + Caffeine + 阿里云 OSS + Canal + Elasticsearch ；前端 React + Vite
-- **项目细节与亮点**：
-    - **认证系统**：开发基于 Spring Security 的 JWT 双令牌认证系统，采用 RS256 签名 + Redis 刷新令牌白名单，实现 15 分钟访问令牌 + 7 天刷新令牌的安全会话管理，支持即时令牌撤销，兼顾高安全与高性能。
-    - **计数系统**：笔记维度(点赞收藏)与用户维度(关注取关) 以 Redis 作为底层存储系统，采用定制化 Redis SDS 二进制紧凑计数，使用 Lua 脚本进行原子更新，并实现了采样一致性校验与自愈重建。定制化 Redis SDS
-    - **发布系统**：采用渐进式发布流程，发布的图片、视频，Markdown 文档等都存入 OSS 对象存储系统，采用后端发布预签名+前端直传的形式上传，节省前后端传输资源渐进式发布流程。并接入 DeepSeek AI 一键生成文章摘要。
-    - **用户关系系统**：实现关注功能，采用一主多从+事件驱动模型。粉丝表，计数系统，列表缓存都作为关注表的伪从。关注事件发生时，在同一事务中插入关注表和 Outbox 表，使用 Canal 订阅 Outbox 表的 binlog，并将变更事件发布到 Kafka 异步更新其他数据源。Outbox 模式
-    - **点赞系统**：采用异步写+写聚合Kafka 异步写+写聚合的形式应对高并发写场景。采用位图的结构高效实现幂等和判重。读取遇到异常或缺失时，基于位图做按需重建，保证最终一致。并用 Kafka 做“灾难回放”的兜底操作。分片位图+计数重建策略
-    - **Feed 流**：采用三级缓存架构且设计了缓存一致性策略，本地 Caffeine + Redis 页面缓存 + Redis 片段缓存。自定义 hotkey 探测机制自定义 hotkey 探测，基于热点检测按层级延长缓存时长，叠加随机抖动抗雪崩。并设置单飞锁(single-flight)避免同一页并发回源风暴。Feed 三级缓存设计
-    - **搜索系统**：基于 Elasticsearch 构建内容搜索与联想建议功能，支持关键词检索，标签过滤，采用 search_after 游标分页保证深分页稳定性。同时通过 function_score 融合 BM25 相关性与点赞等业务权重优化排序，保证结果的相关性；并使用 ES 的 completion suggester 实现低延迟前缀联想。
-    - **AI 问答系统**：开发知光平台 RAG 知识问答系统，实现用户调用接口→索引检查→向量检索→Prompt 构造→大模型流式生成的全流程，通过合理分块、幂等删除保持单一版本、预索引减少首次提问等待时间等，显著提升用户围绕单篇知文的智能问答效率与准确性。
