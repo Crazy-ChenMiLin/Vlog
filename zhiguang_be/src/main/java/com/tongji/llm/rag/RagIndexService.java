@@ -31,7 +31,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class RagIndexService {
     private static final Logger log = LoggerFactory.getLogger(RagIndexService.class);
-    private static final String INDEX_VERSION = "utf8-v1";
+    private static final String INDEX_VERSION = "utf8-v2";
     // 向量库封装（Elasticsearch VectorStore），负责写入/检索向量
     private final VectorStore vectorStore;
     // 数据访问：根据 postId 查询知文详情（含 contentUrl、指纹等）
@@ -87,7 +87,7 @@ public class RagIndexService {
 
         // 先按 Markdown 标题切段，再做固定长度切片（带重叠）
         // 步骤6：把正文切成小块（切片）
-        List<String> chunks = chunkMarkdown(text);
+        List<RagChunk> chunks = chunkMarkdown(text);
         // 幂等 upsert：先删除旧切片
         // 步骤7：先删旧卡片（避免旧内容残留）
         deletePost(postId);
@@ -106,7 +106,10 @@ public class RagIndexService {
             meta.put("indexVersion", INDEX_VERSION);
             meta.put("contentUrl", row.getContentUrl());
             meta.put("title", row.getTitle());
-            docs.add(new Document(chunks.get(i), meta));
+            RagChunk chunk = chunks.get(i);
+            meta.put("sectionTitle", chunk.sectionTitle());
+            meta.put("sectionType", chunk.sectionType());
+            docs.add(new Document(chunk.text(), meta));
         }
         try {
             // 批量写入向量库
@@ -207,42 +210,84 @@ public class RagIndexService {
     /**
      * 按 Markdown 标题切段，再交由固定长度切片策略处理。
      */
-    private List<String> chunkMarkdown(String text) {
-        List<String> paras = new ArrayList<>();
+    private List<RagChunk> chunkMarkdown(String text) {
+        List<RagSection> sections = new ArrayList<>();
         String[] lines = text.split("\r?\n");
         StringBuilder buf = new StringBuilder();
+        String currentTitle = "";
         for (String line : lines) {
             boolean isHeader = line.startsWith("#");
             if (isHeader && !buf.isEmpty()) { // 遇到新的标题，收束上一段
-                paras.add(buf.toString());
+                sections.add(new RagSection(buf.toString(), currentTitle));
                 buf.setLength(0);
+            }
+            if (isHeader) {
+                currentTitle = normalizeMarkdownHeader(line);
             }
             buf.append(line).append('\n');
         }
-        if (!buf.isEmpty()) paras.add(buf.toString());
+        if (!buf.isEmpty()) sections.add(new RagSection(buf.toString(), currentTitle));
 
-        return getChunks(paras);
+        return getChunks(sections);
     }
 
     /**
      * 固定长度切片（每片 ≤ 800 字符），切片间 100 字符重叠：
      * - 兼顾检索召回与上下文连续性
      */
-    private static List<String> getChunks(List<String> paras) {
-        List<String> chunks = new ArrayList<>();
-        for (String p : paras) {
+    private static List<RagChunk> getChunks(List<RagSection> sections) {
+        List<RagChunk> chunks = new ArrayList<>();
+        for (RagSection section : sections) {
+            String p = section.text();
+            String sectionTitle = section.sectionTitle();
+            String sectionType = classifySectionType(sectionTitle);
             if (p.length() <= 800) {
-                chunks.add(p);
+                chunks.add(new RagChunk(p, sectionTitle, sectionType));
             } else {
                 int start = 0;
                 while (start < p.length()) {
                     int end = Math.min(start + 800, p.length());
-                    chunks.add(p.substring(start, end));
+                    chunks.add(new RagChunk(p.substring(start, end), sectionTitle, sectionType));
                     if (end >= p.length()) break;
                     start = Math.max(end - 100, start + 1); // 重叠 100 字符以保留语义连续
                 }
             }
         }
         return chunks;
+    }
+
+    private static String normalizeMarkdownHeader(String line) {
+        return line == null ? "" : line.replaceFirst("^#+\\s*", "").trim();
+    }
+
+    private static String classifySectionType(String sectionTitle) {
+        if (!StringUtils.hasText(sectionTitle)) {
+            return "OTHER";
+        }
+        if (sectionTitle.contains("核心概念")) {
+            return "CONCEPT";
+        }
+        if (sectionTitle.contains("背景")) {
+            return "BACKGROUND";
+        }
+        if (sectionTitle.contains("面试回答模板")) {
+            return "INTERVIEW_TEMPLATE";
+        }
+        if (sectionTitle.contains("测试问题")) {
+            return "TEST_QUESTION";
+        }
+        if (sectionTitle.contains("常见误区") || sectionTitle.contains("坑")) {
+            return "PITFALL";
+        }
+        if (sectionTitle.contains("解决") || sectionTitle.contains("方案") || sectionTitle.contains("排查")) {
+            return "SOLUTION";
+        }
+        return "OTHER";
+    }
+
+    private record RagSection(String text, String sectionTitle) {
+    }
+
+    private record RagChunk(String text, String sectionTitle, String sectionType) {
     }
 }
