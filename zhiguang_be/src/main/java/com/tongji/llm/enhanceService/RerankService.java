@@ -75,11 +75,13 @@ public class RerankService {
                 return fallback(fusedDocs, topK);
             }
 
+            QuestionIntent intent = detectIntent(standaloneQuestion);
             List<Document> reranked = response.rankings().stream()
                     .filter(ranking -> ranking.index() >= 0 && ranking.index() < fusedDocs.size())
-                    .sorted(Comparator.comparingDouble(Ranking::logit).reversed())
+                    .map(ranking -> toScoredRanking(intent, fusedDocs.get(ranking.index()), ranking))
+                    .sorted(Comparator.comparingDouble(ScoredRanking::finalScore).reversed())
                     .limit(topK)
-                    .map(ranking -> fusedDocs.get(ranking.index()))
+                    .map(scored -> fusedDocs.get(scored.index()))
                     .toList();
             return reranked.isEmpty() ? fallback(fusedDocs, topK) : reranked;
         } catch (Exception e) {
@@ -90,6 +92,90 @@ public class RerankService {
 
     private List<Document> fallback(List<Document> fusedDocs, int topK) {
         return fusedDocs.stream().limit(topK).toList();
+    }
+
+    private ScoredRanking toScoredRanking(QuestionIntent intent, Document document, Ranking ranking) {
+        double boost = sectionBoost(intent, document);
+        double finalScore = ranking.logit() + boost;
+        document.getMetadata().put("questionIntent", intent.name());
+        document.getMetadata().put("rerankScore", ranking.logit());
+        document.getMetadata().put("sectionBoost", boost);
+        document.getMetadata().put("finalScore", finalScore);
+        return new ScoredRanking(ranking.index(), ranking.logit(), boost, finalScore);
+    }
+
+    private double finalScore(QuestionIntent intent, Document document, double rerankScore) {
+        return rerankScore + sectionBoost(intent, document);
+    }
+
+    private QuestionIntent detectIntent(String question) {
+        if (!StringUtils.hasText(question)) {
+            return QuestionIntent.OTHER;
+        }
+        String normalized = question.trim().toLowerCase();
+        if (containsAny(normalized, "测试问题", "测试集", "评估", "benchmark", "召回率", "命中率")) {
+            return QuestionIntent.TEST;
+        }
+        if (containsAny(normalized, "面试", "怎么回答", "如何回答", "回答模板")) {
+            return QuestionIntent.INTERVIEW;
+        }
+        if (containsAny(normalized, "怎么解决", "如何解决", "怎么排查", "如何排查", "注意什么", "怎么设计", "如何设计", "方案")) {
+            return QuestionIntent.SOLUTION;
+        }
+        if (containsAny(normalized, "是什么", "什么是", "有什么用", "作用", "原理", "区别", "为什么")) {
+            return QuestionIntent.EXPLAIN;
+        }
+        return QuestionIntent.OTHER;
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private double sectionBoost(QuestionIntent intent, Document document) {
+        Object sectionType = document.getMetadata().get("sectionType");
+        String type = sectionType == null ? "" : String.valueOf(sectionType);
+        return switch (intent) {
+            case EXPLAIN -> switch (type) {
+                case "CONCEPT" -> 0.35;
+                case "SOLUTION" -> 0.15;
+                case "INTERVIEW_TEMPLATE" -> 0.05;
+                case "TEST_QUESTION" -> -0.35;
+                case "BACKGROUND", "TITLE" -> -0.25;
+                default -> 0;
+            };
+            case SOLUTION -> switch (type) {
+                case "SOLUTION" -> 0.35;
+                case "CONCEPT" -> 0.25;
+                case "INTERVIEW_TEMPLATE" -> 0.10;
+                case "TEST_QUESTION" -> -0.25;
+                case "BACKGROUND", "TITLE" -> -0.20;
+                default -> 0;
+            };
+            case INTERVIEW -> switch (type) {
+                case "INTERVIEW_TEMPLATE" -> 0.35;
+                case "CONCEPT" -> 0.10;
+                case "SOLUTION" -> 0.05;
+                case "TEST_QUESTION", "BACKGROUND", "TITLE" -> -0.15;
+                default -> 0;
+            };
+            case TEST -> switch (type) {
+                case "TEST_QUESTION" -> 0.35;
+                case "CONCEPT" -> 0.05;
+                case "BACKGROUND", "TITLE" -> -0.15;
+                default -> 0;
+            };
+            case OTHER -> switch (type) {
+                case "CONCEPT", "SOLUTION" -> 0.05;
+                case "TITLE", "BACKGROUND" -> -0.10;
+                default -> 0;
+            };
+        };
     }
 
     private String buildRerankText(Document document) {
@@ -135,5 +221,16 @@ public class RerankService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record Ranking(int index, double logit) {
+    }
+
+    private record ScoredRanking(int index, double rerankScore, double sectionBoost, double finalScore) {
+    }
+
+    private enum QuestionIntent {
+        EXPLAIN,
+        SOLUTION,
+        INTERVIEW,
+        TEST,
+        OTHER
     }
 }

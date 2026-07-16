@@ -28,6 +28,16 @@ QUESTIONS = [
     "Java Stream peek 有什么作用？",
     "Elasticsearch 倒排索引是什么？",
     "RAG 切片策略怎么设计？",
+    "RAG 召回评估应该看哪些指标？",
+    "RAG 上下文压缩有什么用？",
+    "向量库在 RAG 里负责什么？",
+    "引用溯源在 RAG 里为什么重要？",
+    "Redis 布隆过滤器解决什么问题？",
+    "Redis 缓存击穿怎么解决？",
+    "Kafka 消费者组是什么？",
+    "MySQL 的 MVCC 是什么？",
+    "Spring Boot AOP 有什么用？",
+    "JWT 刷新令牌为什么需要 jti？",
 ]
 
 
@@ -77,6 +87,17 @@ def topic_hit(question: str, chunk: dict | None) -> bool:
         "peek",
         "倒排索引",
         "切片策略",
+        "召回评估",
+        "上下文压缩",
+        "向量库",
+        "引用溯源",
+        "布隆过滤器",
+        "缓存击穿",
+        "消费者组",
+        "mvcc",
+        "aop",
+        "刷新令牌",
+        "jti",
     ]
     expected = next((keyword for keyword in keywords if keyword.lower() in question.lower()), None)
     return bool(expected and expected.lower() in haystack)
@@ -111,6 +132,12 @@ def compact_chunk(chunk: dict | None) -> dict | None:
         "title": chunk.get("title"),
         "position": chunk.get("position"),
         "vectorScore": chunk.get("vectorScore"),
+        "sectionTitle": chunk.get("sectionTitle"),
+        "sectionType": chunk.get("sectionType"),
+        "questionIntent": chunk.get("questionIntent"),
+        "rerankScore": chunk.get("rerankScore"),
+        "sectionBoost": chunk.get("sectionBoost"),
+        "finalScore": chunk.get("finalScore"),
         "sectionHint": section_hint(chunk),
         "textPreview": chunk.get("textPreview"),
     }
@@ -130,6 +157,7 @@ def main():
             fused = debug.get("fusedResults") or []
             reranked = debug.get("rerankedResults") or []
             base = baseline_by_question.get(question) or {}
+            has_baseline = bool(base)
             fused_top1 = fused[0] if fused else None
             rerank_top1 = reranked[0] if reranked else None
             base_rerank_top1 = base.get("rerankTop1")
@@ -142,7 +170,11 @@ def main():
                 "candidateSetSame": sorted(filter(None, [chunk_key(c) for c in fused]))
                 == sorted(filter(None, [chunk_key(c) for c in reranked])),
                 "sameTop1WithinCurrentRun": chunk_key(fused_top1) == chunk_key(rerank_top1),
-                "sameRerankTop1AsTitleBaseline": chunk_key(rerank_top1) == chunk_key(base_rerank_top1),
+                "hasTitleBaseline": has_baseline,
+                "sameRerankTop1AsTitleBaseline": (
+                    chunk_key(rerank_top1) == chunk_key(base_rerank_top1)
+                    if has_baseline else None
+                ),
                 "topicHitFusedTop1": topic_hit(question, fused_top1),
                 "topicHitRerankTop1": topic_hit(question, rerank_top1),
                 "fusedTop1Section": section_hint(fused_top1),
@@ -166,7 +198,11 @@ def main():
         "errors": len(errors),
         "candidateSetSameCount": sum(1 for row in rows if row["candidateSetSame"]),
         "top1ChangedWithinCurrentRun": sum(1 for row in rows if not row["sameTop1WithinCurrentRun"]),
-        "rerankTop1ChangedVsTitleBaseline": sum(1 for row in rows if not row["sameRerankTop1AsTitleBaseline"]),
+        "titleBaselineComparableCount": sum(1 for row in rows if row["hasTitleBaseline"]),
+        "rerankTop1ChangedVsTitleBaseline": sum(
+            1 for row in rows
+            if row["hasTitleBaseline"] and not row["sameRerankTop1AsTitleBaseline"]
+        ),
         "topicHitRerankTop1": sum(1 for row in rows if row["topicHitRerankTop1"]),
         "badSectionRerankTop1": sum(
             1 for row in rows
@@ -184,6 +220,7 @@ def main():
             "errors",
             "candidateSetSameCount",
             "top1ChangedWithinCurrentRun",
+            "titleBaselineComparableCount",
             "rerankTop1ChangedVsTitleBaseline",
             "topicHitRerankTop1",
             "badSectionRerankTop1",
