@@ -95,11 +95,27 @@ public class RerankService {
     private String buildRerankText(Document document) {
         String text = document.getText() == null ? "" : document.getText();
         Object title = document.getMetadata().get("title");
+        Object sectionTitle = document.getMetadata().get("sectionTitle");
+        Object sectionType = document.getMetadata().get("sectionType");
         String titleText = title == null ? "" : String.valueOf(title);
+        String sectionTitleText = sectionTitle == null ? "" : String.valueOf(sectionTitle);
+        String sectionTypeText = sectionType == null ? "" : String.valueOf(sectionType);
+
+        StringBuilder builder = new StringBuilder();
         if (StringUtils.hasText(titleText)) {
-            return "标题：" + titleText + "\n正文：\n" + text;
+            builder.append("标题：").append(titleText).append('\n');
         }
-        return text;
+        if (StringUtils.hasText(sectionTitleText)) {
+            builder.append("章节：").append(sectionTitleText).append('\n');
+        }
+        if (StringUtils.hasText(sectionTypeText)) {
+            builder.append("章节类型：").append(sectionTypeText).append('\n');
+        }
+        if (!builder.isEmpty()) {
+            builder.append("正文：\n");
+        }
+        builder.append(text);
+        return builder.toString();
     }
 
     private record RerankRequest(
