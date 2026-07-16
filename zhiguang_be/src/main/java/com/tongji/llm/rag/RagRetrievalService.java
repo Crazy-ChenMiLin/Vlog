@@ -40,11 +40,13 @@ public class RagRetrievalService {
     }
 
     private RagRetrievalResultDTO retrieveInternal(Long postId, String question, int topK) {
+        //hyde生成
         String hypotheticalAnswer = hydeService.generateHypotheticalAnswer(question);
         List<Document> originalDocs = searchDocuments(postId, question, topK);
         List<Document> hydeDocs = StringUtils.hasText(hypotheticalAnswer)
                 ? searchDocuments(postId, hypotheticalAnswer, topK)
                 : List.of();
+        //RRF（Reciprocal Rank Fusion，倒数排名融合）
         List<Document> fusedDocs = hydeDocs.isEmpty()
                 ? originalDocs.stream().limit(topK).toList()
                 : rrfFusion.fuse(List.of(originalDocs, hydeDocs), topK);
