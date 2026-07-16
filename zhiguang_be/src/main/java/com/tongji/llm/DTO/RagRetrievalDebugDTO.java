@@ -24,6 +24,12 @@ public record RagRetrievalDebugDTO(
             String title,
             Integer position,
             Double vectorScore,//得分向量检索返回的相似度分数，不是rrf得分
+            String sectionTitle,
+            String sectionType,
+            String questionIntent,
+            Double rerankScore,
+            Double sectionBoost,
+            Double finalScore,
             String textPreview
     ) {
     }

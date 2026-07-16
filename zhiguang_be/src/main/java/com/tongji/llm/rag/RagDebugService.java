@@ -80,6 +80,12 @@ public class RagDebugService {
                 stringValue(metadata.get("title")),
                 integerValue(metadata.get("position")),
                 document.getScore(),
+                stringValue(metadata.get("sectionTitle")),
+                stringValue(metadata.get("sectionType")),
+                stringValue(metadata.get("questionIntent")),
+                doubleValue(metadata.get("rerankScore")),
+                doubleValue(metadata.get("sectionBoost")),
+                doubleValue(metadata.get("finalScore")),
                 preview(document.getText())
         );
     }
@@ -102,6 +108,17 @@ public class RagDebugService {
         }
         try {
             return value == null ? null : Integer.valueOf(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Double doubleValue(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        try {
+            return value == null ? null : Double.valueOf(String.valueOf(value));
         } catch (NumberFormatException ignored) {
             return null;
         }
