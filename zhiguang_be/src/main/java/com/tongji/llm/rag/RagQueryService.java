@@ -1,6 +1,8 @@
 package com.tongji.llm.rag;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.DTO.RagRetrievalResultRankDTO;
+import com.tongji.llm.enhanceService.RerankService;
 import com.tongji.llm.rag.model.RagConversation;
 import com.tongji.llm.rag.model.RagMessage;
 import lombok.RequiredArgsConstructor;
@@ -22,16 +24,23 @@ public class RagQueryService {
     private final RagRetrievalService retrievalService;
     private final RagConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
+    private final RerankService rerankService;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
+        //先混合检索到文章
         RagRetrievalResultDTO retrieval = retrievalService.retrieveForPost(postId, question, topK);
-        return streamAnswerInternal(retrieval, question,
+        //然后rerank文章
+        RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
+        return streamAnswerInternal(ranked.answerDocs(), question,
                 "未找到与问题相关的当前文章内容，请换一种问法后再试。");
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
+        //先混合检索到文章
         RagRetrievalResultDTO retrieval = retrievalService.retrieveGlobal(question, topK);
-        return streamAnswerInternal(retrieval, question,
+        //然后rerank文章
+        RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
+        return streamAnswerInternal(ranked.answerDocs(), question,
                 "未找到与问题相关的知识库内容，请换一种问法后再试。");
     }
 
@@ -52,6 +61,7 @@ public class RagQueryService {
         RagRetrievalResultDTO retrieval = RagChatScope.POST.equals(scope)
                 ? retrievalService.retrieveForPost(postId, standaloneQuestion, topK)
                 : retrievalService.retrieveGlobal(standaloneQuestion, topK);
+        RagRetrievalResultRankDTO ranked = rankRetrieval(standaloneQuestion, retrieval, topK);
 
         memoryService.appendMessage(userId, conversation.getId(), RagChatRole.USER, originalQuestion);
         StringBuilder assistantAnswer = new StringBuilder();
@@ -61,7 +71,7 @@ public class RagQueryService {
                 .data("{\"conversationId\":\"" + conversation.getId() + "\"}")
                 .build());
         Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
-                retrieval,
+                ranked.answerDocs(),
                 originalQuestion,
                 standaloneQuestion,
                 recentMessages,
@@ -89,11 +99,19 @@ public class RagQueryService {
         return Flux.concat(meta, answer, done);
     }
 
+    private RagRetrievalResultRankDTO rankRetrieval(String standaloneQuestion, RagRetrievalResultDTO retrieval, int topK) {
+        List<Document> rerankedDocs = rerankService.rerank(standaloneQuestion, retrieval.fusedDocs(), topK);
+        if (rerankedDocs == null) {
+            rerankedDocs = retrieval.fusedDocs().stream().limit(topK).toList();
+        }
+        return new RagRetrievalResultRankDTO(retrieval, rerankedDocs, rerankedDocs);
+    }
+
     private Flux<String> streamAnswerInternal(
-            RagRetrievalResultDTO retrieval,
+            List<Document> answerDocs,
             String question,
             String emptyResultMessage) {
-        List<String> contexts = retrieval.fusedDocs().stream()
+        List<String> contexts = answerDocs.stream()
                 .map(Document::getText)
                 .filter(StringUtils::hasText)
                 .toList();
@@ -118,12 +136,12 @@ public class RagQueryService {
     }
 
     private Flux<String> streamAnswerInternal(
-            RagRetrievalResultDTO retrieval,
+            List<Document> answerDocs,
             String originalQuestion,
             String standaloneQuestion,
             List<RagMessage> recentMessages,
             String emptyResultMessage) {
-        List<String> contexts = retrieval.fusedDocs().stream()
+        List<String> contexts = answerDocs.stream()
                 .map(Document::getText)
                 .filter(StringUtils::hasText)
                 .toList();

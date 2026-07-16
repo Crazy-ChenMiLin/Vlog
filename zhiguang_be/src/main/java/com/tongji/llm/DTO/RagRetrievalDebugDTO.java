@@ -13,7 +13,9 @@ public record RagRetrievalDebugDTO(
         double similarityThreshold,
         List<RetrievedChunk> originalResults,
         List<RetrievedChunk> hydeResults,
-        List<RetrievedChunk> fusedResults
+        List<RetrievedChunk> fusedResults,
+        List<RetrievedChunk> rerankedResults,
+        List<RetrievedChunk> answerResults
 ) {
     public record RetrievedChunk(
             int rank,
@@ -21,7 +23,7 @@ public record RagRetrievalDebugDTO(
             String chunkId,
             String title,
             Integer position,
-            Double vectorScore,
+            Double vectorScore,//得分向量检索返回的相似度分数，不是rrf得分
             String textPreview
     ) {
     }
