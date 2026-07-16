@@ -2,6 +2,8 @@ package com.tongji.llm.rag;
 
 import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.DTO.RagRetrievalResultRankDTO;
+import com.tongji.llm.enhanceService.RerankService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
@@ -18,14 +20,19 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class RagDebugService {
     private final RagRetrievalService retrievalService;
+    private final RerankService rerankService;
 
+    //先混合检索到文章
     public RagRetrievalDebugDTO debugPostRetrieval(long postId, String question, int topK) {
         RagRetrievalResultDTO result = retrievalService.retrieveForPost(postId, question, topK);
+    //然后rerank文章
         return toDebugResult("post", postId, question, result);
     }
 
+    //先混合检索到文章
     public RagRetrievalDebugDTO debugGlobalRetrieval(String question, int topK) {
         RagRetrievalResultDTO result = retrievalService.retrieveGlobal(question, topK);
+    //然后rerank文章
         return toDebugResult("global", null, question, result);
     }
 
@@ -34,6 +41,7 @@ public class RagDebugService {
             Long postId,
             String question,
             RagRetrievalResultDTO result) {
+        RagRetrievalResultRankDTO ranked = rankResult(question, result);
         return new RagRetrievalDebugDTO(
                 scope,
                 postId,
@@ -42,8 +50,19 @@ public class RagDebugService {
                 result.similarityThreshold(),
                 toDebugChunks(result.originalDocs()),
                 toDebugChunks(result.hydeDocs()),
-                toDebugChunks(result.fusedDocs())
+                toDebugChunks(result.fusedDocs()),
+                toDebugChunks(ranked.rerankedDocs()),
+                toDebugChunks(ranked.answerDocs())
         );
+    }
+
+    private RagRetrievalResultRankDTO rankResult(String question, RagRetrievalResultDTO result) {
+        int topK = result.fusedDocs().size();
+        List<Document> rerankedDocs = rerankService.rerank(question, result.fusedDocs(), topK);
+        if (rerankedDocs == null) {
+            rerankedDocs = result.fusedDocs();
+        }
+        return new RagRetrievalResultRankDTO(result, rerankedDocs, rerankedDocs);
     }
 
     private List<RagRetrievalDebugDTO.RetrievedChunk> toDebugChunks(List<Document> docs) {
