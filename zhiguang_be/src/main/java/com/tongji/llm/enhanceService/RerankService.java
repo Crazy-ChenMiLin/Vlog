@@ -42,12 +42,14 @@ public class RerankService {
             return fallback(fusedDocs, topK);
         }
 
+        //rerank模型只是发送了内容的text
+        //没有title
         try {
             RerankRequest request = new RerankRequest(
                     model,
                     new TextInput(standaloneQuestion),
                     fusedDocs.stream()
-                            .map(Document::getText)
+                            .map(this::buildRerankText)
                             .filter(StringUtils::hasText)
                             .map(TextInput::new)
                             .toList(),
@@ -88,6 +90,16 @@ public class RerankService {
 
     private List<Document> fallback(List<Document> fusedDocs, int topK) {
         return fusedDocs.stream().limit(topK).toList();
+    }
+
+    private String buildRerankText(Document document) {
+        String text = document.getText() == null ? "" : document.getText();
+        Object title = document.getMetadata().get("title");
+        String titleText = title == null ? "" : String.valueOf(title);
+        if (StringUtils.hasText(titleText)) {
+            return "标题：" + titleText + "\n正文：\n" + text;
+        }
+        return text;
     }
 
     private record RerankRequest(
