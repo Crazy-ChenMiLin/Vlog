@@ -1,0 +1,86 @@
+name: Deploy to cloud server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: zhiguang-be-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy with Docker Compose
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Maven build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Compile backend
+        run: mvn -q -DskipTests compile
+
+      - name: Prepare SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          test -n "$SERVER_HOST"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${SERVER_PORT:-22}" "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Package source
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='target' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='docs-user' \
+            -czf /tmp/zhiguang-be.tar.gz .
+
+      - name: Upload source and env
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          PROD_ENV: ${{ secrets.PROD_ENV }}
+        run: |
+          test -n "$SERVER_USER"
+          test -n "$DEPLOY_PATH"
+          test -n "$PROD_ENV"
+          ssh -i ~/.ssh/deploy_key -p "${SERVER_PORT:-22}" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH'"
+          scp -i ~/.ssh/deploy_key -P "${SERVER_PORT:-22}" /tmp/zhiguang-be.tar.gz "$SERVER_USER@$SERVER_HOST:/tmp/zhiguang-be.tar.gz"
+          printf '%s\n' "$PROD_ENV" > /tmp/zhiguang.env
+          scp -i ~/.ssh/deploy_key -P "${SERVER_PORT:-22}" /tmp/zhiguang.env "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/.env"
+
+      - name: Deploy on server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${SERVER_PORT:-22}" "$SERVER_USER@$SERVER_HOST" << EOF
+            set -e
+            cd "$DEPLOY_PATH"
+            tar -xzf /tmp/zhiguang-be.tar.gz
+            docker compose --env-file .env up -d --build
+            docker image prune -f
+          EOF

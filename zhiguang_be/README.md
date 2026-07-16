@@ -182,6 +182,39 @@ docker compose up -d --build zhiguang-be
 4. Kafka 单机测试环境不要把 `message.max.bytes` 等配置放到几百 MB，容易造成 broker 内存压力。
 5. RAG 相关依赖包括 Elasticsearch 向量索引、OpenAI-compatible embedding、NVIDIA rerank API，部署前必须确认网络和 Key 可用。
 
+## GitHub Actions 自动部署
+
+仓库提供 `.github/workflows/deploy.yml`，推送到 `main` 后会自动：
+
+```text
+checkout 代码
+-> Maven compile 校验
+-> 打包源码
+-> SSH 上传到云服务器
+-> 写入服务器 .env
+-> docker compose up -d --build
+```
+
+需要在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中配置：
+
+| Secret | 含义 |
+|---|---|
+| `SERVER_HOST` | 云服务器 IP 或域名 |
+| `SERVER_PORT` | SSH 端口，默认可填 `22` |
+| `SERVER_USER` | SSH 用户，例如 `root` |
+| `SERVER_SSH_KEY` | 私钥内容，不是 `.pub` 公钥 |
+| `DEPLOY_PATH` | 服务器部署目录，例如 `/opt/zhiguang/zhiguang_be` |
+| `PROD_ENV` | 生产 `.env` 完整内容，可参考 `.env.example` |
+
+服务器需要提前安装：
+
+```text
+Docker
+Docker Compose v2
+```
+
+如果服务器使用 1Panel 已有 MySQL、Redis、Kafka、Elasticsearch、MinIO，可以在 `PROD_ENV` 中把连接地址改成对应容器网络地址或服务器内网地址，并按需调整 `docker-compose.yml` 中的依赖服务。
+
 ## 主要接口
 
 RAG debug：
