@@ -3,7 +3,7 @@
 知光是一个知识获取与分享社区，支持知文发布、关注关系、点赞收藏、Feed 流、全文搜索、对象存储直传，以及面向知识库的 RAG 智能问答。项目目标不是简单 CRUD，而是围绕“内容社区 + 高并发读写 + AI 检索增强”做工程化拆分。
 
 - 前端仓库：https://github.com/G-Pegasus/zhiguang_fe
-- 后端仓库：https://github.com/G-Pegasus/zhiguang_be
+- 后端仓库：https://github.com/Crazy-ChenMiLin/Vlog
 - 后端技术栈：Java 21、Spring Boot、Spring Security、Spring AI、MyBatis、MySQL、Redis、Kafka、Elasticsearch、MinIO/OSS、Canal
 - 前端技术栈：React、Vite
 
