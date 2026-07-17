@@ -2,16 +2,15 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
-import type { IdentifierType, RegisterRequest } from "@/types/auth";
+import type { RegisterRequest } from "@/types/auth";
 import styles from "./RegisterPage.module.css";
-// 注册方式固定为手机号
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { register } = useAuth();
-  const identifierType: IdentifierType = "PHONE";
-  const [identifier, setIdentifier] = useState("");
+  const [phone, setPhone] = useState("");
+  const [deliveryEmail, setDeliveryEmail] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -37,8 +36,8 @@ const RegisterPage = () => {
   }, []);
 
   const handleSendCode = async () => {
-    if (!identifier) {
-      setError("请先填写账号信息");
+    if (!phone) {
+      setError("请先填写手机号");
       return;
     }
     setError(null);
@@ -47,10 +46,11 @@ const RegisterPage = () => {
     try {
       await authService.sendCode({
         scene: "REGISTER",
-        identifier,
-        identifierType
+        identifierType: "PHONE",
+        identifier: phone,
+        deliveryEmail: deliveryEmail || undefined
       });
-      setMessage("验证码已发送，请注意查收");
+      setMessage(deliveryEmail ? "验证码已发送到接收邮箱，请注意查收" : "验证码已生成，请查看后端日志");
       setCountdown(60);
     } catch (err) {
       const info = err instanceof Error ? err.message : "验证码发送失败";
@@ -67,15 +67,14 @@ const RegisterPage = () => {
     setSubmitting(true);
     try {
       const payload: RegisterRequest = {
-        identifierType,
-        identifier,
+        identifierType: "PHONE",
+        identifier: phone,
         code,
         password,
         agreeTerms
       };
       await register(payload);
       setMessage("注册成功，已自动登录");
-      // 直接跳回来源页面或首页
       const from = (location.state as { from?: string } | undefined)?.from ?? "/";
       redirectTimerRef.current = window.setTimeout(() => {
         navigate(from, { replace: true });
@@ -88,7 +87,7 @@ const RegisterPage = () => {
     }
   };
 
-  const isDisabled = submitting || !identifier || !code || !password || !agreeTerms;
+  const isDisabled = submitting || !phone || !code || !password || !agreeTerms;
 
   return (
     <div className={styles.page}>
@@ -99,24 +98,35 @@ const RegisterPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="identifier">手机号</label>
+            <label className={styles.label} htmlFor="phone">手机号</label>
             <input
-              id="identifier"
+              id="phone"
               className={styles.input}
-              value={identifier}
-              onChange={event => setIdentifier(event.target.value)}
-              placeholder="请输入账号"
+              value={phone}
+              onChange={event => setPhone(event.target.value)}
+              placeholder="请输入手机号"
               type="tel"
               autoComplete="tel"
             />
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="code">
-              验证码
-            </label>
+            <label className={styles.label} htmlFor="deliveryEmail">验证码接收邮箱</label>
+            <input
+              id="deliveryEmail"
+              className={styles.input}
+              value={deliveryEmail}
+              onChange={event => setDeliveryEmail(event.target.value)}
+              placeholder="可选：把验证码发送到这个邮箱"
+              type="email"
+              autoComplete="email"
+            />
+            <span className={styles.tips}>邮箱只用于接收本次验证码，不会写入账号身份。</span>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="code">验证码</label>
             <div className={styles.codeRow}>
               <input
                 id="code"
@@ -135,13 +145,10 @@ const RegisterPage = () => {
                 {countdown > 0 ? `${countdown}s` : "获取验证码"}
               </button>
             </div>
-            <span className={styles.tips}>验证码用于验证账号所有权，有效期有限，请及时填写。</span>
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="password">
-              登录密码
-            </label>
+            <label className={styles.label} htmlFor="password">登录密码</label>
             <input
               id="password"
               className={styles.input}
@@ -152,8 +159,6 @@ const RegisterPage = () => {
               autoComplete="new-password"
             />
           </div>
-
-          
 
           <div className={styles.field}>
             <div className={styles.checkboxRow}>

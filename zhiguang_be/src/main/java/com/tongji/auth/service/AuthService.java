@@ -84,7 +84,7 @@ public class AuthService {
         if ((request.scene() == VerificationScene.LOGIN || request.scene() == VerificationScene.RESET_PASSWORD) && !exists) {
             throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND);
         }
-        SendCodeResult result = verificationService.sendCode(request.scene(), normalized);
+        SendCodeResult result = verificationService.sendCode(request.scene(), normalized, request.deliveryEmail());
         return new SendCodeResponse(result.identifier(), result.scene(), result.expireSeconds());
     }
 
