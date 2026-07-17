@@ -21,20 +21,30 @@ trap cleanup_key EXIT
 
 if [[ -z "$SSH_KEY_PATH" && -n "${CLOUD_SSH_KEY:-}" ]]; then
   TEMP_SSH_KEY="$(mktemp)"
-  printf '%s\n' "$CLOUD_SSH_KEY" > "$TEMP_SSH_KEY"
+  printf '%s\n' "$CLOUD_SSH_KEY" | sed 's/\r$//' > "$TEMP_SSH_KEY"
   chmod 600 "$TEMP_SSH_KEY"
   SSH_KEY_PATH="$TEMP_SSH_KEY"
 fi
 
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
+if [[ -z "$SSH_KEY_PATH" ]]; then
+  echo "CLOUD_SSH_KEY or CLOUD_SSH_KEY_PATH is required for cloud deployment." >&2
+  exit 1
+fi
+
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
 if [[ -n "$SSH_KEY_PATH" ]]; then
   SSH_OPTS=(-i "$SSH_KEY_PATH" "${SSH_OPTS[@]}")
 fi
 
 REMOTE_TMP="/tmp/zhiguang-fe-release"
 
+echo "Testing SSH connection to $CLOUD_USER@$CLOUD_HOST ..."
+ssh "${SSH_OPTS[@]}" "$CLOUD_USER@$CLOUD_HOST" "echo 'Cloud SSH OK'"
+
+echo "Uploading frontend dist to $CLOUD_USER@$CLOUD_HOST:$REMOTE_TMP ..."
 ssh "${SSH_OPTS[@]}" "$CLOUD_USER@$CLOUD_HOST" "rm -rf '$REMOTE_TMP' && mkdir -p '$REMOTE_TMP'"
 rsync -az --delete -e "ssh ${SSH_OPTS[*]}" "$DIST_DIR"/ "$CLOUD_USER@$CLOUD_HOST:$REMOTE_TMP"/
+echo "Activating frontend release and reloading nginx ..."
 ssh "${SSH_OPTS[@]}" "$CLOUD_USER@$CLOUD_HOST" "
   set -e
   mkdir -p '$CLOUD_WEB_ROOT'
