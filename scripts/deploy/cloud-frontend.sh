@@ -21,7 +21,7 @@ trap cleanup_key EXIT
 
 if [[ -z "$SSH_KEY_PATH" && -n "${CLOUD_SSH_KEY:-}" ]]; then
   TEMP_SSH_KEY="$(mktemp)"
-  printf '%s\n' "$CLOUD_SSH_KEY" | sed 's/\r$//' > "$TEMP_SSH_KEY"
+  printf '%b\n' "$CLOUD_SSH_KEY" | sed 's/\r$//' > "$TEMP_SSH_KEY"
   chmod 600 "$TEMP_SSH_KEY"
   SSH_KEY_PATH="$TEMP_SSH_KEY"
 fi
@@ -33,6 +33,10 @@ fi
 
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
 if [[ -n "$SSH_KEY_PATH" ]]; then
+  if ! ssh-keygen -y -f "$SSH_KEY_PATH" >/dev/null 2>&1; then
+    echo "CLOUD_SSH_KEY is not a valid OpenSSH private key. Please paste the private key, including BEGIN/END lines, into the GitHub secret." >&2
+    exit 1
+  fi
   SSH_OPTS=(-i "$SSH_KEY_PATH" "${SSH_OPTS[@]}")
 fi
 
