@@ -1,0 +1,22 @@
+name: Test Checkout
+
+on:
+  workflow_dispatch:
+
+jobs:
+  checkout-test:
+
+    runs-on: self-hosted
+
+    steps:
+
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 查看代码
+        run: |
+          echo "当前目录:"
+          pwd
+
+          echo "文件:"
+          ls -la
