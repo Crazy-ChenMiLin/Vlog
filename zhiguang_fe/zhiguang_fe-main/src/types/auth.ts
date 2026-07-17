@@ -6,6 +6,7 @@ export type SendCodeRequest = {
   scene: VerificationScene;
   identifierType: IdentifierType;
   identifier: string;
+  deliveryEmail?: string;
 };
 
 export type SendCodeResponse = {

@@ -13,7 +13,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, user } = useAuth();
-  const [identifier, setIdentifier] = useState("");
+  const [phone, setPhone] = useState("");
+  const [deliveryEmail, setDeliveryEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +41,11 @@ const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const payload: LoginRequest = { identifierType: "PHONE", identifier, code };
+      const payload: LoginRequest = {
+        identifierType: "PHONE",
+        identifier: phone,
+        code
+      };
       await login(payload);
       navigate(from, { replace: true });
     } catch (err) {
@@ -52,8 +57,8 @@ const LoginPage = () => {
   };
 
   const handleSendCode = async () => {
-    if (!identifier) {
-      setError("请先填写账号信息");
+    if (!phone) {
+      setError("请先填写手机号");
       return;
     }
     setError(null);
@@ -62,7 +67,8 @@ const LoginPage = () => {
       const response = await authService.sendCode({
         scene: "LOGIN",
         identifierType: "PHONE",
-        identifier
+        identifier: phone,
+        deliveryEmail: deliveryEmail || undefined
       });
       setCountdown(Math.max(1, response.expireSeconds ?? 300));
     } catch (err) {
@@ -73,7 +79,7 @@ const LoginPage = () => {
     }
   };
 
-  const isDisabled = submitting || !identifier || !code;
+  const isDisabled = submitting || !phone || !code;
 
   return (
     <div className={styles.page}>
@@ -84,26 +90,35 @@ const LoginPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {/* 只保留手机号 + 验证码登录，不提供选择 */}
-
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="identifier">
-              手机号
-            </label>
+            <label className={styles.label} htmlFor="phone">手机号</label>
             <input
-              id="identifier"
+              id="phone"
               className={styles.input}
-              value={identifier}
-              onChange={event => setIdentifier(event.target.value)}
-              placeholder="请输入账号"
+              value={phone}
+              onChange={event => setPhone(event.target.value)}
+              placeholder="请输入手机号"
               type="tel"
               autoComplete="tel"
             />
           </div>
+
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="code">
-              验证码
-            </label>
+            <label className={styles.label} htmlFor="deliveryEmail">验证码接收邮箱</label>
+            <input
+              id="deliveryEmail"
+              className={styles.input}
+              value={deliveryEmail}
+              onChange={event => setDeliveryEmail(event.target.value)}
+              placeholder="可选：把验证码发送到这个邮箱"
+              type="email"
+              autoComplete="email"
+            />
+            <span className={styles.tips}>邮箱只用于接收本次验证码，不作为登录账号。</span>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="code">验证码</label>
             <div className={styles.codeRow}>
               <input
                 id="code"
@@ -122,7 +137,6 @@ const LoginPage = () => {
                 {countdown > 0 ? `${countdown}s` : "获取验证码"}
               </button>
             </div>
-            <span className={styles.tips}>验证码用于校验登录，不需要输入密码。</span>
           </div>
 
           {error ? <div className={styles.error}>{error}</div> : null}
