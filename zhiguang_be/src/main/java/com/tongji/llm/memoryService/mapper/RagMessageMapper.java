@@ -1,6 +1,6 @@
-package com.tongji.llm.rag.mapper;
+package com.tongji.llm.memoryService.mapper;
 
-import com.tongji.llm.rag.model.RagMessage;
+import com.tongji.llm.memoryService.model.RagMessage;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

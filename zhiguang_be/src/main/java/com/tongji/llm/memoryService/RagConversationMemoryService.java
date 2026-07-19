@@ -1,10 +1,12 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.memoryService;
 
 import com.tongji.common.id.IdService;
-import com.tongji.llm.rag.mapper.RagConversationMapper;
-import com.tongji.llm.rag.mapper.RagMessageMapper;
-import com.tongji.llm.rag.model.RagConversation;
-import com.tongji.llm.rag.model.RagMessage;
+import com.tongji.llm.chat.model.RagChatRole;
+import com.tongji.llm.chat.model.RagChatScope;
+import com.tongji.llm.memoryService.mapper.RagConversationMapper;
+import com.tongji.llm.memoryService.mapper.RagMessageMapper;
+import com.tongji.llm.memoryService.model.RagConversation;
+import com.tongji.llm.memoryService.model.RagMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -62,14 +64,11 @@ public class RagConversationMemoryService {
         return messages;
     }
 
-    public void appendMessage(long userId, long conversationId, String role, String content) {
-        if (!RagChatRole.USER.equals(role) && !RagChatRole.ASSISTANT.equals(role)) {
-            throw new IllegalArgumentException("Unsupported chat role: " + role);
-        }
+    public void appendMessage(long userId, long conversationId, RagChatRole role, String content) {
         if (!StringUtils.hasText(content)) {
             return;
         }
-        messageMapper.insert(idService.nextId(), conversationId, userId, role, content);
+        messageMapper.insert(idService.nextId(), conversationId, userId, role.value(), content);
         conversationMapper.touch(conversationId, userId);
     }
 
@@ -77,15 +76,17 @@ public class RagConversationMemoryService {
         if (!RagChatScope.isSupported(scope)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不支持的会话范围");
         }
-        if (RagChatScope.GLOBAL.equals(scope) && postId != null) {
+        if (RagChatScope.GLOBAL.is(scope) && postId != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "全库会话不能绑定文章");
         }
-        if (RagChatScope.POST.equals(scope) && postId == null) {
+        if (RagChatScope.POST.is(scope) && postId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "单篇文章会话缺少 postId");
         }
     }
 
     private String defaultTitle(String scope) {
-        return RagChatScope.POST.equals(scope) ? "单篇文章问答" : "全库问答";
+        return RagChatScope.fromValue(scope)
+                .map(RagChatScope::defaultTitle)
+                .orElse("问答");
     }
 }

@@ -1,4 +1,4 @@
-package com.tongji.llm.rag.config;
+package com.tongji.llm.config;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -12,7 +12,7 @@ import org.springframework.validation.annotation.Validated;
 @Component
 @Validated
 @ConfigurationProperties(prefix = "rag")
-public class RagProperties {
+public class RagConfig {
     @Valid
     private Answer answer = new Answer();
 

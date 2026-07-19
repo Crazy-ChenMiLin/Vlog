@@ -67,6 +67,12 @@ public class SearchServiceImpl implements SearchService {
                         // 召回与加权：先构造 bool 查询，再用 function_score 做互动数据加权
                         .query(qb -> qb.functionScore(fs -> fs
                                 .query(qb2 -> qb2.bool(bq -> {
+                                    /*
+                                    q 是用户输入的关键词
+                                    multiMatch 表示拿 q 同时去多个字段里搜
+                                    title^3 表示标题字段权重更高
+                                    body 表示正文也参与搜索
+                                     */
                                     bq.must(m -> m.multiMatch(mm   -> mm.query(q)
                                             .fields("title^3", "body")));
                                     bq.filter(f -> f.term(t -> t.field("status")

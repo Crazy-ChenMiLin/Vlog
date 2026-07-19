@@ -1,10 +1,15 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.chat;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.DTO.RagRetrievalResultRankDTO;
+import com.tongji.llm.chat.model.RagChatRole;
+import com.tongji.llm.chat.model.RagChatScope;
+import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.enhanceService.RerankService;
-import com.tongji.llm.rag.model.RagConversation;
-import com.tongji.llm.rag.model.RagMessage;
+import com.tongji.llm.memoryService.model.RagConversation;
+import com.tongji.llm.memoryService.model.RagMessage;
+import com.tongji.llm.memoryService.RagConversationMemoryService;
+import com.tongji.llm.searchService.RagRetrievalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -27,7 +32,7 @@ public class RagQueryService {
     private final RerankService rerankService;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
-        //先混合检索到文章
+        // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
         RagRetrievalResultDTO retrieval = retrievalService.retrieveForPost(postId, question, topK);
         //然后rerank文章
         RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
@@ -36,7 +41,7 @@ public class RagQueryService {
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
-        //先混合检索到文章
+        // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
         RagRetrievalResultDTO retrieval = retrievalService.retrieveGlobal(question, topK);
         //然后rerank文章
         RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
@@ -58,7 +63,7 @@ public class RagQueryService {
                 RagConversationMemoryService.DEFAULT_HISTORY_LIMIT
         );
         String standaloneQuestion = queryRewriteService.rewrite(originalQuestion, recentMessages);
-        RagRetrievalResultDTO retrieval = RagChatScope.POST.equals(scope)
+        RagRetrievalResultDTO retrieval = RagChatScope.POST.is(scope)
                 ? retrievalService.retrieveForPost(postId, standaloneQuestion, topK)
                 : retrievalService.retrieveGlobal(standaloneQuestion, topK);
         RagRetrievalResultRankDTO ranked = rankRetrieval(standaloneQuestion, retrieval, topK);
@@ -177,7 +182,9 @@ public class RagQueryService {
         }
         StringBuilder builder = new StringBuilder();
         for (RagMessage message : messages) {
-            String role = RagChatRole.USER.equals(message.getRole()) ? "用户" : "助手";
+            String role = RagChatRole.fromValue(message.getRole())
+                    .map(RagChatRole::displayName)
+                    .orElse("未知");
             builder.append(role).append("：")
                     .append(message.getContent())
                     .append('\n');
@@ -186,7 +193,7 @@ public class RagQueryService {
     }
 
     private String emptyResultMessage(String scope) {
-        return RagChatScope.POST.equals(scope)
+        return RagChatScope.POST.is(scope)
                 ? "未找到与问题相关的当前文章内容，请换一种问法后再试。"
                 : "未找到与问题相关的知识库内容，请换一种问法后再试。";
     }

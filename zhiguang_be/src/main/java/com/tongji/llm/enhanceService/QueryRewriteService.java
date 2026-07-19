@@ -1,6 +1,7 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.enhanceService;
 
-import com.tongji.llm.rag.model.RagMessage;
+import com.tongji.llm.chat.model.RagChatRole;
+import com.tongji.llm.memoryService.model.RagMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -50,7 +51,9 @@ public class QueryRewriteService {
     private String formatHistory(List<RagMessage> messages) {
         StringBuilder builder = new StringBuilder();
         for (RagMessage message : messages) {
-            String role = RagChatRole.USER.equals(message.getRole()) ? "用户" : "助手";
+            String role = RagChatRole.fromValue(message.getRole())
+                    .map(RagChatRole::displayName)
+                    .orElse("未知");
             builder.append(role).append("：")
                     .append(message.getContent())
                     .append('\n');

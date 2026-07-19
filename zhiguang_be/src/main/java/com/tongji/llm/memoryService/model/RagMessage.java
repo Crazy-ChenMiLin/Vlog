@@ -1,4 +1,4 @@
-package com.tongji.llm.rag.model;
+package com.tongji.llm.memoryService.model;
 
 import lombok.Data;
 
