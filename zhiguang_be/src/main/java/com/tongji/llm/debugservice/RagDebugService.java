@@ -1,9 +1,10 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.debugservice;
 
 import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.DTO.RagRetrievalResultRankDTO;
 import com.tongji.llm.enhanceService.RerankService;
+import com.tongji.llm.searchService.RagRetrievalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
@@ -22,14 +23,14 @@ public class RagDebugService {
     private final RagRetrievalService retrievalService;
     private final RerankService rerankService;
 
-    //先混合检索到文章
+    // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
     public RagRetrievalDebugDTO debugPostRetrieval(long postId, String question, int topK) {
         RagRetrievalResultDTO result = retrievalService.retrieveForPost(postId, question, topK);
     //然后rerank文章
         return toDebugResult("post", postId, question, result);
     }
 
-    //先混合检索到文章
+    // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
     public RagRetrievalDebugDTO debugGlobalRetrieval(String question, int topK) {
         RagRetrievalResultDTO result = retrievalService.retrieveGlobal(question, topK);
     //然后rerank文章

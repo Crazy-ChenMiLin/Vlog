@@ -1,4 +1,4 @@
-package com.tongji.llm.rag;
+package com.tongji.llm.searchService;
 
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
@@ -17,7 +17,8 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 
 /**
- * 负责单篇或全库的原问题检索、HyDE 检索和 RRF 融合。
+ * 负责单篇或全库的原问题向量检索、HyDE 向量检索和 RRF 融合。
+ * 底层通过 Spring AI Elasticsearch VectorStore 做 kNN 检索，当前使用 cosine 相似度。
  */
 @Slf4j
 @Service
@@ -46,7 +47,8 @@ public class RagRetrievalService {
         List<Document> hydeDocs = StringUtils.hasText(hypotheticalAnswer)
                 ? searchDocuments(postId, hypotheticalAnswer, topK)
                 : List.of();
-        //RRF（Reciprocal Rank Fusion，倒数排名融合）
+        // 两路召回都是向量检索：原问题召回 + HyDE 假设答案召回。
+        // RRF（Reciprocal Rank Fusion，倒数排名融合）只负责融合排名，不代表 BM25 混合召回。
         List<Document> fusedDocs = hydeDocs.isEmpty()
                 ? originalDocs.stream().limit(topK).toList()
                 : rrfFusion.fuse(List.of(originalDocs, hydeDocs), topK);
