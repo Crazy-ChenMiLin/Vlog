@@ -28,11 +28,18 @@ public class RrfFusionService {
 
 
     /**
-     * 多路召回结果融合
+     * 多路召回结果融合。
+     *
+     * 当前 RAG 不是 BM25 + 向量的混合召回，而是两路向量召回：
+     * 1. 原始问题的向量检索结果
+     * 2. HyDE 假设答案的向量检索结果
+     *
+     * 如果后续接入 BM25 关键词召回，也可以继续复用这个 RRF 融合逻辑。
+     *
      * @param rankedLists 多个召回结果列表
      * [
-     *    [A,B,C],   // 向量检索结果
-     *    [B,D,A]    // BM25结果
+     *    [A,B,C],   // 原问题向量检索结果
+     *    [B,D,A]    // HyDE 答案向量检索结果
      * ]
      * @param topK 最终保留多少个文档
      * @return RRF排序后的文档列表
@@ -68,9 +75,9 @@ public class RrfFusionService {
          * 遍历每一路召回结果
          * 例如：
          * 第一次循环：
-         * 向量检索结果
+         * 原问题向量检索结果
          * 第二次循环：
-         * BM25结果
+         * HyDE 答案向量检索结果
          */
         for (List<Document> rankedList : rankedLists) {
 
@@ -160,10 +167,10 @@ public class RrfFusionService {
 
     /**
      * 获取文档唯一标识
-     * 因为多个召回器可能找到同一个文档。
-     * 向量搜索找到：
+     * 因为多路召回可能找到同一个文档。
+     * 原问题向量检索找到：
      * chunk001
-     * BM25也找到：
+     * HyDE 答案向量检索也找到：
      * chunk001
      *
      * RRF需要知道：
