@@ -51,6 +51,7 @@ public class RagDebugService {
                 result.similarityThreshold(),
                 toDebugChunks(result.originalDocs()),
                 toDebugChunks(result.hydeDocs()),
+                toDebugChunks(result.keywordDocs()),
                 toDebugChunks(result.fusedDocs()),
                 toDebugChunks(ranked.rerankedDocs()),
                 toDebugChunks(ranked.answerDocs())

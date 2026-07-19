@@ -12,11 +12,13 @@ public record RagRetrievalResultDTO(
         double similarityThreshold,
         List<Document> originalDocs,
         List<Document> hydeDocs,
+        List<Document> keywordDocs,
         List<Document> fusedDocs
 ) {
     public RagRetrievalResultDTO {
         originalDocs = List.copyOf(originalDocs);
         hydeDocs = List.copyOf(hydeDocs);
+        keywordDocs = List.copyOf(keywordDocs);
         fusedDocs = List.copyOf(fusedDocs);
     }
 }

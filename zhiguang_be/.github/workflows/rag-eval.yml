@@ -1,0 +1,103 @@
+name: RAG evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      questions:
+        description: "Question set file"
+        required: true
+        default: "scripts/rag-eval/questions-40.json"
+      top_k:
+        description: "Debug retrieval topK"
+        required: true
+        default: "10"
+      run_name:
+        description: "Output run name"
+        required: false
+        default: ""
+      off_port:
+        description: "Backend port for bm25-off"
+        required: true
+        default: "18180"
+      on_port:
+        description: "Backend port for bm25-on"
+        required: true
+        default: "18181"
+
+concurrency:
+  group: rag-eval
+  cancel-in-progress: false
+
+jobs:
+  rag-eval:
+    name: Run BM25 A/B evaluation
+    runs-on: self-hosted
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r scripts/rag-eval/requirements.txt
+
+      - name: Import RAG eval environment
+        shell: pwsh
+        env:
+          RAG_EVAL_ENV: ${{ secrets.RAG_EVAL_ENV }}
+        run: |
+          if ($env:RAG_EVAL_ENV -eq "") {
+            Write-Host "RAG_EVAL_ENV is empty; using repository/application defaults."
+            exit 0
+          }
+          foreach ($line in $env:RAG_EVAL_ENV -split "`n") {
+            $trimmed = $line.Trim()
+            if ($trimmed -eq "" -or $trimmed.StartsWith("#")) {
+              continue
+            }
+            $parts = $trimmed -split "=", 2
+            if ($parts.Length -ne 2) {
+              continue
+            }
+            $name = $parts[0].Trim()
+            $value = $parts[1].Trim()
+            Add-Content -Path $env:GITHUB_ENV -Value "$name=$value"
+          }
+
+      - name: Run RAG BM25 A/B evaluation
+        shell: pwsh
+        run: |
+          $runName = "${{ inputs.run_name }}"
+          if ($runName -eq "") {
+            $runName = "github-rag-ab-${{ github.run_id }}"
+          }
+
+          ./scripts/rag-eval/run-rag-ab.ps1 `
+            -RunName $runName `
+            -Questions "${{ inputs.questions }}" `
+            -TopK ${{ inputs.top_k }} `
+            -OffPort ${{ inputs.off_port }} `
+            -OnPort ${{ inputs.on_port }} `
+            -ReportTitle "GitHub Action RAG BM25 A/B 自动评估"
+
+      - name: Upload RAG eval report
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-eval-${{ github.run_id }}
+          path: target/rag-eval/**
+          if-no-files-found: error

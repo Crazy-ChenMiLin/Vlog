@@ -23,6 +23,10 @@ docs-user/
 
 # Local RAG experiments/tests
 src/test/java/com/tongji/llm/
+!src/test/java/com/tongji/llm/
+!src/test/java/com/tongji/llm/*/
+!src/test/java/com/tongji/llm/searchService/
+!src/test/java/com/tongji/llm/searchService/*.java
 
 # Eclipse
 .apt_generated

@@ -13,6 +13,7 @@ public record RagRetrievalDebugDTO(
         double similarityThreshold,
         List<RetrievedChunk> originalResults,
         List<RetrievedChunk> hydeResults,
+        List<RetrievedChunk> keywordResults,
         List<RetrievedChunk> fusedResults,
         List<RetrievedChunk> rerankedResults,
         List<RetrievedChunk> answerResults
@@ -23,7 +24,7 @@ public record RagRetrievalDebugDTO(
             String chunkId,
             String title,
             Integer position,
-            Double vectorScore,//得分向量检索返回的相似度分数，不是rrf得分
+            Double vectorScore,// 历史字段名：向量结果是相似度分数，BM25 结果是 ES _score；不是 RRF 分数。
             String sectionTitle,
             String sectionType,
             String questionIntent,
