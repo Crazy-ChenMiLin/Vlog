@@ -83,12 +83,41 @@ def compact_chunk(chunk: dict | None) -> dict | None:
     }
 
 
+def compact_graph_context(gc: dict | None) -> dict | None:
+    """把 debug 接口返回的 graphContext 原样收敛成可落盘的结构。
+
+    这是 A/B 评测的“观察仪表盘”字段：graph-off 时后端返回空对象（matched/relations
+    均为空），graph-on 时返回 Neo4j 匹配到的实体/关系/父概念/扩展词。逐题保留它，
+    才能复盘每一题到底有没有命中图关系，而不是只看到最终的召回指标。
+    """
+    if not gc:
+        return None
+    return {
+        "matchedEntities": [
+            {"name": m.get("name"), "type": m.get("type")}
+            for m in (gc.get("matchedEntities") or [])
+        ],
+        "relations": [
+            {
+                "source": r.get("source"),
+                "type": r.get("type"),
+                "target": r.get("target"),
+                "description": r.get("description"),
+            }
+            for r in (gc.get("relations") or [])
+        ],
+        "parentConcepts": gc.get("parentConcepts") or [],
+        "expandedTerms": gc.get("expandedTerms") or [],
+    }
+
+
 def build_row(question: str, debug: dict, latency_ms: int) -> dict:
     original = debug.get("originalResults") or []
     hyde = debug.get("hydeResults") or []
     keyword = debug.get("keywordResults") or []
     fused = debug.get("fusedResults") or []
     reranked = debug.get("rerankedResults") or []
+    gc = compact_graph_context(debug.get("graphContext"))
 
     keyword_keys = key_set(keyword)
     vector_keys = key_set(original) | key_set(hyde)
@@ -125,6 +154,9 @@ def build_row(question: str, debug: dict, latency_ms: int) -> dict:
         ],
         "fusedTop5": [compact_chunk(chunk) for chunk in fused[:5]],
         "rerankedTop5": [compact_chunk(chunk) for chunk in reranked[:5]],
+        # GraphContext 仪表盘：graph-off 时为 null / 空，graph-on 时带实体与关系
+        "graphContext": gc,
+        "graphContextHit": bool(gc and (gc.get("matchedEntities") or gc.get("relations"))),
     }
 
 
@@ -161,6 +193,10 @@ def main() -> None:
         ),
         "fusedTop1FromKeywordCount": sum(1 for row in rows if row["fusedTop1FromKeyword"]),
         "rerankTop1FromKeywordCount": sum(1 for row in rows if row["rerankTop1FromKeyword"]),
+        "graphContextHitCount": sum(1 for row in rows if row["graphContextHit"]),
+        "graphContextHitQuestionCount": sum(
+            1 for row in rows if row.get("graphContextHit")
+        ),
         "rows": rows,
         "errorsDetail": errors,
     }
@@ -177,6 +213,8 @@ def main() -> None:
         "keywordOnlyInFusedTotal",
         "keywordOnlyInRerankedTop5Total",
         "keywordOnlyInRerankedTop5QuestionCount",
+        "graphContextHitCount",
+        "graphContextHitQuestionCount",
     ]}, ensure_ascii=False, indent=2))
     print(str(args.output))
 
