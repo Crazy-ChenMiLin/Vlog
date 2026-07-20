@@ -154,6 +154,10 @@ def build_row(question: str, debug: dict, latency_ms: int) -> dict:
         ],
         "fusedTop5": [compact_chunk(chunk) for chunk in fused[:5]],
         "rerankedTop5": [compact_chunk(chunk) for chunk in reranked[:5]],
+        # Top10 快照：扩展评测用（判断“召回到但排得靠后”还是“根本没召回”）。
+        # 接口返回的 fused/reranked 即为完整融合池（topK=10 时即 10 条），这里直接存前 10。
+        "fusedTop10": [compact_chunk(chunk) for chunk in fused[:10]],
+        "rerankedTop10": [compact_chunk(chunk) for chunk in reranked[:10]],
         # GraphContext 仪表盘：graph-off 时为 null / 空，graph-on 时带实体与关系
         "graphContext": gc,
         "graphContextHit": bool(gc and (gc.get("matchedEntities") or gc.get("relations"))),
