@@ -18,6 +18,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: 2
+          GIT_CONFIG_KEY_0: url.https://v4.gh-proxy.org/https://github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
+          GIT_CONFIG_KEY_1: http.version
+          GIT_CONFIG_VALUE_1: HTTP/1.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Deploy backend on internal server
         env:
