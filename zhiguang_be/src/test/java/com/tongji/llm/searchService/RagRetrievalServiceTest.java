@@ -5,6 +5,10 @@ import com.tongji.common.exception.ErrorCode;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.enhanceService.HyDEService;
 import com.tongji.llm.enhanceService.RrfFusionService;
+import com.tongji.llm.graphService.GraphContextService;
+import com.tongji.llm.graphService.model.GraphContext;
+import com.tongji.llm.graphService.model.GraphEntity;
+import com.tongji.llm.graphService.model.GraphRelation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -32,6 +36,8 @@ class RagRetrievalServiceTest {
     private RagVectorRetrievalService vectorRetrievalService;
     @Mock
     private RagBm25RetrievalService bm25RetrievalService;
+    @Mock
+    private GraphContextService graphContextService;
     @Mock
     private HyDEService hydeService;
     @Mock
@@ -71,7 +77,7 @@ class RagRetrievalServiceTest {
 
         assertThat(result.keywordDocs()).isEmpty();
         assertThat(result.fusedDocs()).containsExactly(original);
-        verifyNoInteractions(indexService, bm25RetrievalService, rrfFusion);
+        verifyNoInteractions(indexService, bm25RetrievalService, graphContextService, rrfFusion);
     }
 
     @Test
@@ -83,7 +89,7 @@ class RagRetrievalServiceTest {
         assertThatThrownBy(() -> service.retrieveForPost(123L, "问题", 5))
                 .isInstanceOf(BusinessException.class);
 
-        verifyNoInteractions(vectorRetrievalService, bm25RetrievalService, hydeService, rrfFusion);
+        verifyNoInteractions(vectorRetrievalService, bm25RetrievalService, graphContextService, hydeService, rrfFusion);
     }
 
     @Test
@@ -104,15 +110,50 @@ class RagRetrievalServiceTest {
         verify(vectorRetrievalService, never()).search(null, null, 5);
     }
 
+    @Test
+    void graphContextEnhancesHydeAndBm25QueriesWhenEnabled() {
+        Document original = document("1#0");
+        Document hyde = document("1#1");
+        Document keyword = document("1#2");
+        GraphContext graphContext = new GraphContext(
+                List.of(new GraphEntity("缓存命中", List.of("缓存命中", "命中"))),
+                List.of(new GraphRelation("缓存命中", "COMPARE_WITH", "缓存击穿", "缓存命中是直接从缓存返回，缓存击穿是热点 key 失效后打到数据库。")),
+                List.of("Redis 缓存问题"),
+                List.of("缓存命中", "命中", "缓存击穿", "热点 key", "互斥锁")
+        );
+        when(graphContextService.build("缓存命中和缓存击穿是什么关系")).thenReturn(graphContext);
+        when(hydeService.generateHypotheticalAnswer(org.mockito.ArgumentMatchers.contains("已知知识图谱关系")))
+                .thenReturn("带关系的假设答案");
+        when(vectorRetrievalService.search(null, "缓存命中和缓存击穿是什么关系", 5)).thenReturn(List.of(original));
+        when(vectorRetrievalService.search(null, "带关系的假设答案", 5)).thenReturn(List.of(hyde));
+        when(bm25RetrievalService.search(null, graphContext.keywordQuery("缓存命中和缓存击穿是什么关系"), 5))
+                .thenReturn(List.of(keyword));
+        when(rrfFusion.fuse(List.of(List.of(original), List.of(hyde), List.of(keyword)), 5))
+                .thenReturn(List.of(keyword, hyde, original));
+        RagRetrievalService service = createService(true, true);
+
+        RagRetrievalResultDTO result = service.retrieveGlobal("缓存命中和缓存击穿是什么关系", 5);
+
+        assertThat(result.graphContext().matchedEntities()).hasSize(1);
+        assertThat(result.keywordDocs()).containsExactly(keyword);
+        assertThat(result.fusedDocs()).containsExactly(keyword, hyde, original);
+    }
+
     private RagRetrievalService createService(boolean bm25Enabled) {
+        return createService(bm25Enabled, false);
+    }
+
+    private RagRetrievalService createService(boolean bm25Enabled, boolean graphEnabled) {
         RagRetrievalService service = new RagRetrievalService(
                 indexService,
                 vectorRetrievalService,
                 bm25RetrievalService,
+                graphContextService,
                 hydeService,
                 rrfFusion
         );
         ReflectionTestUtils.setField(service, "bm25Enabled", bm25Enabled);
+        ReflectionTestUtils.setField(service, "graphEnabled", graphEnabled);
         return service;
     }
 

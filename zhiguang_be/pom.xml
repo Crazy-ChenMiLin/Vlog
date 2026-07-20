@@ -161,6 +161,12 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- Neo4j：图数据库驱动（知识图谱/关系存储） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-neo4j</artifactId>
+        </dependency>
+
         <!-- Caffeine：本地内存缓存（高性能 LRU/TTL 缓存） -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>

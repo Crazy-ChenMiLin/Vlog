@@ -49,6 +49,12 @@ public class RagDebugService {
                 question,
                 result.hypotheticalAnswer(),
                 result.similarityThreshold(),
+                new RagRetrievalDebugDTO.GraphContextDebugDTO(
+                        result.graphContext().matchedEntities(),
+                        result.graphContext().relations(),
+                        result.graphContext().parentConcepts(),
+                        result.graphContext().expandedTerms()
+                ),
                 toDebugChunks(result.originalDocs()),
                 toDebugChunks(result.hydeDocs()),
                 toDebugChunks(result.keywordDocs()),
