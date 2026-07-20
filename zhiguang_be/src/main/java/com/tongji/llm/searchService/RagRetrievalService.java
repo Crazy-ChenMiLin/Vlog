@@ -3,6 +3,8 @@ package com.tongji.llm.searchService;
 import com.tongji.llm.enhanceService.HyDEService;
 import com.tongji.llm.enhanceService.RrfFusionService;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.graphService.GraphContextService;
+import com.tongji.llm.graphService.model.GraphContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -23,11 +25,14 @@ public class RagRetrievalService {
     private final RagIndexService indexService;
     private final RagVectorRetrievalService vectorRetrievalService;
     private final RagBm25RetrievalService bm25RetrievalService;
+    private final GraphContextService graphContextService;
     private final HyDEService hydeService;
     private final RrfFusionService rrfFusion;
 
     @Value("${rag.retrieval.bm25-enabled:false}")
     private boolean bm25Enabled;
+    @Value("${rag.retrieval.graph-enabled:false}")
+    private boolean graphEnabled;
 
     public RagRetrievalResultDTO retrieveForPost(long postId, String question, int topK) {
         indexService.ensureIndexed(postId);
@@ -39,14 +44,18 @@ public class RagRetrievalService {
     }
 
     private RagRetrievalResultDTO retrieveInternal(Long postId, String question, int topK) {
-        // HyDE 只生成向量召回用的辅助查询；BM25 仍使用用户问题本身，避免生成文本污染关键词召回。
-        String hypotheticalAnswer = hydeService.generateHypotheticalAnswer(question);
+        GraphContext graphContext = graphEnabled ? graphContextService.build(question) : GraphContext.empty();
+        String bm25Query = graphEnabled && !graphContext.isEmpty() ? graphContext.keywordQuery(question) : question;
+
+        // HyDE 只生成向量召回用的辅助查询；GraphContext 打开时用关系摘要让假设答案更聚焦。
+        String hydeQuestion = enrichHydeQuestion(question, graphContext);
+        String hypotheticalAnswer = hydeService.generateHypotheticalAnswer(hydeQuestion);
         List<Document> originalDocs = vectorRetrievalService.search(postId, question, topK);
         List<Document> hydeDocs = StringUtils.hasText(hypotheticalAnswer)
                 ? vectorRetrievalService.search(postId, hypotheticalAnswer, topK)
                 : List.of();
         List<Document> keywordDocs = bm25Enabled
-                ? bm25RetrievalService.search(postId, question, topK)
+                ? bm25RetrievalService.search(postId, bm25Query, topK)
                 : List.of();
 
         // 只有一路召回有结果时不需要 RRF；多路召回时再按排名融合，避免空列表影响分数。
@@ -56,16 +65,26 @@ public class RagRetrievalService {
                 : rrfFusion.fuse(rankedLists, topK);
 
         String scope = postId == null ? "global" : "post:" + postId;
-        log.info("RAG retrieval scope={} original={} hyde={} keyword={} fused={}",
-                scope, chunkIds(originalDocs), chunkIds(hydeDocs), chunkIds(keywordDocs), chunkIds(fusedDocs));
+        log.info("RAG retrieval scope={} graphEntities={} original={} hyde={} keyword={} fused={}",
+                scope, graphContext.matchedEntities(), chunkIds(originalDocs), chunkIds(hydeDocs), chunkIds(keywordDocs), chunkIds(fusedDocs));
         return new RagRetrievalResultDTO(
                 hypotheticalAnswer,
                 RagVectorRetrievalService.MIN_SIMILARITY_SCORE,
+                graphContext,
                 originalDocs,
                 hydeDocs,
                 keywordDocs,
                 fusedDocs
         );
+    }
+
+    private String enrichHydeQuestion(String question, GraphContext graphContext) {
+        if (!graphEnabled || graphContext.isEmpty() || !StringUtils.hasText(graphContext.relationSummary())) {
+            return question;
+        }
+        return question.trim()
+                + "\n\n已知知识图谱关系：\n"
+                + graphContext.relationSummary();
     }
 
     @SafeVarargs

@@ -1,5 +1,8 @@
 package com.tongji.llm.DTO;
 
+import com.tongji.llm.graphService.model.GraphEntity;
+import com.tongji.llm.graphService.model.GraphRelation;
+
 import java.util.List;
 
 /**
@@ -11,6 +14,7 @@ public record RagRetrievalDebugDTO(
         String question,
         String hypotheticalAnswer,
         double similarityThreshold,
+        GraphContextDebugDTO graphContext,
         List<RetrievedChunk> originalResults,
         List<RetrievedChunk> hydeResults,
         List<RetrievedChunk> keywordResults,
@@ -33,5 +37,19 @@ public record RagRetrievalDebugDTO(
             Double finalScore,
             String textPreview
     ) {
+    }
+
+    public record GraphContextDebugDTO(
+            List<GraphEntity> matchedEntities,
+            List<GraphRelation> relations,
+            List<String> parentConcepts,
+            List<String> expandedTerms
+    ) {
+        public GraphContextDebugDTO {
+            matchedEntities = matchedEntities == null ? List.of() : List.copyOf(matchedEntities);
+            relations = relations == null ? List.of() : List.copyOf(relations);
+            parentConcepts = parentConcepts == null ? List.of() : List.copyOf(parentConcepts);
+            expandedTerms = expandedTerms == null ? List.of() : List.copyOf(expandedTerms);
+        }
     }
 }

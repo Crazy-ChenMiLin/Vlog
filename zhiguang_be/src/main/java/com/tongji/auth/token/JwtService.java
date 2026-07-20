@@ -51,7 +51,9 @@ public class JwtService {
         Instant accessExpiresAt = issuedAt.plus(properties.getJwt().getAccessTokenTtl());
         Instant refreshExpiresAt = issuedAt.plus(properties.getJwt().getRefreshTokenTtl());
 
+        //at
         String accessToken = encodeToken(user, issuedAt, accessExpiresAt, "access", UUID.randomUUID().toString());
+        //rt
         String refreshToken = encodeRefreshToken(user, issuedAt, refreshExpiresAt, refreshTokenId);
         return new TokenPair(accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, refreshTokenId);
     }

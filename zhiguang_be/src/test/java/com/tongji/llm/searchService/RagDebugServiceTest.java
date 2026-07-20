@@ -50,6 +50,7 @@ class RagDebugServiceTest {
             assertThat(chunk.chunkId()).isEqualTo("456#0");
         });
         assertThat(result.keywordResults()).isEmpty();
+        assertThat(result.graphContext().matchedEntities()).isEmpty();
         assertThat(result.rerankedResults()).hasSize(1);
         assertThat(result.answerResults()).hasSize(1);
     }
