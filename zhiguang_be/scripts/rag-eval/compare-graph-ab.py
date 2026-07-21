@@ -156,7 +156,7 @@ def aggregate(coverages: list[dict]) -> dict:
         if n == 0:
             return None
         # Top10 指标在无 Top10 数据时显式返回 None（而非 0%），避免误导
-        if key.startswith("Top10") and not top10_available:
+        if "Top10" in key and not top10_available:
             return None
         return round(sum(1 for c in matched if c.get(key) is True) / n * 100, 1)
 
