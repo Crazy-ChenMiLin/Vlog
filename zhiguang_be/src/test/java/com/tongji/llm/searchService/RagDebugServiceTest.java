@@ -4,6 +4,7 @@ import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.debugservice.RagDebugService;
 import com.tongji.llm.enhanceService.RerankService;
+import com.tongji.llm.graphService.model.GraphContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -37,7 +38,7 @@ class RagDebugServiceTest {
         when(retrievalService.retrieveGlobal("问题", 5))
                 .thenReturn(new RagRetrievalResultDTO(
                         "假设答案", 0.30, List.of(document), List.of(), List.of(), List.of(document)));
-        when(rerankService.rerank(anyString(), eq(List.of(document)), eq(1)))
+        when(rerankService.rerank(anyString(), eq(List.of(document)), eq(1), org.mockito.ArgumentMatchers.any(GraphContext.class)))
                 .thenReturn(List.of(document));
         RagDebugService service = new RagDebugService(retrievalService, rerankService);
 

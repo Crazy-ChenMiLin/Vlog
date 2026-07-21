@@ -6,9 +6,10 @@ import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.enhanceService.RerankService;
+import com.tongji.llm.graphService.model.GraphContext;
+import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
 import com.tongji.llm.memoryService.model.RagMessage;
-import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.searchService.RagRetrievalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
@@ -32,21 +33,25 @@ public class RagQueryService {
     private final RerankService rerankService;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
-        // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
         RagRetrievalResultDTO retrieval = retrievalService.retrieveForPost(postId, question, topK);
-        //然后rerank文章
         RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
-        return streamAnswerInternal(ranked.answerDocs(), question,
-                "未找到与问题相关的当前文章内容，请换一种问法后再试。");
+        return streamAnswerInternal(
+                ranked.answerDocs(),
+                retrieval.graphContext(),
+                question,
+                "未找到与问题相关的当前文章内容，请换一种问法后再试。"
+        );
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
-        // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
         RagRetrievalResultDTO retrieval = retrievalService.retrieveGlobal(question, topK);
-        //然后rerank文章
         RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
-        return streamAnswerInternal(ranked.answerDocs(), question,
-                "未找到与问题相关的知识库内容，请换一种问法后再试。");
+        return streamAnswerInternal(
+                ranked.answerDocs(),
+                retrieval.graphContext(),
+                question,
+                "未找到与问题相关的知识库内容，请换一种问法后再试。"
+        );
     }
 
     public Flux<ServerSentEvent<String>> streamChatAnswerFlux(
@@ -77,6 +82,7 @@ public class RagQueryService {
                 .build());
         Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
                 ranked.answerDocs(),
+                retrieval.graphContext(),
                 originalQuestion,
                 standaloneQuestion,
                 recentMessages,
@@ -105,7 +111,12 @@ public class RagQueryService {
     }
 
     private RagRetrievalResultRankDTO rankRetrieval(String standaloneQuestion, RagRetrievalResultDTO retrieval, int topK) {
-        List<Document> rerankedDocs = rerankService.rerank(standaloneQuestion, retrieval.fusedDocs(), topK);
+        List<Document> rerankedDocs = rerankService.rerank(
+                standaloneQuestion,
+                retrieval.fusedDocs(),
+                topK,
+                retrieval.graphContext()
+        );
         if (rerankedDocs == null) {
             rerankedDocs = retrieval.fusedDocs().stream().limit(topK).toList();
         }
@@ -114,6 +125,7 @@ public class RagQueryService {
 
     private Flux<String> streamAnswerInternal(
             List<Document> answerDocs,
+            GraphContext graphContext,
             String question,
             String emptyResultMessage) {
         List<String> contexts = answerDocs.stream()
@@ -125,9 +137,12 @@ public class RagQueryService {
         }
 
         String context = String.join("\n\n---\n\n", contexts);
-        String system = "你是中文知识助手。只能依据提供的知识库上下文回答；无法确定的请说明不确定。";
-        String user = "问题：" + question + "\n\n上下文如下（可能不完整）：\n"
-                + context + "\n\n请基于以上上下文作答。";
+        String system = "你是中文知识助手。只能依据提供的知识库上下文和 Neo4j graph trace 回答；无法确定时请说明不确定。";
+        String user = "问题：\n" + question
+                + graphTrace(graphContext)
+                + "\n\n知识库上下文如下（可能不完整）：\n"
+                + context
+                + "\n\n请基于以上材料作答。";
 
         return chatClient
                 .prompt()
@@ -142,6 +157,7 @@ public class RagQueryService {
 
     private Flux<String> streamAnswerInternal(
             List<Document> answerDocs,
+            GraphContext graphContext,
             String originalQuestion,
             String standaloneQuestion,
             List<RagMessage> recentMessages,
@@ -157,13 +173,14 @@ public class RagQueryService {
         String context = String.join("\n\n---\n\n", contexts);
         String system = """
                 你是中文知识助手。对话历史只用于理解用户当前问题，改写问题只表示系统对当前问题的理解。
-                最终答案必须基于提供的知识库上下文；无法确定时请说明不确定。
+                最终答案必须基于提供的知识库上下文和 Neo4j graph trace；无法确定时请说明不确定。
                 """;
         String user = "最近对话：\n" + formatHistory(recentMessages)
                 + "\n\n用户当前原始问题：\n" + originalQuestion
                 + "\n\n系统改写后的检索问题：\n" + standaloneQuestion
+                + graphTrace(graphContext)
                 + "\n\n知识库上下文如下（可能不完整）：\n" + context
-                + "\n\n请基于知识库上下文回答用户当前原始问题。";
+                + "\n\n请基于以上材料回答用户当前原始问题。";
 
         return chatClient
                 .prompt()
@@ -190,6 +207,13 @@ public class RagQueryService {
                     .append('\n');
         }
         return builder.toString();
+    }
+
+    private String graphTrace(GraphContext graphContext) {
+        if (graphContext == null || graphContext.isEmpty() || !StringUtils.hasText(graphContext.relationSummary())) {
+            return "";
+        }
+        return "\n\nNeo4j graph trace:\n" + graphContext.relationSummary();
     }
 
     private String emptyResultMessage(String scope) {

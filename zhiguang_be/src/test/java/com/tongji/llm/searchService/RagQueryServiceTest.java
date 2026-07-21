@@ -6,6 +6,7 @@ import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.chat.RagQueryService;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.enhanceService.RerankService;
+import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -99,7 +100,7 @@ class RagQueryServiceTest {
         when(requestSpec.options(any(OpenAiChatOptions.class))).thenReturn(requestSpec);
         when(requestSpec.stream()).thenReturn(streamResponseSpec);
         when(streamResponseSpec.content()).thenReturn(Flux.just("回答"));
-        when(rerankService.rerank(anyString(), eq(List.of(document)), eq(5)))
+        when(rerankService.rerank(anyString(), eq(List.of(document)), eq(5), org.mockito.ArgumentMatchers.any(GraphContext.class)))
                 .thenReturn(List.of(document));
         RagQueryService service = new RagQueryService(chatClient, retrievalService, memoryService, queryRewriteService, rerankService);
 
