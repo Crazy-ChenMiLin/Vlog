@@ -32,8 +32,10 @@ public record RagRetrievalDebugDTO(
             String sectionTitle,
             String sectionType,
             String questionIntent,
+            String relationIntent,
             Double rerankScore,
             Double sectionBoost,
+            Double graphBoost,
             Double finalScore,
             String textPreview
     ) {
@@ -41,12 +43,16 @@ public record RagRetrievalDebugDTO(
 
     public record GraphContextDebugDTO(
             List<GraphEntity> matchedEntities,
+            List<GraphEntity> llmEntities,
+            String relationIntent,
+            String questionType,
             List<GraphRelation> relations,
             List<String> parentConcepts,
             List<String> expandedTerms
     ) {
         public GraphContextDebugDTO {
             matchedEntities = matchedEntities == null ? List.of() : List.copyOf(matchedEntities);
+            llmEntities = llmEntities == null ? List.of() : List.copyOf(llmEntities);
             relations = relations == null ? List.of() : List.copyOf(relations);
             parentConcepts = parentConcepts == null ? List.of() : List.copyOf(parentConcepts);
             expandedTerms = expandedTerms == null ? List.of() : List.copyOf(expandedTerms);

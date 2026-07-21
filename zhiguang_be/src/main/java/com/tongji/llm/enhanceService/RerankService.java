@@ -1,6 +1,9 @@
 package com.tongji.llm.enhanceService;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.tongji.llm.graphService.model.GraphContext;
+import com.tongji.llm.graphService.model.GraphEntity;
+import com.tongji.llm.graphService.model.GraphRelation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -11,7 +14,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -34,12 +40,22 @@ public class RerankService {
     @Value("${rag.rerank.path}")
     private String path;
 
+    @Value("${rag.rerank.graph-relation-boost:0.35}")
+    private double graphRelationBoost;
+
+    @Value("${rag.rerank.graph-entity-boost:0.12}")
+    private double graphEntityBoost;
+
     public List<Document> rerank(String standaloneQuestion, List<Document> fusedDocs, int topK) {
+        return rerank(standaloneQuestion, fusedDocs, topK, GraphContext.empty());
+    }
+
+    public List<Document> rerank(String standaloneQuestion, List<Document> fusedDocs, int topK, GraphContext graphContext) {
         if (fusedDocs == null || fusedDocs.isEmpty() || topK <= 0) {
             return List.of();
         }
         if (!enabled || !StringUtils.hasText(apiKey) || !StringUtils.hasText(standaloneQuestion)) {
-            return fallback(fusedDocs, topK);
+            return fallback(fusedDocs, topK, graphContext);
         }
 
         //rerank模型只是发送了内容的text
@@ -72,40 +88,111 @@ public class RerankService {
                     .body(RerankResponse.class);
 
             if (response == null || response.rankings() == null || response.rankings().isEmpty()) {
-                return fallback(fusedDocs, topK);
+                return fallback(fusedDocs, topK, graphContext);
             }
 
-            QuestionIntent intent = detectIntent(standaloneQuestion);
+            QuestionIntent intent = resolveIntent(standaloneQuestion, graphContext);
             List<Document> reranked = response.rankings().stream()
                     .filter(ranking -> ranking.index() >= 0 && ranking.index() < fusedDocs.size())
-                    .map(ranking -> toScoredRanking(intent, fusedDocs.get(ranking.index()), ranking))
+                    .map(ranking -> toScoredRanking(intent, graphContext, fusedDocs.get(ranking.index()), ranking))
                     .sorted(Comparator.comparingDouble(ScoredRanking::finalScore).reversed())
                     .limit(topK)
                     .map(scored -> fusedDocs.get(scored.index()))
                     .toList();
-            return reranked.isEmpty() ? fallback(fusedDocs, topK) : reranked;
+            return reranked.isEmpty() ? fallback(fusedDocs, topK, graphContext) : reranked;
         } catch (Exception e) {
             log.warn("Rerank failed, fallback to fused docs: {}", e.getMessage());
-            return fallback(fusedDocs, topK);
+            return fallback(fusedDocs, topK, graphContext);
         }
     }
 
-    private List<Document> fallback(List<Document> fusedDocs, int topK) {
-        return fusedDocs.stream().limit(topK).toList();
+    private List<Document> fallback(List<Document> fusedDocs, int topK, GraphContext graphContext) {
+        QuestionIntent intent = resolveIntent(null, graphContext);
+        return fusedDocs.stream()
+                .peek(document -> annotateScores(intent, graphContext, document, 0))
+                .sorted(Comparator.comparingDouble((Document document) -> numericMetadata(document, "finalScore")).reversed())
+                .limit(topK)
+                .toList();
     }
 
-    private ScoredRanking toScoredRanking(QuestionIntent intent, Document document, Ranking ranking) {
-        double boost = sectionBoost(intent, document);
-        double finalScore = ranking.logit() + boost;
+    private ScoredRanking toScoredRanking(QuestionIntent intent, GraphContext graphContext, Document document, Ranking ranking) {
+        double finalScore = annotateScores(intent, graphContext, document, ranking.logit());
+        return new ScoredRanking(ranking.index(), ranking.logit(), finalScore);
+    }
+
+    private double annotateScores(QuestionIntent intent, GraphContext graphContext, Document document, double rerankScore) {
+        double sectionBoost = sectionBoost(intent, document);
+        double graphBoost = graphBoost(graphContext, document);
+        double finalScore = rerankScore + sectionBoost + graphBoost;
         document.getMetadata().put("questionIntent", intent.name());
-        document.getMetadata().put("rerankScore", ranking.logit());
-        document.getMetadata().put("sectionBoost", boost);
+        document.getMetadata().put("relationIntent", graphContext == null ? null : graphContext.relationIntent());
+        document.getMetadata().put("rerankScore", rerankScore);
+        document.getMetadata().put("sectionBoost", sectionBoost);
+        document.getMetadata().put("graphBoost", graphBoost);
         document.getMetadata().put("finalScore", finalScore);
-        return new ScoredRanking(ranking.index(), ranking.logit(), boost, finalScore);
+        return finalScore;
     }
 
-    private double finalScore(QuestionIntent intent, Document document, double rerankScore) {
-        return rerankScore + sectionBoost(intent, document);
+    private double graphBoost(GraphContext graphContext, Document document) {
+        if (graphContext == null || graphContext.isEmpty()) {
+            return 0;
+        }
+        String text = documentText(document);
+        double boost = 0;
+        for (GraphRelation relation : graphContext.relations()) {
+            if (containsTerm(text, relation.source()) && containsTerm(text, relation.target())) {
+                boost += graphRelationBoost;
+            }
+        }
+        if (boost > 0) {
+            return boost;
+        }
+
+        long matchedEntityCount = graphEntityTerms(graphContext).stream()
+                .filter(term -> containsTerm(text, term))
+                .limit(2)
+                .count();
+        return matchedEntityCount >= 2 ? graphEntityBoost : 0;
+    }
+
+    private Set<String> graphEntityTerms(GraphContext graphContext) {
+        Set<String> terms = new LinkedHashSet<>();
+        for (GraphEntity entity : graphContext.matchedEntities()) {
+            if (StringUtils.hasText(entity.name())) {
+                terms.add(entity.name());
+            }
+            entity.aliases().stream()
+                    .filter(StringUtils::hasText)
+                    .forEach(terms::add);
+        }
+        return terms;
+    }
+
+    private boolean containsTerm(String text, String term) {
+        return StringUtils.hasText(term) && text.contains(term.toLowerCase(Locale.ROOT));
+    }
+
+    private String documentText(Document document) {
+        StringBuilder builder = new StringBuilder();
+        appendMetadataText(builder, document, "title");
+        appendMetadataText(builder, document, "sectionTitle");
+        builder.append(' ').append(document.getText() == null ? "" : document.getText());
+        return builder.toString().toLowerCase(Locale.ROOT);
+    }
+
+    private void appendMetadataText(StringBuilder builder, Document document, String key) {
+        Object value = document.getMetadata().get(key);
+        if (value != null) {
+            builder.append(' ').append(value);
+        }
+    }
+
+    private double numericMetadata(Document document, String key) {
+        Object value = document.getMetadata().get(key);
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return 0;
     }
 
     private QuestionIntent detectIntent(String question) {
@@ -126,6 +213,24 @@ public class RerankService {
             return QuestionIntent.EXPLAIN;
         }
         return QuestionIntent.OTHER;
+    }
+
+    private QuestionIntent resolveIntent(String question, GraphContext graphContext) {
+        QuestionIntent graphIntent = graphIntent(graphContext);
+        return graphIntent == QuestionIntent.OTHER ? detectIntent(question) : graphIntent;
+    }
+
+    private QuestionIntent graphIntent(GraphContext graphContext) {
+        if (graphContext == null || !StringUtils.hasText(graphContext.relationIntent())) {
+            return QuestionIntent.OTHER;
+        }
+        return switch (graphContext.relationIntent()) {
+            case "COMPARE" -> QuestionIntent.COMPARE;
+            case "CAUSE" -> QuestionIntent.CAUSE;
+            case "PART_OF" -> QuestionIntent.PART_OF;
+            case "SOLUTION" -> QuestionIntent.SOLUTION;
+            default -> QuestionIntent.OTHER;
+        };
     }
 
     private boolean containsAny(String text, String... keywords) {
@@ -168,6 +273,11 @@ public class RerankService {
                 case "TEST_QUESTION" -> 0.35;
                 case "CONCEPT" -> 0.05;
                 case "BACKGROUND", "TITLE" -> -0.15;
+                default -> 0;
+            };
+            case COMPARE, CAUSE, PART_OF -> switch (type) {
+                case "CONCEPT", "SOLUTION", "INTERVIEW_TEMPLATE" -> 0.10;
+                case "TEST_QUESTION", "BACKGROUND", "TITLE" -> -0.15;
                 default -> 0;
             };
             case OTHER -> switch (type) {
@@ -223,10 +333,13 @@ public class RerankService {
     private record Ranking(int index, double logit) {
     }
 
-    private record ScoredRanking(int index, double rerankScore, double sectionBoost, double finalScore) {
+    private record ScoredRanking(int index, double rerankScore, double finalScore) {
     }
 
     private enum QuestionIntent {
+        COMPARE,
+        CAUSE,
+        PART_OF,
         EXPLAIN,
         SOLUTION,
         INTERVIEW,

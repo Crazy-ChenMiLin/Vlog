@@ -51,6 +51,9 @@ public class RagDebugService {
                 result.similarityThreshold(),
                 new RagRetrievalDebugDTO.GraphContextDebugDTO(
                         result.graphContext().matchedEntities(),
+                        result.graphContext().llmEntities(),
+                        result.graphContext().relationIntent(),
+                        result.graphContext().questionType(),
                         result.graphContext().relations(),
                         result.graphContext().parentConcepts(),
                         result.graphContext().expandedTerms()
@@ -66,7 +69,7 @@ public class RagDebugService {
 
     private RagRetrievalResultRankDTO rankResult(String question, RagRetrievalResultDTO result) {
         int topK = result.fusedDocs().size();
-        List<Document> rerankedDocs = rerankService.rerank(question, result.fusedDocs(), topK);
+        List<Document> rerankedDocs = rerankService.rerank(question, result.fusedDocs(), topK, result.graphContext());
         if (rerankedDocs == null) {
             rerankedDocs = result.fusedDocs();
         }
@@ -91,8 +94,10 @@ public class RagDebugService {
                 stringValue(metadata.get("sectionTitle")),
                 stringValue(metadata.get("sectionType")),
                 stringValue(metadata.get("questionIntent")),
+                stringValue(metadata.get("relationIntent")),
                 doubleValue(metadata.get("rerankScore")),
                 doubleValue(metadata.get("sectionBoost")),
+                doubleValue(metadata.get("graphBoost")),
                 doubleValue(metadata.get("finalScore")),
                 preview(document.getText())
         );
