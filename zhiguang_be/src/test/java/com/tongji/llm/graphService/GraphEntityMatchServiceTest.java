@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GraphEntityMatchServiceTest {
 
-    private final GraphEntityMatchService service = new GraphEntityMatchService();
+    private final QueryEntityMatchService service = new QueryEntityMatchService();
 
     @Test
     void matchesCacheRelationEntitiesByAliases() {

@@ -1,8 +1,10 @@
 import argparse
 import json
 import time
+import socket
 import urllib.parse
 import urllib.request
+import urllib.error
 import uuid
 from pathlib import Path
 
@@ -22,6 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--user-id", type=int, default=1)
     parser.add_argument("--private-key", type=Path, default=DEFAULT_PRIVATE_KEY)
     parser.add_argument("--label", default="rag-debug")
+    parser.add_argument("--retries", type=int, default=2)
+    parser.add_argument("--retry-delay", type=float, default=2.0)
     return parser.parse_args()
 
 
@@ -42,7 +46,7 @@ def jwt_headers(private_key: Path, user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def request_debug(base_url: str, question: str, top_k: int, headers: dict[str, str]) -> dict:
+def request_debug_once(base_url: str, question: str, top_k: int, headers: dict[str, str]) -> dict:
     query = urllib.parse.urlencode({"question": question, "topK": top_k})
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/v1/knowposts/qa/debug?{query}",
@@ -51,6 +55,43 @@ def request_debug(base_url: str, question: str, top_k: int, headers: dict[str, s
     )
     with urllib.request.urlopen(request, timeout=90) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def request_debug(base_url: str, question: str, top_k: int, headers: dict[str, str], retries: int, retry_delay: float) -> dict:
+    last_exc = None
+    for attempt in range(retries + 1):
+        try:
+            return request_debug_once(base_url, question, top_k, headers)
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            last_exc = exc
+            if attempt >= retries:
+                raise
+            time.sleep(retry_delay * (attempt + 1))
+    raise last_exc
+
+
+def format_error(exc: Exception) -> dict:
+    if isinstance(exc, urllib.error.HTTPError):
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        return {
+            "type": exc.__class__.__name__,
+            "status": exc.code,
+            "reason": exc.reason,
+            "body": body[:1000],
+        }
+    if isinstance(exc, urllib.error.URLError):
+        return {
+            "type": exc.__class__.__name__,
+            "reason": str(exc.reason),
+        }
+    return {
+        "type": exc.__class__.__name__,
+        "message": str(exc),
+    }
 
 
 def chunk_key(chunk: dict | None) -> str | None:
@@ -174,10 +215,12 @@ def main() -> None:
     for question in questions:
         started = time.perf_counter()
         try:
-            debug = request_debug(args.base_url, question, args.top_k, headers)
+            debug = request_debug(args.base_url, question, args.top_k, headers, args.retries, args.retry_delay)
             rows.append(build_row(question, debug, round((time.perf_counter() - started) * 1000)))
         except Exception as exc:
-            errors.append({"question": question, "error": str(exc)})
+            error = {"question": question, "error": str(exc)}
+            error.update(format_error(exc))
+            errors.append(error)
 
     summary = {
         "label": args.label,

@@ -64,7 +64,7 @@ RELATIONS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Seed and verify lightweight interview knowledge graph.")
-    parser.add_argument("--uri", default=os.environ.get("NEO4J_URI", "bolt://10.13.1.5:7687"))
+    parser.add_argument("--uri", default=os.environ.get("NEO4J_URI", "bolt://100.83.242.114:7687"))
     parser.add_argument("--username", default=os.environ.get("NEO4J_USERNAME", "neo4j"))
     parser.add_argument("--password", default=os.environ.get("NEO4J_PASSWORD"))
     parser.add_argument("--verify-query", default="Redis 缓存穿透、击穿、雪崩有什么区别？")

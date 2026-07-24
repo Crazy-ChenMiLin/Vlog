@@ -495,7 +495,7 @@ def create_one(theme, scenario, n, headers):
     etag = put.headers.get("ETag", "").strip('"')
 
     # 等价 confirmContent：直接写内容字段（含公共 URL）
-    public_url = f"http://10.13.1.5:9000/zhiguang/posts/{draft_id}/content.md"
+    public_url = f"http://100.83.242.114:9000/zhiguang/posts/{draft_id}/content.md"
     conn = mysql_conn()
     try:
         with conn.cursor() as cur:

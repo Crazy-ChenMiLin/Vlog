@@ -35,7 +35,7 @@ NEO4J_PASSWORD
 ```yaml
 spring:
   neo4j:
-    uri: ${NEO4J_URI:bolt://10.13.1.5:7687}
+    uri: ${NEO4J_URI:bolt://100.83.242.114:7687}
     authentication:
       username: ${NEO4J_USERNAME:neo4j}
       password: ${NEO4J_PASSWORD:...}

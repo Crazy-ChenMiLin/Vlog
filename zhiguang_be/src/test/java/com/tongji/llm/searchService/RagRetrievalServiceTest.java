@@ -5,7 +5,7 @@ import com.tongji.common.exception.ErrorCode;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.enhanceService.HyDEService;
 import com.tongji.llm.enhanceService.RrfFusionService;
-import com.tongji.llm.graphService.MainGraphContextService;
+import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.graphService.model.GraphEntity;
 import com.tongji.llm.graphService.model.GraphRelation;
@@ -37,7 +37,7 @@ class RagRetrievalServiceTest {
     @Mock
     private RagBm25RetrievalService bm25RetrievalService;
     @Mock
-    private MainGraphContextService graphContextService;
+    private MainService graphContextService;
     @Mock
     private HyDEService hydeService;
     @Mock

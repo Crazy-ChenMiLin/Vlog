@@ -3,7 +3,7 @@ package com.tongji.llm.searchService;
 import com.tongji.llm.enhanceService.HyDEService;
 import com.tongji.llm.enhanceService.RrfFusionService;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
-import com.tongji.llm.graphService.MainGraphContextService;
+import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,7 @@ public class RagRetrievalService {
     private final RagIndexService indexService;
     private final RagVectorRetrievalService vectorRetrievalService;
     private final RagBm25RetrievalService bm25RetrievalService;
-    private final MainGraphContextService graphContextService;
+    private final MainService graphContextService;
     private final HyDEService hydeService;
     private final RrfFusionService rrfFusion;
 

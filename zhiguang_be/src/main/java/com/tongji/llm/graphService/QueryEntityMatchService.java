@@ -18,9 +18,14 @@ import java.util.Map;
  *
  * <p>匹配为「子串包含」语义（如「击穿」可命中「缓存击穿」），因此对别名列表的取值
  * 需要人工把控，避免过短别名造成误召回（例如「命中」可能误命中非缓存场景）。
+ * 词典实体匹配层。
+ *
+ * <p>这层是图谱增强的稳定兜底：用可控的概念/别名字典从问题里匹配实体。
+ * 它不理解“关系意图”，只负责找出问题中明确出现的概念；关系意图由
+ * {@link QueryUnderstandingService} 补充。</p>
  */
 @Service
-public class GraphEntityMatchService {
+public class QueryEntityMatchService {
     /**
      * 概念别名词典：key 为规范化概念名（需与 Neo4j 中 Concept.name 对齐），
      * value 为该概念在用户问题中可能出现的各种表述。
@@ -52,6 +57,11 @@ public class GraphEntityMatchService {
      *
      * @param question 用户原始问题
      * @return 命中的概念列表（含其全部别名）；空文本或无机概念命中时返回空列表
+     */
+    /**
+     * 按别名做大小写不敏感的子串匹配。
+     *
+     * <p>这里故意保持简单：命中任意别名就认为命中该概念，复杂语义交给 LLM 理解层处理。</p>
      */
     public List<GraphEntity> match(String question) {
         // 空问题直接返回，避免无意义遍历
