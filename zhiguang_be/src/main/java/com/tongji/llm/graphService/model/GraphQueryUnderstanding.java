@@ -4,6 +4,13 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+/**
+ * LLM 对查询的结构化理解结果。
+ *
+ * @param entities       从问题里抽取出的实体候选
+ * @param relationIntent 关系意图，如 COMPARE、CAUSE、PART_OF、SOLUTION
+ * @param questionType   问题类型，如 RELATION、CONCEPT、SOLUTION、TEST
+ */
 public record GraphQueryUnderstanding(
         List<GraphEntity> entities,
         String relationIntent,
@@ -19,6 +26,9 @@ public record GraphQueryUnderstanding(
         return new GraphQueryUnderstanding(List.of(), "UNKNOWN", "UNKNOWN");
     }
 
+    /**
+     * UNKNOWN 表示“没有可靠信号”，不是错误状态。
+     */
     public boolean isEmpty() {
         return entities.isEmpty()
                 && "UNKNOWN".equals(relationIntent)

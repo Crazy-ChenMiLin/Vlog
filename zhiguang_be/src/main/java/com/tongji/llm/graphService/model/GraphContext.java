@@ -5,6 +5,13 @@ import org.springframework.util.StringUtils;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+/**
+ * 图谱线索包。
+ *
+ * <p>它不是最终答案，而是 Neo4j 查询和问题理解后的结构化 trace：
+ * 命中的实体、相关关系、父概念、扩展检索词，以及 LLM 对问题的理解结果。
+ * 后续 BM25、HyDE、rerank 和最终回答 prompt 都会复用这个对象。</p>
+ */
 public record GraphContext(
         List<GraphEntity> matchedEntities,
         List<GraphRelation> relations,
@@ -32,6 +39,9 @@ public record GraphContext(
         return new GraphContext(List.of(), List.of(), List.of(), List.of(), GraphQueryUnderstanding.empty());
     }
 
+    /**
+     * 空 trace 表示图谱链路没有给主检索提供任何额外线索。
+     */
     public boolean isEmpty() {
         return matchedEntities.isEmpty()
                 && relations.isEmpty()
@@ -52,6 +62,9 @@ public record GraphContext(
         return understanding.questionType();
     }
 
+    /**
+     * 生成 BM25 使用的扩展查询：原问题 + 图谱扩展词 + LLM 实体 + 父概念。
+     */
     public String keywordQuery(String question) {
         LinkedHashSet<String> terms = new LinkedHashSet<>();
         if (StringUtils.hasText(question)) {
@@ -68,6 +81,9 @@ public record GraphContext(
         return String.join(" ", terms);
     }
 
+    /**
+     * 生成给 HyDE/最终回答使用的关系摘要，只取前几条，避免 prompt 被图谱信息淹没。
+     */
     public String relationSummary() {
         if (relations.isEmpty()) {
             return "";

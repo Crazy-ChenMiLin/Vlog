@@ -16,6 +16,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Neo4j 关系查询层。
+ *
+ * <p>输入是已经识别好的概念实体，输出是可供 RAG 使用的 {@link GraphContext}。
+ * 这里会把关系两端、父概念和实体别名都合并为 expandedTerms，用于 BM25 等关键词召回。</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class GraphRelationQueryService {
@@ -25,6 +31,9 @@ public class GraphRelationQueryService {
         return query(matchedEntities, GraphQueryUnderstanding.empty());
     }
 
+    /**
+     * 查询与实体相关的 Neo4j 关系，并根据 LLM 的关系意图调整关系展示顺序。
+     */
     public GraphContext query(List<GraphEntity> matchedEntities, GraphQueryUnderstanding understanding) {
         if (matchedEntities == null || matchedEntities.isEmpty()) {
             return GraphContext.empty();
@@ -70,6 +79,7 @@ public class GraphRelationQueryService {
                         relations.add(relation);
                         terms.add(relation.source());
                         terms.add(relation.target());
+                        // PART_OF 的 target 是更上位概念，单独收集后能帮助关键词召回扩大到父主题。
                         if ("PART_OF".equals(relation.type()) && names.contains(relation.source())) {
                             parents.add(relation.target());
                         }
@@ -99,6 +109,9 @@ public class GraphRelationQueryService {
                 .toList();
     }
 
+    /**
+     * 简单意图优先级：只改变关系摘要排序，不过滤关系，避免误判导致 trace 丢失。
+     */
     private int relationPriority(GraphRelation relation, String relationIntent) {
         if (!StringUtils.hasText(relationIntent) || "UNKNOWN".equals(relationIntent)) {
             return 10;
