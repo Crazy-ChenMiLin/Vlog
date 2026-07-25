@@ -10,10 +10,12 @@ import com.tongji.llm.agent.model.RagAgentStepTrace;
 import com.tongji.llm.enhanceService.RerankService;
 import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
+import com.tongji.llm.observability.AgentObservationService;
 import com.tongji.llm.searchService.RagRetrievalOptions;
 import com.tongji.llm.searchService.RagRetrievalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -22,6 +24,8 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.function.Supplier;
+
+import static net.logstash.logback.argument.StructuredArguments.kv;
 
 /**
  * RAG 主 Agent，也就是这条问答链路的“main 函数”。
@@ -45,6 +49,9 @@ public class RagMainAgent {
     private final RerankService rerankService;
     private final ChatClient chatClient;
 
+    @Autowired(required = false)
+    private AgentObservationService observationService;
+
     public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK) {
         String effectiveQuestion = StringUtils.hasText(standaloneQuestion) ? standaloneQuestion.trim() : originalQuestion;
         RagAgentState state = new RagAgentState(originalQuestion, effectiveQuestion, topK);
@@ -53,7 +60,7 @@ public class RagMainAgent {
         RagAgentPlan plan = timed(state, "plan", "PLANNER", () -> plannerService.plan(effectiveQuestion, topK));
         state.plan(plan);
         state.currentTopK(plan.initialTopK());
-        state.addStep(new RagAgentStepTrace("plan_result", plan.retrievalMode().name(), true, 0, plan.reason()));
+        recordStep(state, new RagAgentStepTrace("plan_result", plan.retrievalMode().name(), true, 0, plan.reason()));
 
         // 闲聊/无需知识库的问题直接回答，避免“你好”也走 ES、向量、图谱这一整套重链路。
         if (plan.questionType() == QuestionType.CHAT || plan.needDirectAnswer()) {
@@ -62,10 +69,11 @@ public class RagMainAgent {
         }
 
         // 关系型问题前置查图谱：Neo4j 返回的是 trace/线索，用来增强后面的检索和重排。
+        try {
         if (plan.needGraphTrace()) {
             GraphContext graphContext = timed(state, "graph_trace", "QUERY_NEO4J", () -> graphService.build(effectiveQuestion));
             state.graphContext(graphContext);
-            state.addStep(new RagAgentStepTrace(
+            recordStep(state, new RagAgentStepTrace(
                     "graph_trace_result",
                     graphContext.isEmpty() ? "GRAPH_MISS" : "GRAPH_HIT",
                     true,
@@ -85,20 +93,18 @@ public class RagMainAgent {
                 && state.currentTopK() < 10) {
             state.incrementRetryCount();
             state.currentTopK(Math.min(10, Math.max(state.currentTopK() + 1, 10)));
-            state.addStep(new RagAgentStepTrace("retry", "EXPAND_TOP_K", true, 0, "Expand topK to " + state.currentTopK()));
+            recordStep(state, new RagAgentStepTrace("retry", "EXPAND_TOP_K", true, 0, "Expand topK to " + state.currentTopK()));
             executeRetrievalRound(state, scope, postId);
             state.evidenceResult(checkEvidence(state));
         }
 
-        log.info("RAG main agent traceId={} questionType={} mode={} topK={} retry={} evidence={} steps={}",
-                state.traceId(),
-                state.plan().questionType(),
-                state.plan().retrievalMode(),
-                state.currentTopK(),
-                state.retryCount(),
-                state.evidenceResult(),
-                state.steps());
+        //log
+        logAgentCompleted(state);
         return state;
+        } catch (Exception e) {
+            logAgentFailed(state, e);
+            throw e;
+        }
     }
 
     private void directAnswer(RagAgentState state, String originalQuestion) {
@@ -170,12 +176,62 @@ public class RagMainAgent {
         try {
             T result = supplier.get();
             // Trace 记录的是本次请求实际走过的路径，所以用 List 顺序追加，而不是记录整张流程图。
-            state.addStep(new RagAgentStepTrace(stepName, decision, true, elapsedMs(started), summary(result)));
+            recordStep(state, new RagAgentStepTrace(stepName, decision, true, elapsedMs(started), summary(result)));
             return result;
         } catch (Exception e) {
-            state.addStep(new RagAgentStepTrace(stepName, decision, false, elapsedMs(started), e.getMessage()));
+            recordStep(state, new RagAgentStepTrace(stepName, decision, false, elapsedMs(started), e.getMessage()));
             throw e;
         }
+    }
+
+    private void recordStep(RagAgentState state, RagAgentStepTrace step) {
+        state.addStep(step);
+        if (observationService != null) {
+            observationService.recordStep(state, step);
+        }
+        log.info("rag_agent_step",
+                kv("event_type", "rag_agent_step"),
+                kv("trace_id", state.traceId()),
+                kv("original_question", state.originalQuestion()),
+                kv("standalone_question", state.standaloneQuestion()),
+                kv("step_name", step.stepName()),
+                kv("decision", step.decision()),
+                kv("success", step.success()),
+                kv("cost_ms", step.costMs()),
+                kv("summary", step.summary()));
+    }
+
+    private void logAgentCompleted(RagAgentState state) {
+        EvidenceResult evidence = state.evidenceResult();
+        if (observationService != null) {
+            observationService.recordCompleted(state);
+        }
+        log.info("rag_agent_completed",
+                kv("event_type", "rag_agent_completed"),
+                kv("trace_id", state.traceId()),
+                kv("question_type", state.plan().questionType().name()),
+                kv("retrieval_mode", state.plan().retrievalMode().name()),
+                kv("top_k", state.currentTopK()),
+                kv("retry_count", state.retryCount()),
+                kv("evidence_sufficient", evidence != null && evidence.sufficient()),
+                kv("evidence_score", evidence == null ? null : evidence.score()),
+                kv("evidence_action", evidence == null ? null : evidence.suggestedAction().name()),
+                kv("answer_doc_count", state.answerDocs().size()),
+                kv("step_count", state.steps().size()));
+    }
+
+    private void logAgentFailed(RagAgentState state, Exception exception) {
+        if (observationService != null) {
+            observationService.recordFailed(state, exception);
+        }
+        log.warn("rag_agent_failed",
+                kv("event_type", "rag_agent_failed"),
+                kv("trace_id", state.traceId()),
+                kv("top_k", state.currentTopK()),
+                kv("retry_count", state.retryCount()),
+                kv("step_count", state.steps().size()),
+                kv("error_type", exception.getClass().getSimpleName()),
+                kv("error_message", exception.getMessage()));
     }
 
     private long elapsedMs(long started) {

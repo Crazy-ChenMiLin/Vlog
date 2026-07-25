@@ -1,0 +1,20 @@
+services:
+  zhiguang-logstash:
+    image: docker.elastic.co/logstash/logstash:9.4.2
+    container_name: zhiguang-logstash
+    restart: unless-stopped
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx512m"
+      XPACK_MONITORING_ENABLED: "false"
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    volumes:
+      - ./pipeline:/usr/share/logstash/pipeline:ro
+    networks:
+      - onepanel
+
+networks:
+  onepanel:
+    external: true
+    name: 1panel-network

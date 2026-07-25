@@ -180,6 +180,13 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Structured JSON logging for ELK / Logstash ingestion. -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
         <!-- Lombok：减少样板代码（Getter/Setter/Builder 等），编译期生效 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
