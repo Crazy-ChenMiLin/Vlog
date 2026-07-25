@@ -1,9 +1,12 @@
 package com.tongji.llm.chat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.RagMainAgent;
 import com.tongji.llm.agent.model.RagAgentState;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
+import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
@@ -28,6 +31,7 @@ public class RagQueryService {
     private final RagMainAgent ragMainAgent;
     private final RagConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
+    private final ObjectMapper objectMapper;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
         RagAgentState state = ragMainAgent.run("post", postId, question, question, topK);
@@ -76,6 +80,7 @@ public class RagQueryService {
                 .event("meta")
                 .data("{\"conversationId\":\"" + conversation.getId() + "\"}")
                 .build());
+        Flux<ServerSentEvent<AgentStepEventDTO>> agentSteps = agentStepEvents(state);
         Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
                 state,
                 originalQuestion,
@@ -102,7 +107,34 @@ public class RagQueryService {
                 .event("done")
                 .data("{}")
                 .build());
-        return Flux.concat(meta, answer, done);
+        return Flux.concat(meta, agentSteps.map(this::stringEvent), answer, done);
+    }
+
+    private Flux<ServerSentEvent<AgentStepEventDTO>> agentStepEvents(RagAgentState state) {
+        return Flux.fromIterable(state.steps())
+                .map(step -> ServerSentEvent.<AgentStepEventDTO>builder()
+                        .event("agent_step")
+                        .data(AgentStepEventDTO.from(state.traceId(), step))
+                        .build());
+    }
+
+    private ServerSentEvent<String> stringEvent(ServerSentEvent<AgentStepEventDTO> event) {
+        AgentStepEventDTO data = event.data();
+        return ServerSentEvent.<String>builder()
+                .event(event.event())
+                .data(toJson(data))
+                .build();
+    }
+
+    private String toJson(AgentStepEventDTO event) {
+        if (event == null) {
+            return "{}";
+        }
+        try {
+            return objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException e) {
+            return "{\"stepName\":\"agent_step\",\"title\":\"执行 Agent 步骤\",\"success\":false,\"summary\":\"serialize failed\"}";
+        }
     }
 
     private Flux<String> streamAnswerInternal(

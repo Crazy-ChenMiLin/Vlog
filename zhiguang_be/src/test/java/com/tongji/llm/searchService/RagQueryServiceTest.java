@@ -1,9 +1,11 @@
 package com.tongji.llm.searchService;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.llm.agent.RagMainAgent;
 import com.tongji.llm.agent.model.RagAgentState;
+import com.tongji.llm.agent.model.RagAgentStepTrace;
 import com.tongji.llm.chat.RagQueryService;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.enhanceService.QueryRewriteService;
@@ -44,6 +46,8 @@ class RagQueryServiceTest {
     private ChatClient.ChatClientRequestSpec requestSpec;
     @Mock
     private ChatClient.StreamResponseSpec streamResponseSpec;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void emptyRetrievalReturnsFriendlyMessageWithoutCallingLlm() {
@@ -110,7 +114,7 @@ class RagQueryServiceTest {
     }
 
     @Test
-    void chatStreamUsesAgentAndStillStoresMessages() {
+    void chatStreamEmitsAgentStepBeforeAnswerAndStillStoresMessages() {
         RagConversation conversation = new RagConversation();
         conversation.setId(99L);
         when(memoryService.resolveConversation(1L, 7L, "global", null)).thenReturn(conversation);
@@ -119,6 +123,7 @@ class RagQueryServiceTest {
         when(queryRewriteService.rewrite("原问题", List.of())).thenReturn("改写问题");
 
         RagAgentState state = state("改写问题", 5, List.of());
+        state.addStep(new RagAgentStepTrace("plan", "PLANNER", true, 12, "NORMAL_QA/HYBRID"));
         state.finalAnswer("直接回答");
         when(ragMainAgent.run("global", null, "原问题", "改写问题", 5)).thenReturn(state);
 
@@ -130,6 +135,7 @@ class RagQueryServiceTest {
 
         assertThat(events).containsExactly(
                 "meta:{\"conversationId\":\"99\"}",
+                "agent_step:{\"traceId\":\"" + state.traceId() + "\",\"stepName\":\"plan\",\"title\":\"理解问题并制定计划\",\"decision\":\"PLANNER\",\"success\":true,\"costMs\":12,\"summary\":\"NORMAL_QA/HYBRID\"}",
                 "message:直接回答",
                 "done:{}"
         );
@@ -138,7 +144,7 @@ class RagQueryServiceTest {
     }
 
     private RagQueryService createService() {
-        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService);
+        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper);
     }
 
     private RagAgentState state(String question, int topK, List<Document> answerDocs) {

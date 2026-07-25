@@ -230,6 +230,110 @@
   overflow-wrap: anywhere;
 }
 
+.agentTrace {
+  margin-top: 12px;
+  overflow: hidden;
+  color: #43505a;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(38, 52, 60, 0.08);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.agentTraceToggle {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  color: #3d4a53;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.6);
+  border: 0;
+  cursor: pointer;
+}
+
+.agentTraceToggle span {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.agentTraceToggle strong {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6c7780;
+}
+
+.agentTraceToggle i {
+  font-style: normal;
+  font-size: 11px;
+  color: #8c969e;
+}
+
+.agentStepList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 11px 11px;
+  list-style: none;
+}
+
+.agentStep {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.agentStepDot,
+.agentStepDotError {
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 50%;
+}
+
+.agentStepDot {
+  background: rgba(255, 122, 34, 0.72);
+}
+
+.agentStepDotError {
+  background: rgba(181, 59, 50, 0.82);
+}
+
+.agentStepTitle {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agentStepTitle span {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
+.agentStepTitle em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-size: 10px;
+  color: #9aa2a9;
+}
+
+.agentStep p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #7a858d;
+  overflow-wrap: anywhere;
+}
+
 .answerBlock {
   margin-top: 14px;
   padding: 12px 14px;

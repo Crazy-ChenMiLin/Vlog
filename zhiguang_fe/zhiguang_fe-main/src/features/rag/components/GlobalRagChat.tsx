@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowRightIcon, ChatBubbleIcon, CloseIcon, MinimizeIcon, SparkIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
-import { useRagStream } from "@/features/rag/useRagStream";
+import { useRagStream } from "@/features/rag/hooks/useRagStream";
 import { resolveApiUrl } from "@/services/apiClient";
 import styles from "./GlobalRagChat.module.css";
 
@@ -14,11 +14,12 @@ const GlobalRagChat = () => {
   const [question, setQuestion] = useState("");
   const [submittedQuestion, setSubmittedQuestion] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [topK, setTopK] = useState(5);
   const answerViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { answer, loading, error, start, stop } = useRagStream();
+  const { answer, agentSteps, loading, error, start, stop } = useRagStream();
   const { tokens } = useAuth();
 
   useEffect(() => {
@@ -57,6 +58,7 @@ const GlobalRagChat = () => {
 
     setLocalError(null);
     setSubmittedQuestion(normalizedQuestion);
+    setAgentPanelOpen(true);
     setQuestion("");
     start(resolveApiUrl("/api/v1/knowposts/qa/chat/stream"), {
       method: "POST",
@@ -167,6 +169,36 @@ const GlobalRagChat = () => {
             ) : (
               <>
                 <div className={styles.questionBubble}>{submittedQuestion}</div>
+                {agentSteps.length ? (
+                  <section className={styles.agentTrace} aria-label="Agent 执行过程">
+                    <button
+                      type="button"
+                      className={styles.agentTraceToggle}
+                      onClick={() => setAgentPanelOpen((value) => !value)}
+                      aria-expanded={agentPanelOpen}
+                    >
+                      <span>过程</span>
+                      <strong>{agentSteps.length} 步</strong>
+                      <i aria-hidden="true">{agentPanelOpen ? "收起" : "展开"}</i>
+                    </button>
+                    {agentPanelOpen ? (
+                      <ol className={styles.agentStepList}>
+                        {agentSteps.map((step, index) => (
+                          <li key={`${step.traceId}-${step.stepName}-${index}`} className={styles.agentStep}>
+                            <span className={step.success ? styles.agentStepDot : styles.agentStepDotError} aria-hidden="true" />
+                            <div>
+                              <div className={styles.agentStepTitle}>
+                                <span>{step.title}</span>
+                                {step.costMs > 0 ? <em>{step.costMs}ms</em> : null}
+                              </div>
+                              <p>{step.summary || step.decision}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : null}
+                  </section>
+                ) : null}
                 <div className={styles.answerBlock}>
                   {answer ? (
                     <ReactMarkdown

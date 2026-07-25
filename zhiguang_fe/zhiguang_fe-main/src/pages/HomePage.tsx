@@ -6,7 +6,7 @@ import LikeFavBar from "@/components/common/LikeFavBar";
 import { knowpostService } from "@/services/knowpostService";
 import type { FeedItem } from "@/types/knowpost";
 import AuthStatus from "@/features/auth/AuthStatus";
-import GlobalRagChat from "@/components/rag/GlobalRagChat";
+import GlobalRagChat from "@/features/rag/components/GlobalRagChat";
 import styles from "./HomePage.module.css";
 
 const PAGE_SIZE = 20;

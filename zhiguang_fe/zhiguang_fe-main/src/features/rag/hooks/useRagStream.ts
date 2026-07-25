@@ -6,6 +6,17 @@ type StartOptions = {
   method?: "GET" | "POST";
   body?: unknown;
   onMeta?: (meta: unknown) => void;
+  onAgentStep?: (step: AgentStep) => void;
+};
+
+export type AgentStep = {
+  traceId: string;
+  stepName: string;
+  title: string;
+  decision: string;
+  success: boolean;
+  costMs: number;
+  summary: string;
 };
 
 const getStoredAccessToken = (): string | null => {
@@ -21,6 +32,7 @@ const getStoredAccessToken = (): string | null => {
 
 export const useRagStream = () => {
   const [answer, setAnswer] = useState("");
+  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
@@ -37,6 +49,7 @@ export const useRagStream = () => {
     stop();
     answerRef.current = "";
     setAnswer("");
+    setAgentSteps([]);
     setError(null);
     setLoading(true);
 
@@ -49,8 +62,7 @@ export const useRagStream = () => {
       setAnswer(answerRef.current);
     };
 
-    const consumeEvents = (input: string) => {
-      let buffer = input;
+    const consumeEvents = (buffer: string) => {
       let match = buffer.match(/\r?\n\r?\n/);
       while (match?.index !== undefined) {
         const eventBlock = buffer.slice(0, match.index);
@@ -67,6 +79,14 @@ export const useRagStream = () => {
               options.onMeta?.(JSON.parse(payload));
             } catch {
               options.onMeta?.(payload);
+            }
+          } else if (eventType === "agent_step") {
+            try {
+              const step = JSON.parse(payload) as AgentStep;
+              setAgentSteps((current) => [...current, step]);
+              options.onAgentStep?.(step);
+            } catch {
+              // Ignore malformed observability events; answer streaming should keep working.
             }
           } else if (eventType === "message") {
             appendChunk(payload === "" ? "\n" : payload);
@@ -126,5 +146,5 @@ export const useRagStream = () => {
 
   useEffect(() => stop, [stop]);
 
-  return { answer, loading, error, start, stop };
+  return { answer, agentSteps, loading, error, start, stop };
 };
