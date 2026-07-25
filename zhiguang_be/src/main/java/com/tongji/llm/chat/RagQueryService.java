@@ -4,9 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.RagMainAgent;
 import com.tongji.llm.agent.model.RagAgentState;
+import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
-import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
@@ -27,6 +27,11 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class RagQueryService {
+    private static final String EMPTY_POST_MESSAGE =
+            "\u672a\u627e\u5230\u4e0e\u95ee\u9898\u76f8\u5173\u7684\u5f53\u524d\u6587\u7ae0\u5185\u5bb9\uff0c\u8bf7\u6362\u4e00\u79cd\u95ee\u6cd5\u540e\u518d\u8bd5\u3002";
+    private static final String EMPTY_GLOBAL_MESSAGE =
+            "\u672a\u627e\u5230\u4e0e\u95ee\u9898\u76f8\u5173\u7684\u77e5\u8bc6\u5e93\u5185\u5bb9\uff0c\u8bf7\u6362\u4e00\u79cd\u95ee\u6cd5\u540e\u518d\u8bd5\u3002";
+
     private final ChatClient chatClient;
     private final RagMainAgent ragMainAgent;
     private final RagConversationMemoryService memoryService;
@@ -35,20 +40,22 @@ public class RagQueryService {
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
         RagAgentState state = ragMainAgent.run("post", postId, question, question, topK);
-        return streamAnswerInternal(
-                state,
-                question,
-                "未找到与问题相关的当前文章内容，请换一种问法后再试。"
-        );
+        return streamAnswerInternal(state, question, EMPTY_POST_MESSAGE);
+    }
+
+    public Flux<String> streamPostAnswerFlux(long postId, String question, int topK, String evalRunId) {
+        RagAgentState state = ragMainAgent.run("post", postId, question, question, topK, evalRunId);
+        return streamAnswerInternal(state, question, EMPTY_POST_MESSAGE);
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
         RagAgentState state = ragMainAgent.run("global", null, question, question, topK);
-        return streamAnswerInternal(
-                state,
-                question,
-                "未找到与问题相关的知识库内容，请换一种问法后再试。"
-        );
+        return streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE);
+    }
+
+    public Flux<String> streamGlobalAnswerFlux(String question, int topK, String evalRunId) {
+        RagAgentState state = ragMainAgent.run("global", null, question, question, topK, evalRunId);
+        return streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE);
     }
 
     public Flux<ServerSentEvent<String>> streamChatAnswerFlux(
@@ -237,8 +244,6 @@ public class RagQueryService {
     }
 
     private String emptyResultMessage(String scope) {
-        return RagChatScope.POST.is(scope)
-                ? "未找到与问题相关的当前文章内容，请换一种问法后再试。"
-                : "未找到与问题相关的知识库内容，请换一种问法后再试。";
+        return RagChatScope.POST.is(scope) ? EMPTY_POST_MESSAGE : EMPTY_GLOBAL_MESSAGE;
     }
 }

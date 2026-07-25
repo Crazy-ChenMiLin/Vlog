@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -92,6 +93,9 @@ public class AgentObservationService {
         doc.put("event_type", eventType);
         doc.put("service", "zhiguang-be");
         doc.put("trace_id", state.traceId());
+        if (StringUtils.hasText(state.evalRunId())) {
+            doc.put("eval_run_id", state.evalRunId());
+        }
         doc.put("original_question", state.originalQuestion());
         doc.put("standalone_question", state.standaloneQuestion());
         return doc;

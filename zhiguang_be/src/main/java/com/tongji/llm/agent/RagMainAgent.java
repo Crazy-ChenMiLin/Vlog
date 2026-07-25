@@ -53,8 +53,13 @@ public class RagMainAgent {
     private AgentObservationService observationService;
 
     public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK) {
+        return run(scope, postId, originalQuestion, standaloneQuestion, topK, null);
+    }
+
+    public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK, String evalRunId) {
         String effectiveQuestion = StringUtils.hasText(standaloneQuestion) ? standaloneQuestion.trim() : originalQuestion;
         RagAgentState state = new RagAgentState(originalQuestion, effectiveQuestion, topK);
+        state.evalRunId(evalRunId);
 
         // Plan 是事前路线图：让 LLM 判断问题类型和工具开关，而不是用大量关键词规则硬判。
         RagAgentPlan plan = timed(state, "plan", "PLANNER", () -> plannerService.plan(effectiveQuestion, topK));

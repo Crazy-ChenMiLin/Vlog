@@ -143,6 +143,21 @@ class RagQueryServiceTest {
         verify(memoryService).appendMessage(7L, 99L, RagChatRole.ASSISTANT, "直接回答");
     }
 
+    @Test
+    void globalEvalStreamPassesEvalRunIdToAgent() {
+        when(ragMainAgent.run("global", null, "question", "question", 5, "batch-001"))
+                .thenReturn(state("question", 5, List.of()));
+        RagQueryService service = createService();
+
+        List<String> result = service.streamGlobalAnswerFlux("question", 5, "batch-001")
+                .collectList()
+                .block();
+
+        assertThat(result).hasSize(1);
+        verify(ragMainAgent).run("global", null, "question", "question", 5, "batch-001");
+        verifyNoInteractions(chatClient);
+    }
+
     private RagQueryService createService() {
         return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper);
     }

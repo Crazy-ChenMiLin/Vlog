@@ -23,6 +23,7 @@ public class RagAgentState {
     private final String traceId;
     private final String originalQuestion;
     private final String standaloneQuestion;
+    private String evalRunId;
     private RagAgentPlan plan;
     private int currentTopK;
     private GraphContext graphContext = GraphContext.empty();
@@ -51,6 +52,14 @@ public class RagAgentState {
 
     public String standaloneQuestion() {
         return standaloneQuestion;
+    }
+
+    public String evalRunId() {
+        return evalRunId;
+    }
+
+    public void evalRunId(String evalRunId) {
+        this.evalRunId = normalize(evalRunId);
     }
 
     public RagAgentPlan plan() {

@@ -45,8 +45,9 @@ public class KnowPostRagController {
     public Flux<String> qaStream(
             @PathVariable("id") @Positive long id,
             @RequestParam("question") @NotBlank @Size(max = 500) String question,
-            @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK) {
-        return ragQueryService.streamPostAnswerFlux(id, question.trim(), topK);
+            @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK,
+            @RequestParam(value = "evalRunId", required = false) @Size(max = 80) String evalRunId) {
+        return ragQueryService.streamPostAnswerFlux(id, question.trim(), topK, evalRunId);
     }
 
     /**
@@ -55,8 +56,9 @@ public class KnowPostRagController {
     @GetMapping(value = "/qa/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> globalQaStream(
             @RequestParam("question") @NotBlank @Size(max = 500) String question,
-            @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK) {
-        return ragQueryService.streamGlobalAnswerFlux(question.trim(), topK);
+            @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK,
+            @RequestParam(value = "evalRunId", required = false) @Size(max = 80) String evalRunId) {
+        return ragQueryService.streamGlobalAnswerFlux(question.trim(), topK, evalRunId);
     }
 
     @PostMapping(value = "/qa/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
