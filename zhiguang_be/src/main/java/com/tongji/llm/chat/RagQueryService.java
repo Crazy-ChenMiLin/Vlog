@@ -1,16 +1,14 @@
 package com.tongji.llm.chat;
 
-import com.tongji.llm.DTO.RagRetrievalResultDTO;
-import com.tongji.llm.DTO.RagRetrievalResultRankDTO;
+import com.tongji.llm.agent.RagMainAgent;
+import com.tongji.llm.agent.model.RagAgentState;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
 import com.tongji.llm.enhanceService.QueryRewriteService;
-import com.tongji.llm.enhanceService.RerankService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
 import com.tongji.llm.memoryService.model.RagMessage;
-import com.tongji.llm.searchService.RagRetrievalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -27,28 +25,23 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RagQueryService {
     private final ChatClient chatClient;
-    private final RagRetrievalService retrievalService;
+    private final RagMainAgent ragMainAgent;
     private final RagConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
-    private final RerankService rerankService;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
-        RagRetrievalResultDTO retrieval = retrievalService.retrieveForPost(postId, question, topK);
-        RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
+        RagAgentState state = ragMainAgent.run("post", postId, question, question, topK);
         return streamAnswerInternal(
-                ranked.answerDocs(),
-                retrieval.graphContext(),
+                state,
                 question,
                 "未找到与问题相关的当前文章内容，请换一种问法后再试。"
         );
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
-        RagRetrievalResultDTO retrieval = retrievalService.retrieveGlobal(question, topK);
-        RagRetrievalResultRankDTO ranked = rankRetrieval(question, retrieval, topK);
+        RagAgentState state = ragMainAgent.run("global", null, question, question, topK);
         return streamAnswerInternal(
-                ranked.answerDocs(),
-                retrieval.graphContext(),
+                state,
                 question,
                 "未找到与问题相关的知识库内容，请换一种问法后再试。"
         );
@@ -68,10 +61,13 @@ public class RagQueryService {
                 RagConversationMemoryService.DEFAULT_HISTORY_LIMIT
         );
         String standaloneQuestion = queryRewriteService.rewrite(originalQuestion, recentMessages);
-        RagRetrievalResultDTO retrieval = RagChatScope.POST.is(scope)
-                ? retrievalService.retrieveForPost(postId, standaloneQuestion, topK)
-                : retrievalService.retrieveGlobal(standaloneQuestion, topK);
-        RagRetrievalResultRankDTO ranked = rankRetrieval(standaloneQuestion, retrieval, topK);
+        RagAgentState state = ragMainAgent.run(
+                RagChatScope.POST.is(scope) ? "post" : "global",
+                postId,
+                originalQuestion,
+                standaloneQuestion,
+                topK
+        );
 
         memoryService.appendMessage(userId, conversation.getId(), RagChatRole.USER, originalQuestion);
         StringBuilder assistantAnswer = new StringBuilder();
@@ -81,8 +77,7 @@ public class RagQueryService {
                 .data("{\"conversationId\":\"" + conversation.getId() + "\"}")
                 .build());
         Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
-                ranked.answerDocs(),
-                retrieval.graphContext(),
+                state,
                 originalQuestion,
                 standaloneQuestion,
                 recentMessages,
@@ -110,25 +105,15 @@ public class RagQueryService {
         return Flux.concat(meta, answer, done);
     }
 
-    private RagRetrievalResultRankDTO rankRetrieval(String standaloneQuestion, RagRetrievalResultDTO retrieval, int topK) {
-        List<Document> rerankedDocs = rerankService.rerank(
-                standaloneQuestion,
-                retrieval.fusedDocs(),
-                topK,
-                retrieval.graphContext()
-        );
-        if (rerankedDocs == null) {
-            rerankedDocs = retrieval.fusedDocs().stream().limit(topK).toList();
-        }
-        return new RagRetrievalResultRankDTO(retrieval, rerankedDocs, rerankedDocs);
-    }
-
     private Flux<String> streamAnswerInternal(
-            List<Document> answerDocs,
-            GraphContext graphContext,
+            RagAgentState state,
             String question,
             String emptyResultMessage) {
-        List<String> contexts = answerDocs.stream()
+        if (StringUtils.hasText(state.finalAnswer())) {
+            return Flux.just(state.finalAnswer());
+        }
+
+        List<String> contexts = state.answerDocs().stream()
                 .map(Document::getText)
                 .filter(StringUtils::hasText)
                 .toList();
@@ -139,7 +124,7 @@ public class RagQueryService {
         String context = String.join("\n\n---\n\n", contexts);
         String system = "你是中文知识助手。只能依据提供的知识库上下文和 Neo4j graph trace 回答；无法确定时请说明不确定。";
         String user = "问题：\n" + question
-                + graphTrace(graphContext)
+                + graphTrace(state.graphContext())
                 + "\n\n知识库上下文如下（可能不完整）：\n"
                 + context
                 + "\n\n请基于以上材料作答。";
@@ -156,13 +141,16 @@ public class RagQueryService {
     }
 
     private Flux<String> streamAnswerInternal(
-            List<Document> answerDocs,
-            GraphContext graphContext,
+            RagAgentState state,
             String originalQuestion,
             String standaloneQuestion,
             List<RagMessage> recentMessages,
             String emptyResultMessage) {
-        List<String> contexts = answerDocs.stream()
+        if (StringUtils.hasText(state.finalAnswer())) {
+            return Flux.just(state.finalAnswer());
+        }
+
+        List<String> contexts = state.answerDocs().stream()
                 .map(Document::getText)
                 .filter(StringUtils::hasText)
                 .toList();
@@ -178,7 +166,7 @@ public class RagQueryService {
         String user = "最近对话：\n" + formatHistory(recentMessages)
                 + "\n\n用户当前原始问题：\n" + originalQuestion
                 + "\n\n系统改写后的检索问题：\n" + standaloneQuestion
-                + graphTrace(graphContext)
+                + graphTrace(state.graphContext())
                 + "\n\n知识库上下文如下（可能不完整）：\n" + context
                 + "\n\n请基于以上材料回答用户当前原始问题。";
 

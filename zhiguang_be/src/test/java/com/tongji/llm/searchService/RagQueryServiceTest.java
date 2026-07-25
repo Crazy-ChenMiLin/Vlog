@@ -2,12 +2,13 @@ package com.tongji.llm.searchService;
 
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
-import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.agent.RagMainAgent;
+import com.tongji.llm.agent.model.RagAgentState;
 import com.tongji.llm.chat.RagQueryService;
+import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.enhanceService.QueryRewriteService;
-import com.tongji.llm.enhanceService.RerankService;
-import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
+import com.tongji.llm.memoryService.model.RagConversation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -23,10 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,13 +35,11 @@ class RagQueryServiceTest {
     @Mock
     private ChatClient chatClient;
     @Mock
-    private RagRetrievalService retrievalService;
+    private RagMainAgent ragMainAgent;
     @Mock
     private RagConversationMemoryService memoryService;
     @Mock
     private QueryRewriteService queryRewriteService;
-    @Mock
-    private RerankService rerankService;
     @Mock
     private ChatClient.ChatClientRequestSpec requestSpec;
     @Mock
@@ -49,8 +47,8 @@ class RagQueryServiceTest {
 
     @Test
     void emptyRetrievalReturnsFriendlyMessageWithoutCallingLlm() {
-        when(retrievalService.retrieveForPost(123L, "问题", 5))
-                .thenReturn(new RagRetrievalResultDTO(null, 0.30, List.of(), List.of(), List.of(), List.of()));
+        when(ragMainAgent.run("post", 123L, "问题", "问题", 5))
+                .thenReturn(state("问题", 5, List.of()));
         RagQueryService service = createService();
 
         List<String> result = service.streamPostAnswerFlux(123L, "问题", 5)
@@ -63,8 +61,8 @@ class RagQueryServiceTest {
 
     @Test
     void emptyGlobalRetrievalReturnsKnowledgeBaseMessage() {
-        when(retrievalService.retrieveGlobal("问题", 5))
-                .thenReturn(new RagRetrievalResultDTO(null, 0.30, List.of(), List.of(), List.of(), List.of()));
+        when(ragMainAgent.run("global", null, "问题", "问题", 5))
+                .thenReturn(state("问题", 5, List.of()));
         RagQueryService service = createService();
 
         List<String> result = service.streamGlobalAnswerFlux("问题", 5)
@@ -72,13 +70,13 @@ class RagQueryServiceTest {
                 .block();
 
         assertThat(result).containsExactly("未找到与问题相关的知识库内容，请换一种问法后再试。");
-        verify(retrievalService).retrieveGlobal("问题", 5);
+        verify(ragMainAgent).run("global", null, "问题", "问题", 5);
         verifyNoInteractions(chatClient);
     }
 
     @Test
-    void retrievalFailureStopsBeforeCallingLlm() {
-        when(retrievalService.retrieveForPost(123L, "问题", 5))
+    void agentFailureStopsBeforeCallingAnswerLlm() {
+        when(ragMainAgent.run("post", 123L, "问题", "问题", 5))
                 .thenThrow(new BusinessException(ErrorCode.RAG_RETRIEVAL_FAILED));
         RagQueryService service = createService();
 
@@ -91,18 +89,15 @@ class RagQueryServiceTest {
     @Test
     void answerOptionsDoNotSendMaxTokensForGatewayCompatibility() {
         Document document = new Document("可用于回答的上下文");
-        when(retrievalService.retrieveGlobal("问题", 5))
-                .thenReturn(new RagRetrievalResultDTO(
-                        null, 0.30, List.of(document), List.of(), List.of(), List.of(document)));
+        when(ragMainAgent.run("global", null, "问题", "问题", 5))
+                .thenReturn(state("问题", 5, List.of(document)));
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.options(any(OpenAiChatOptions.class))).thenReturn(requestSpec);
         when(requestSpec.stream()).thenReturn(streamResponseSpec);
         when(streamResponseSpec.content()).thenReturn(Flux.just("回答"));
-        when(rerankService.rerank(anyString(), eq(List.of(document)), eq(5), org.mockito.ArgumentMatchers.any(GraphContext.class)))
-                .thenReturn(List.of(document));
-        RagQueryService service = new RagQueryService(chatClient, retrievalService, memoryService, queryRewriteService, rerankService);
+        RagQueryService service = createService();
 
         assertThat(service.streamGlobalAnswerFlux("问题", 5).collectList().block())
                 .containsExactly("回答");
@@ -114,7 +109,41 @@ class RagQueryServiceTest {
         verify(requestSpec, times(1)).stream();
     }
 
+    @Test
+    void chatStreamUsesAgentAndStillStoresMessages() {
+        RagConversation conversation = new RagConversation();
+        conversation.setId(99L);
+        when(memoryService.resolveConversation(1L, 7L, "global", null)).thenReturn(conversation);
+        when(memoryService.loadRecentMessages(7L, 99L, RagConversationMemoryService.DEFAULT_HISTORY_LIMIT))
+                .thenReturn(List.of());
+        when(queryRewriteService.rewrite("原问题", List.of())).thenReturn("改写问题");
+
+        RagAgentState state = state("改写问题", 5, List.of());
+        state.finalAnswer("直接回答");
+        when(ragMainAgent.run("global", null, "原问题", "改写问题", 5)).thenReturn(state);
+
+        RagQueryService service = createService();
+        List<String> events = service.streamChatAnswerFlux(7L, 1L, "global", null, "原问题", 5)
+                .map(event -> event.event() + ":" + event.data())
+                .collectList()
+                .block();
+
+        assertThat(events).containsExactly(
+                "meta:{\"conversationId\":\"99\"}",
+                "message:直接回答",
+                "done:{}"
+        );
+        verify(memoryService).appendMessage(7L, 99L, RagChatRole.USER, "原问题");
+        verify(memoryService).appendMessage(7L, 99L, RagChatRole.ASSISTANT, "直接回答");
+    }
+
     private RagQueryService createService() {
-        return new RagQueryService(chatClient, retrievalService, memoryService, queryRewriteService, rerankService);
+        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService);
+    }
+
+    private RagAgentState state(String question, int topK, List<Document> answerDocs) {
+        RagAgentState state = new RagAgentState(question, question, topK);
+        state.answerDocs(answerDocs);
+        return state;
     }
 }

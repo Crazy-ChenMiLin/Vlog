@@ -40,26 +40,38 @@ public class RagRetrievalService {
 
     public RagRetrievalResultDTO retrieveForPost(long postId, String question, int topK) {
         indexService.ensureIndexed(postId);
-        return retrieveInternal(postId, question, topK);
+        return retrieveInternal(postId, question, topK, RagRetrievalOptions.defaults(bm25Enabled, graphEnabled));
     }
 
     public RagRetrievalResultDTO retrieveGlobal(String question, int topK) {
-        return retrieveInternal(null, question, topK);
+        return retrieveInternal(null, question, topK, RagRetrievalOptions.defaults(bm25Enabled, graphEnabled));
     }
 
-    private RagRetrievalResultDTO retrieveInternal(Long postId, String question, int topK) {
+    public RagRetrievalResultDTO retrieveForPost(long postId, String question, int topK, RagRetrievalOptions options) {
+        indexService.ensureIndexed(postId);
+        return retrieveInternal(postId, question, topK, options);
+    }
+
+    public RagRetrievalResultDTO retrieveGlobal(String question, int topK, RagRetrievalOptions options) {
+        return retrieveInternal(null, question, topK, options);
+    }
+
+    private RagRetrievalResultDTO retrieveInternal(Long postId, String question, int topK, RagRetrievalOptions options) {
         int candidateK = candidateK(topK);
-        GraphContext graphContext = graphEnabled ? graphContextService.build(question) : GraphContext.empty();
-        String bm25Query = graphEnabled && !graphContext.isEmpty() ? graphContext.keywordQuery(question) : question;
+        options = options == null ? RagRetrievalOptions.defaults(bm25Enabled, graphEnabled) : options;
+        GraphContext graphContext = resolveGraphContext(question, options);
+        String bm25Query = options.useGraph() && !graphContext.isEmpty() ? graphContext.keywordQuery(question) : question;
 
         // HyDE 只生成向量召回用的辅助查询；GraphContext 打开时用关系摘要让假设答案更聚焦。
         String hydeQuestion = enrichHydeQuestion(question, graphContext);
-        String hypotheticalAnswer = hydeService.generateHypotheticalAnswer(hydeQuestion);
-        List<Document> originalDocs = vectorRetrievalService.search(postId, question, candidateK);
-        List<Document> hydeDocs = StringUtils.hasText(hypotheticalAnswer)
+        String hypotheticalAnswer = options.useHyde() ? hydeService.generateHypotheticalAnswer(hydeQuestion) : null;
+        List<Document> originalDocs = options.useVector()
+                ? vectorRetrievalService.search(postId, question, candidateK)
+                : List.of();
+        List<Document> hydeDocs = options.useVector() && options.useHyde() && StringUtils.hasText(hypotheticalAnswer)
                 ? vectorRetrievalService.search(postId, hypotheticalAnswer, candidateK)
                 : List.of();
-        List<Document> keywordDocs = bm25Enabled
+        List<Document> keywordDocs = options.useBm25()
                 ? bm25RetrievalService.search(postId, bm25Query, candidateK)
                 : List.of();
 
@@ -83,6 +95,16 @@ public class RagRetrievalService {
         );
     }
 
+    private GraphContext resolveGraphContext(String question, RagRetrievalOptions options) {
+        if (!options.useGraph()) {
+            return GraphContext.empty();
+        }
+        if (options.graphContext() != null && !options.graphContext().isEmpty()) {
+            return options.graphContext();
+        }
+        return graphContextService.build(question);
+    }
+
     private int candidateK(int topK) {
         int safeTopK = Math.max(1, topK);
         int multiplier = Math.max(1, candidateMultiplier);
@@ -91,7 +113,7 @@ public class RagRetrievalService {
     }
 
     private String enrichHydeQuestion(String question, GraphContext graphContext) {
-        if (!graphEnabled || graphContext.isEmpty() || !StringUtils.hasText(graphContext.relationSummary())) {
+        if (graphContext.isEmpty() || !StringUtils.hasText(graphContext.relationSummary())) {
             return question;
         }
         return question.trim()
