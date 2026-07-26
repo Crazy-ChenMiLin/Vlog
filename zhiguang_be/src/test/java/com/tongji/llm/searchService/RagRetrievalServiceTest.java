@@ -139,6 +139,23 @@ class RagRetrievalServiceTest {
         assertThat(result.fusedDocs()).containsExactly(keyword, hyde, original);
     }
 
+    @Test
+    void vectorFailureFallsBackToBm25InsteadOfFailingWholeRetrieval() {
+        Document keyword = document("1#2");
+        when(hydeService.generateHypotheticalAnswer("question")).thenReturn(null);
+        when(vectorRetrievalService.search(null, "question", 5))
+                .thenThrow(new BusinessException(ErrorCode.RAG_RETRIEVAL_FAILED));
+        when(bm25RetrievalService.search(null, "question", 5)).thenReturn(List.of(keyword));
+        RagRetrievalService service = createService(true);
+
+        RagRetrievalResultDTO result = service.retrieveGlobal("question", 5);
+
+        assertThat(result.originalDocs()).isEmpty();
+        assertThat(result.hydeDocs()).isEmpty();
+        assertThat(result.keywordDocs()).containsExactly(keyword);
+        assertThat(result.fusedDocs()).containsExactly(keyword);
+    }
+
     private RagRetrievalService createService(boolean bm25Enabled) {
         return createService(bm25Enabled, false);
     }

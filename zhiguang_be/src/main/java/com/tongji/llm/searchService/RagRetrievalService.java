@@ -64,15 +64,15 @@ public class RagRetrievalService {
 
         // HyDE 只生成向量召回用的辅助查询；GraphContext 打开时用关系摘要让假设答案更聚焦。
         String hydeQuestion = enrichHydeQuestion(question, graphContext);
-        String hypotheticalAnswer = options.useHyde() ? hydeService.generateHypotheticalAnswer(hydeQuestion) : null;
+        String hypotheticalAnswer = options.useHyde() ? safeHyde(question, hydeQuestion) : null;
         List<Document> originalDocs = options.useVector()
-                ? vectorRetrievalService.search(postId, question, candidateK)
+                ? safeVectorSearch(postId, question, candidateK, "original")
                 : List.of();
         List<Document> hydeDocs = options.useVector() && options.useHyde() && StringUtils.hasText(hypotheticalAnswer)
-                ? vectorRetrievalService.search(postId, hypotheticalAnswer, candidateK)
+                ? safeVectorSearch(postId, hypotheticalAnswer, candidateK, "hyde")
                 : List.of();
         List<Document> keywordDocs = options.useBm25()
-                ? bm25RetrievalService.search(postId, bm25Query, candidateK)
+                ? safeBm25Search(postId, bm25Query, candidateK)
                 : List.of();
 
         // 只有一路召回有结果时不需要 RRF；多路召回时再按排名融合，避免空列表影响分数。
@@ -93,6 +93,33 @@ public class RagRetrievalService {
                 keywordDocs,
                 fusedDocs
         );
+    }
+
+    private String safeHyde(String question, String hydeQuestion) {
+        try {
+            return hydeService.generateHypotheticalAnswer(hydeQuestion);
+        } catch (Exception e) {
+            log.warn("RAG hyde generation skipped question={} reason={}", question, e.getMessage());
+            return null;
+        }
+    }
+
+    private List<Document> safeVectorSearch(Long postId, String query, int candidateK, String route) {
+        try {
+            return vectorRetrievalService.search(postId, query, candidateK);
+        } catch (Exception e) {
+            log.warn("RAG vector retrieval skipped route={} postId={} reason={}", route, postId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<Document> safeBm25Search(Long postId, String query, int candidateK) {
+        try {
+            return bm25RetrievalService.search(postId, query, candidateK);
+        } catch (Exception e) {
+            log.warn("RAG bm25 retrieval skipped postId={} reason={}", postId, e.getMessage());
+            return List.of();
+        }
     }
 
     private GraphContext resolveGraphContext(String question, RagRetrievalOptions options) {

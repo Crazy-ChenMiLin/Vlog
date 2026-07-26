@@ -3,31 +3,51 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowRightIcon, ChatBubbleIcon, CloseIcon, MinimizeIcon, SparkIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
-import { useRagStream } from "@/features/rag/hooks/useRagStream";
+import { AgentStep, useRagStream } from "@/features/rag/hooks/useRagStream";
 import { resolveApiUrl } from "@/services/apiClient";
 import styles from "./GlobalRagChat.module.css";
 
 const TOP_K_OPTIONS = [3, 5, 8, 12];
 
+type ChatTurn = {
+  id: string;
+  question: string;
+  answer: string;
+  agentSteps: AgentStep[];
+  loading: boolean;
+  error: string | null;
+};
+
 const GlobalRagChat = () => {
   const [expanded, setExpanded] = useState(false);
   const [question, setQuestion] = useState("");
-  const [submittedQuestion, setSubmittedQuestion] = useState("");
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [topK, setTopK] = useState(5);
   const answerViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const activeTurnIdRef = useRef<string | null>(null);
   const { answer, agentSteps, loading, error, start, stop } = useRagStream();
   const { tokens } = useAuth();
 
   useEffect(() => {
     const viewport = answerViewportRef.current;
-    if (viewport && answer) {
+    if (viewport && turns.length) {
       viewport.scrollTop = viewport.scrollHeight;
     }
-  }, [answer]);
+  }, [turns]);
+
+  useEffect(() => {
+    const activeTurnId = activeTurnIdRef.current;
+    if (!activeTurnId) return;
+    setTurns((current) => current.map((turn) => (
+      turn.id === activeTurnId
+        ? { ...turn, answer, agentSteps, loading, error }
+        : turn
+    )));
+  }, [answer, agentSteps, loading, error]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -57,9 +77,23 @@ const GlobalRagChat = () => {
     }
 
     setLocalError(null);
-    setSubmittedQuestion(normalizedQuestion);
     setAgentPanelOpen(true);
     setQuestion("");
+
+    const turnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    activeTurnIdRef.current = turnId;
+    setTurns((current) => [
+      ...current,
+      {
+        id: turnId,
+        question: normalizedQuestion,
+        answer: "",
+        agentSteps: [],
+        loading: true,
+        error: null
+      }
+    ]);
+
     start(resolveApiUrl("/api/v1/knowposts/qa/chat/stream"), {
       method: "POST",
       body: {
@@ -146,7 +180,7 @@ const GlobalRagChat = () => {
           </div>
 
           <div ref={answerViewportRef} className={styles.answerViewport} aria-live="polite">
-            {!submittedQuestion ? (
+            {!turns.length ? (
               <div className={styles.emptyState}>
                 <span>试试这些全库问题：</span>
                 <button type="button" onClick={() => useSuggestion("Redis 缓存穿透怎么解决？")}>
@@ -167,61 +201,63 @@ const GlobalRagChat = () => {
                 </button>
               </div>
             ) : (
-              <>
-                <div className={styles.questionBubble}>{submittedQuestion}</div>
-                {agentSteps.length ? (
-                  <section className={styles.agentTrace} aria-label="Agent 执行过程">
-                    <button
-                      type="button"
-                      className={styles.agentTraceToggle}
-                      onClick={() => setAgentPanelOpen((value) => !value)}
-                      aria-expanded={agentPanelOpen}
-                    >
-                      <span>过程</span>
-                      <strong>{agentSteps.length} 步</strong>
-                      <i aria-hidden="true">{agentPanelOpen ? "收起" : "展开"}</i>
-                    </button>
-                    {agentPanelOpen ? (
-                      <ol className={styles.agentStepList}>
-                        {agentSteps.map((step, index) => (
-                          <li key={`${step.traceId}-${step.stepName}-${index}`} className={styles.agentStep}>
-                            <span className={step.success ? styles.agentStepDot : styles.agentStepDotError} aria-hidden="true" />
-                            <div>
-                              <div className={styles.agentStepTitle}>
-                                <span>{step.title}</span>
-                                {step.costMs > 0 ? <em>{step.costMs}ms</em> : null}
+              turns.map((turn) => (
+                <article key={turn.id} className={styles.chatTurn}>
+                  <div className={styles.questionBubble}>{turn.question}</div>
+                  {turn.agentSteps.length ? (
+                    <section className={styles.agentTrace} aria-label="Agent 执行过程">
+                      <button
+                        type="button"
+                        className={styles.agentTraceToggle}
+                        onClick={() => setAgentPanelOpen((value) => !value)}
+                        aria-expanded={agentPanelOpen}
+                      >
+                        <span>过程</span>
+                        <strong>{turn.agentSteps.length} 步</strong>
+                        <i aria-hidden="true">{agentPanelOpen ? "收起" : "展开"}</i>
+                      </button>
+                      {agentPanelOpen ? (
+                        <ol className={styles.agentStepList}>
+                          {turn.agentSteps.map((step, index) => (
+                            <li key={`${step.traceId}-${step.stepName}-${index}`} className={styles.agentStep}>
+                              <span className={step.success ? styles.agentStepDot : styles.agentStepDotError} aria-hidden="true" />
+                              <div>
+                                <div className={styles.agentStepTitle}>
+                                  <span>{step.title}</span>
+                                  {step.costMs > 0 ? <em>{step.costMs}ms</em> : null}
+                                </div>
+                                <p>{step.summary || step.decision}</p>
                               </div>
-                              <p>{step.summary || step.decision}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : null}
-                  </section>
-                ) : null}
-                <div className={styles.answerBlock}>
-                  {answer ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        a: ({ node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
-                        img: ({ node, ...props }) => <img {...props} alt={props.alt ?? ""} />
-                      }}
-                    >
-                      {answer}
-                    </ReactMarkdown>
-                  ) : loading ? (
-                    <div className={styles.thinking}>
-                      <span />
-                      <span />
-                      <span />
-                    </div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : null}
+                    </section>
                   ) : null}
-                </div>
-              </>
+                  <div className={styles.answerBlock}>
+                    {turn.answer ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+                          img: ({ node, ...props }) => <img {...props} alt={props.alt ?? ""} />
+                        }}
+                      >
+                        {turn.answer}
+                      </ReactMarkdown>
+                    ) : turn.loading ? (
+                      <div className={styles.thinking}>
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    ) : null}
+                  </div>
+                  {turn.error ? <div className={styles.error} role="alert">{turn.error}</div> : null}
+                </article>
+              ))
             )}
             {localError ? <div className={styles.error} role="alert">{localError}</div> : null}
-            {error ? <div className={styles.error} role="alert">{error}</div> : null}
           </div>
 
           <form className={styles.composer} onSubmit={handleSubmit}>

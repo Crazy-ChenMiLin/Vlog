@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const CONNECTION_ERROR = "无法连接问答服务，请确认后端已启动后重试。";
+const CONNECTION_ERROR = "问答服务暂时不可用，请稍后再试。";
 
 type StartOptions = {
   method?: "GET" | "POST";
@@ -131,7 +131,7 @@ export const useRagStream = () => {
         if (buffer) {
           consumeEvents(`${buffer}\n\n`);
         }
-      } catch (streamError) {
+      } catch {
         if (!controller.signal.aborted && controllerRef.current === controller) {
           setError(CONNECTION_ERROR);
         }

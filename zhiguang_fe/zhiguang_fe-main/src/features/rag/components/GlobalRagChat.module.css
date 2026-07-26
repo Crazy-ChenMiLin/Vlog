@@ -217,6 +217,16 @@
   transform: translateX(2px);
 }
 
+.chatTurn {
+  display: grid;
+  gap: 0;
+  margin-top: 18px;
+}
+
+.chatTurn:first-child {
+  margin-top: 0;
+}
+
 .questionBubble {
   width: fit-content;
   max-width: 84%;
