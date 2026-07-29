@@ -41,8 +41,8 @@ public class RagMainAgent {
     private final PlanNode planNode;
     private final EvidenceCheckNode evidenceCheckNode;
     private final GraphTraceNode graphTraceNode;
-    private final RetrieveNode graphTraceRetrieveNode;
-    private final RerankNode graphTraceRerankNode;
+    private final RetrieveNode retrieveNode;
+    private final RerankNode rerankNode;
     private final ExpandTopKNode expandTopKNode;
     private final DirectAnswerNode directAnswerNode;
 
@@ -61,30 +61,20 @@ public class RagMainAgent {
         RagAgentPlan plan = timed(state, "plan", "PLANNER", () -> planNode.execute(state));
         recordStep(state, new RagAgentStepTrace("plan_result", plan.retrievalMode().name(), true, 0, plan.reason()));
 
-        if (plan.questionType() == QuestionType.CHAT || plan.needDirectAnswer()) {
+        if (shouldDirectAnswer(plan)) {
             directAnswer(state);
             return state;
         }
 
         try {
-            if (plan.needGraphTrace()) {
-                GraphContext graphContext = timed(state, "graph_trace", "QUERY_NEO4J", () -> graphTraceNode.execute(state));
-                recordStep(state, new RagAgentStepTrace(
-                        "graph_trace_result",
-                        graphContext.isEmpty() ? "GRAPH_MISS" : "GRAPH_HIT",
-                        true,
-                        0,
-                        "relations=" + graphContext.relations().size() + ", entities=" + graphContext.matchedEntities().size()
-                ));
+            if (shouldQueryGraph(plan)) {
+                queryGraphTrace(state);
             }
 
             executeRetrievalRound(state, scope, postId);
             EvidenceResult evidence = checkEvidence(state);
 
-            if (!evidence.sufficient()
-                    && evidence.suggestedAction() == EvidenceAction.EXPAND_TOP_K
-                    && state.retryCount() == 0
-                    && state.currentTopK() < 10) {
+            if (shouldExpandTopK(state, evidence)) {
                 String retrySummary = expandTopKNode.execute(state);
                 recordStep(state, new RagAgentStepTrace("retry", "EXPAND_TOP_K", true, 0, retrySummary));
                 executeRetrievalRound(state, scope, postId);
@@ -103,17 +93,47 @@ public class RagMainAgent {
         timed(state, "direct_answer", "LLM_DIRECT", () -> directAnswerNode.execute(state));
     }
 
+    private void queryGraphTrace(RagAgentState state) {
+        GraphContext graphContext = timed(state, "graph_trace", "QUERY_NEO4J", () -> graphTraceNode.execute(state));
+        recordStep(state, new RagAgentStepTrace(
+                "graph_trace_result",
+                graphContext.isEmpty() ? "GRAPH_MISS" : "GRAPH_HIT",
+                true,
+                0,
+                "relations=" + graphContext.relations().size() + ", entities=" + graphContext.matchedEntities().size()
+        ));
+    }
+
     private void executeRetrievalRound(RagAgentState state, String scope, Long postId) {
-        timed(state, "retrieve", "TOP" + state.currentTopK(), () -> graphTraceRetrieveNode.execute(state, scope, postId));
-        if (state.plan().needRerank()) {
-            timed(state, "rerank", "TOP" + state.currentTopK(), () -> graphTraceRerankNode.execute(state));
+        timed(state, "retrieve", "TOP" + state.currentTopK(), () -> retrieveNode.execute(state, scope, postId));
+        if (shouldRerank(state)) {
+            timed(state, "rerank", "TOP" + state.currentTopK(), () -> rerankNode.execute(state));
         } else {
-            graphTraceRerankNode.skip(state);
+            rerankNode.skip(state);
         }
     }
 
     private EvidenceResult checkEvidence(RagAgentState state) {
         return timed(state, "evidence_check", "CHECK_TOP" + state.currentTopK(), () -> evidenceCheckNode.execute(state));
+    }
+
+    private boolean shouldDirectAnswer(RagAgentPlan plan) {
+        return plan.questionType() == QuestionType.CHAT || plan.needDirectAnswer();
+    }
+
+    private boolean shouldQueryGraph(RagAgentPlan plan) {
+        return plan.needGraphTrace();
+    }
+
+    private boolean shouldRerank(RagAgentState state) {
+        return state.plan().needRerank();
+    }
+
+    private boolean shouldExpandTopK(RagAgentState state, EvidenceResult evidence) {
+        return !evidence.sufficient()
+                && evidence.suggestedAction() == EvidenceAction.EXPAND_TOP_K
+                && state.retryCount() == 0
+                && state.currentTopK() < 10;
     }
 
     private <T> T timed(RagAgentState state, String stepName, String decision, Supplier<T> supplier) {
