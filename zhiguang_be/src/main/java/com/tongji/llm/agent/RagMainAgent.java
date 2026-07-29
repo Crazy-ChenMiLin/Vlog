@@ -1,6 +1,7 @@
 package com.tongji.llm.agent;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.agent.edge.RagAgentEdgePolicy;
 import com.tongji.llm.agent.node.anwserNode.DirectAnswerNode;
 import com.tongji.llm.agent.node.infraNode.EvidenceCheckNode;
 import com.tongji.llm.agent.node.infraNode.ExpandTopKNode;
@@ -8,9 +9,7 @@ import com.tongji.llm.agent.node.graphNode.GraphTraceNode;
 import com.tongji.llm.agent.node.PlanNode.PlanNode;
 import com.tongji.llm.agent.node.SearchNode.RerankNode;
 import com.tongji.llm.agent.node.SearchNode.RetrieveNode;
-import com.tongji.llm.agent.state.EvidenceAction;
 import com.tongji.llm.agent.state.EvidenceResult;
-import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.agent.state.RagAgentStepTrace;
@@ -45,6 +44,7 @@ public class RagMainAgent {
     private final RerankNode rerankNode;
     private final ExpandTopKNode expandTopKNode;
     private final DirectAnswerNode directAnswerNode;
+    private final RagAgentEdgePolicy edgePolicy;
 
     @Autowired(required = false)
     private AgentObservationService observationService;
@@ -61,20 +61,20 @@ public class RagMainAgent {
         RagAgentPlan plan = timed(state, "plan", "PLANNER", () -> planNode.execute(state));
         recordStep(state, new RagAgentStepTrace("plan_result", plan.retrievalMode().name(), true, 0, plan.reason()));
 
-        if (shouldDirectAnswer(plan)) {
+        if (edgePolicy.shouldDirectAnswer(plan)) {
             directAnswer(state);
             return state;
         }
 
         try {
-            if (shouldQueryGraph(plan)) {
+            if (edgePolicy.shouldQueryGraph(plan)) {
                 queryGraphTrace(state);
             }
 
             executeRetrievalRound(state, scope, postId);
             EvidenceResult evidence = checkEvidence(state);
 
-            if (shouldExpandTopK(state, evidence)) {
+            if (edgePolicy.shouldExpandTopK(state, evidence)) {
                 String retrySummary = expandTopKNode.execute(state);
                 recordStep(state, new RagAgentStepTrace("retry", "EXPAND_TOP_K", true, 0, retrySummary));
                 executeRetrievalRound(state, scope, postId);
@@ -106,7 +106,7 @@ public class RagMainAgent {
 
     private void executeRetrievalRound(RagAgentState state, String scope, Long postId) {
         timed(state, "retrieve", "TOP" + state.currentTopK(), () -> retrieveNode.execute(state, scope, postId));
-        if (shouldRerank(state)) {
+        if (edgePolicy.shouldRerank(state)) {
             timed(state, "rerank", "TOP" + state.currentTopK(), () -> rerankNode.execute(state));
         } else {
             rerankNode.skip(state);
@@ -115,25 +115,6 @@ public class RagMainAgent {
 
     private EvidenceResult checkEvidence(RagAgentState state) {
         return timed(state, "evidence_check", "CHECK_TOP" + state.currentTopK(), () -> evidenceCheckNode.execute(state));
-    }
-
-    private boolean shouldDirectAnswer(RagAgentPlan plan) {
-        return plan.questionType() == QuestionType.CHAT || plan.needDirectAnswer();
-    }
-
-    private boolean shouldQueryGraph(RagAgentPlan plan) {
-        return plan.needGraphTrace();
-    }
-
-    private boolean shouldRerank(RagAgentState state) {
-        return state.plan().needRerank();
-    }
-
-    private boolean shouldExpandTopK(RagAgentState state, EvidenceResult evidence) {
-        return !evidence.sufficient()
-                && evidence.suggestedAction() == EvidenceAction.EXPAND_TOP_K
-                && state.retryCount() == 0
-                && state.currentTopK() < 10;
     }
 
     private <T> T timed(RagAgentState state, String stepName, String decision, Supplier<T> supplier) {

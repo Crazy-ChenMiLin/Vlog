@@ -1,6 +1,7 @@
 package com.tongji.llm.agent;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.agent.edge.RagAgentEdgePolicy;
 import com.tongji.llm.agent.node.anwserNode.DirectAnswerNode;
 import com.tongji.llm.agent.node.infraNode.EvidenceCheckNode;
 import com.tongji.llm.agent.node.infraNode.ExpandTopKNode;
@@ -114,7 +115,8 @@ class RagMainAgentTest {
                 new RetrieveNode(retrievalService),
                 new RerankNode(rerankService),
                 new ExpandTopKNode(),
-                new DirectAnswerNode(chatClient)
+                new DirectAnswerNode(chatClient),
+                new RagAgentEdgePolicy()
         );
     }
 
