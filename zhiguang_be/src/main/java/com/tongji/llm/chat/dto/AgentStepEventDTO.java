@@ -1,6 +1,6 @@
 package com.tongji.llm.chat.dto;
 
-import com.tongji.llm.agent.model.RagAgentStepTrace;
+import com.tongji.llm.agent.state.RagAgentStepTrace;
 
 /**
  * 推给前端的 Agent 过程事件。

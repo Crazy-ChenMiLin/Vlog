@@ -1,4 +1,4 @@
-package com.tongji.llm.agent.model;
+package com.tongji.llm.agent.state;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.graphService.model.GraphContext;

@@ -3,7 +3,7 @@ package com.tongji.llm.chat;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.RagMainAgent;
-import com.tongji.llm.agent.model.RagAgentState;
+import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;

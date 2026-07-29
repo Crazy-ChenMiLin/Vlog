@@ -1,8 +1,8 @@
 package com.tongji.llm.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.llm.agent.model.EvidenceAction;
-import com.tongji.llm.agent.model.EvidenceResult;
+import com.tongji.llm.agent.state.EvidenceAction;
+import com.tongji.llm.agent.state.EvidenceResult;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -2,8 +2,8 @@ package com.tongji.llm.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.llm.agent.model.EvidenceAction;
-import com.tongji.llm.agent.model.EvidenceResult;
+import com.tongji.llm.agent.state.EvidenceAction;
+import com.tongji.llm.agent.state.EvidenceResult;
 import com.tongji.llm.graphService.model.GraphContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

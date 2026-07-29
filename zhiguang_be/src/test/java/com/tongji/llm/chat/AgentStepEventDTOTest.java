@@ -1,6 +1,6 @@
 package com.tongji.llm.chat;
 
-import com.tongji.llm.agent.model.RagAgentStepTrace;
+import com.tongji.llm.agent.state.RagAgentStepTrace;
 import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import org.junit.jupiter.api.Test;
 

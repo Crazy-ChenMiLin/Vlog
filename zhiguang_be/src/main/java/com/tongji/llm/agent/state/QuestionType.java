@@ -1,4 +1,4 @@
-package com.tongji.llm.agent.model;
+package com.tongji.llm.agent.state;
 
 public enum QuestionType {
     CHAT,

@@ -1,9 +1,9 @@
 package com.tongji.llm.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.llm.agent.model.QuestionType;
-import com.tongji.llm.agent.model.RagAgentPlan;
-import com.tongji.llm.agent.model.RetrievalMode;
+import com.tongji.llm.agent.state.QuestionType;
+import com.tongji.llm.agent.state.RagAgentPlan;
+import com.tongji.llm.agent.state.RetrievalMode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

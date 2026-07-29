@@ -1,12 +1,19 @@
 package com.tongji.llm.agent;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
-import com.tongji.llm.agent.model.EvidenceAction;
-import com.tongji.llm.agent.model.EvidenceResult;
-import com.tongji.llm.agent.model.QuestionType;
-import com.tongji.llm.agent.model.RagAgentPlan;
-import com.tongji.llm.agent.model.RagAgentState;
-import com.tongji.llm.agent.model.RetrievalMode;
+import com.tongji.llm.agent.node.anwserNode.DirectAnswerNode;
+import com.tongji.llm.agent.node.infraNode.EvidenceCheckNode;
+import com.tongji.llm.agent.node.infraNode.ExpandTopKNode;
+import com.tongji.llm.agent.node.graphNode.GraphTraceNode;
+import com.tongji.llm.agent.node.PlanNode.PlanNode;
+import com.tongji.llm.agent.node.SearchNode.RerankNode;
+import com.tongji.llm.agent.node.SearchNode.RetrieveNode;
+import com.tongji.llm.agent.state.EvidenceAction;
+import com.tongji.llm.agent.state.EvidenceResult;
+import com.tongji.llm.agent.state.QuestionType;
+import com.tongji.llm.agent.state.RagAgentPlan;
+import com.tongji.llm.agent.state.RagAgentState;
+import com.tongji.llm.agent.state.RetrievalMode;
 import com.tongji.llm.enhanceService.RerankService;
 import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
@@ -101,12 +108,13 @@ class RagMainAgentTest {
 
     private RagMainAgent createAgent() {
         return new RagMainAgent(
-                plannerService,
-                evidenceCheckService,
-                graphService,
-                retrievalService,
-                rerankService,
-                chatClient
+                new PlanNode(plannerService),
+                new EvidenceCheckNode(evidenceCheckService),
+                new GraphTraceNode(graphService),
+                new RetrieveNode(retrievalService),
+                new RerankNode(rerankService),
+                new ExpandTopKNode(),
+                new DirectAnswerNode(chatClient)
         );
     }
 

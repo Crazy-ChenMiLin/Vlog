@@ -1,9 +1,9 @@
 package com.tongji.llm.observability;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import com.tongji.llm.agent.model.EvidenceResult;
-import com.tongji.llm.agent.model.RagAgentState;
-import com.tongji.llm.agent.model.RagAgentStepTrace;
+import com.tongji.llm.agent.state.EvidenceResult;
+import com.tongji.llm.agent.state.RagAgentState;
+import com.tongji.llm.agent.state.RagAgentStepTrace;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
