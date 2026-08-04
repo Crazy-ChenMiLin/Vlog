@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.tongji.knowpost.model.KnowPostFeedRow;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 搜索索引写入服务：负责 upsert/软删 以及首次启动的索引回灌。
@@ -45,12 +46,22 @@ public class SearchIndexService {
     private final CounterService counterService;
     private final ObjectMapper objectMapper;
     private final RestTemplate http = new RestTemplate();
+    private final AtomicBoolean backfillRunning = new AtomicBoolean(false);
 
     /**
      * 启动时若索引为空，进行历史数据回灌（分页）。
      */
     @PostConstruct
     public void ensureBackfill() {
+        Thread backfillThread = new Thread(this::runBackfillSafely, "search-index-backfill");
+        backfillThread.setDaemon(true);
+        backfillThread.start();
+    }
+
+    private void runBackfillSafely() {
+        if (!backfillRunning.compareAndSet(false, true)) {
+            return;
+        }
         try {
             long before = es.count(c -> c.index(INDEX)).count();
             int upserted = 0;
@@ -72,6 +83,8 @@ public class SearchIndexService {
             log.info("Search index backfill completed: before={} upserted={} after={}", before, upserted, after);
         } catch (Exception e) {
             log.warn("Search index backfill skipped: {}", e.getMessage());
+        } finally {
+            backfillRunning.set(false);
         }
     }
 
