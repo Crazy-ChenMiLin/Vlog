@@ -32,6 +32,7 @@ jobs:
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
           SMTP: ${{ secrets.SMTP }}
+          MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'http://100.83.242.114:9000' }}
         run: bash scripts/deploy/internal-backend.sh
 
       - name: Set up Node

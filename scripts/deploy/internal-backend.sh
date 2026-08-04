@@ -5,6 +5,9 @@ BASE="${ZHIGUANG_DEPLOY_BASE:-/home/chenmilin/zhiguang-deploy}"
 REPO="$BASE/Vlog"
 RUNTIME="$BASE/runtime"
 SOURCE="${GITHUB_WORKSPACE:-}"
+MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://127.0.0.1:9000}"
+MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-http://100.83.242.114:9000}"
+MINIO_BUCKET="${MINIO_BUCKET:-zhiguang}"
 
 if [[ -z "$SOURCE" ]]; then
   SOURCE="$(git rev-parse --show-toplevel)"
@@ -56,6 +59,10 @@ if [[ -n "${SMTP:-}" ]]; then
   update_env_value "$RUNTIME/.env" "AUTH_MAIL_ENABLED" "true"
   update_env_value "$RUNTIME/.env" "SPRING_MAIL_PASSWORD" "$SMTP"
 fi
+
+update_env_value "$RUNTIME/.env" "MINIO_ENDPOINT" "$MINIO_ENDPOINT"
+update_env_value "$RUNTIME/.env" "MINIO_PUBLIC_DOMAIN" "$MINIO_PUBLIC_DOMAIN"
+update_env_value "$RUNTIME/.env" "MINIO_BUCKET" "$MINIO_BUCKET"
 
 sudo_cmd docker compose -f "$RUNTIME/docker-compose.yml" --env-file "$RUNTIME/.env" up -d --build
 
