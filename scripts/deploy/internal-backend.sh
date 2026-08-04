@@ -48,6 +48,13 @@ update_env_value() {
   fi
 }
 
+read_env_value() {
+  local file="$1"
+  local key="$2"
+
+  sudo_cmd awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
+}
+
 sudo_cmd mkdir -p "$REPO"
 sudo_cmd rsync -a --delete \
   --exclude '.git' \
@@ -60,9 +67,17 @@ if [[ -n "${SMTP:-}" ]]; then
   update_env_value "$RUNTIME/.env" "SPRING_MAIL_PASSWORD" "$SMTP"
 fi
 
+MINIO_ACCESS_KEY_VALUE="${MINIO_ACCESS_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_ACCESS_KEY")}"
+MINIO_SECRET_KEY_VALUE="${MINIO_SECRET_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_SECRET_KEY")}"
+
 update_env_value "$RUNTIME/.env" "MINIO_ENDPOINT" "$MINIO_ENDPOINT"
 update_env_value "$RUNTIME/.env" "MINIO_PUBLIC_DOMAIN" "$MINIO_PUBLIC_DOMAIN"
 update_env_value "$RUNTIME/.env" "MINIO_BUCKET" "$MINIO_BUCKET"
+update_env_value "$RUNTIME/.env" "OSS_ENDPOINT" "$MINIO_ENDPOINT"
+update_env_value "$RUNTIME/.env" "OSS_PUBLIC_DOMAIN" "$MINIO_PUBLIC_DOMAIN"
+update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_ID" "$MINIO_ACCESS_KEY_VALUE"
+update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_SECRET" "$MINIO_SECRET_KEY_VALUE"
+update_env_value "$RUNTIME/.env" "OSS_BUCKET" "$MINIO_BUCKET"
 
 sudo_cmd docker compose -f "$RUNTIME/docker-compose.yml" --env-file "$RUNTIME/.env" up -d --build
 
