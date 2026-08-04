@@ -33,12 +33,12 @@ update_env_value() {
   local key="$2"
   local value="$3"
 
-  if [[ ! -f "$file" ]]; then
+  if ! sudo_cmd test -f "$file"; then
     echo "Runtime env file not found: $file" >&2
     exit 1
   fi
 
-  if grep -q "^${key}=" "$file"; then
+  if sudo_cmd grep -q "^${key}=" "$file"; then
     local escaped_value="${value//\\/\\\\}"
     escaped_value="${escaped_value//&/\\&}"
     escaped_value="${escaped_value//|/\\|}"
