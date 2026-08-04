@@ -52,8 +52,8 @@ public class SearchIndexService {
     @PostConstruct
     public void ensureBackfill() {
         try {
-            long cnt = es.count(c -> c.index(INDEX)).count();
-            if (cnt > 0) return;
+            long before = es.count(c -> c.index(INDEX)).count();
+            int upserted = 0;
             int limit = 500;
             int offset = 0;
             while (true) {
@@ -64,10 +64,12 @@ public class SearchIndexService {
                 }
                 for (KnowPostFeedRow r : rows) {
                     upsertKnowPost(r.getId());
+                    upserted++;
                 }
                 offset += rows.size();
             }
-            log.info("Search index backfill completed: {} documents", es.count(c -> c.index(INDEX)).count());
+            long after = es.count(c -> c.index(INDEX)).count();
+            log.info("Search index backfill completed: before={} upserted={} after={}", before, upserted, after);
         } catch (Exception e) {
             log.warn("Search index backfill skipped: {}", e.getMessage());
         }
