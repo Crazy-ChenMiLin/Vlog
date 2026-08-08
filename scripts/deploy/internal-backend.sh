@@ -6,7 +6,7 @@ REPO="$BASE/Vlog"
 RUNTIME="$BASE/runtime"
 SOURCE="${GITHUB_WORKSPACE:-}"
 MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://100.83.242.114:9000}"
-MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-http://100.83.242.114:9000}"
+MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-http://47.108.66.230}"
 MINIO_BUCKET="${MINIO_BUCKET:-zhiguang}"
 
 if [[ -z "$SOURCE" ]]; then
@@ -79,7 +79,29 @@ update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_ID" "$MINIO_ACCESS_KEY_VALUE"
 update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_SECRET" "$MINIO_SECRET_KEY_VALUE"
 update_env_value "$RUNTIME/.env" "OSS_BUCKET" "$MINIO_BUCKET"
 
-sudo_cmd docker compose -f "$RUNTIME/docker-compose.yml" --env-file "$RUNTIME/.env" up -d --build
+cat <<EOF | sudo_cmd tee "$RUNTIME/docker-compose.zhiguang-env.yml" >/dev/null
+services:
+  zhiguang-be:
+    env_file:
+      - $RUNTIME/.env
+    environment:
+      MINIO_ENDPOINT: \${MINIO_ENDPOINT}
+      MINIO_PUBLIC_DOMAIN: \${MINIO_PUBLIC_DOMAIN}
+      MINIO_ACCESS_KEY: \${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: \${MINIO_SECRET_KEY}
+      MINIO_BUCKET: \${MINIO_BUCKET}
+      OSS_ENDPOINT: \${OSS_ENDPOINT}
+      OSS_PUBLIC_DOMAIN: \${OSS_PUBLIC_DOMAIN}
+      OSS_ACCESS_KEY_ID: \${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: \${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET: \${OSS_BUCKET}
+EOF
+
+sudo_cmd docker compose \
+  -f "$RUNTIME/docker-compose.yml" \
+  -f "$RUNTIME/docker-compose.zhiguang-env.yml" \
+  --env-file "$RUNTIME/.env" \
+  up -d --build
 
 for _ in $(seq 1 40); do
   if curl -fsS http://127.0.0.1:18080/actuator/health >/dev/null; then
