@@ -50,6 +50,15 @@ const coverTopic = (tags: string[]) => {
   return (tags[0] ?? "知光").replace(/^#/, "");
 };
 
+const buildCoverLines = (topic: string, title: string) => {
+  const titleLines = title.split("\n").map(line => line.trim()).filter(Boolean);
+  const normalizedTopic = topic.trim();
+  const lines = normalizedTopic && !titleLines.some(line => line.includes(normalizedTopic))
+    ? [normalizedTopic, ...titleLines]
+    : titleLines;
+  return lines.slice(0, 2);
+};
+
 export type CourseCardProps = {
   id: string;
   title: string;
@@ -106,6 +115,7 @@ const CourseCard = ({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const coverKicker = coverTopic(tags ?? []);
   const generatedCoverTitle = compactCoverTitle(title);
+  const generatedCoverLines = buildCoverLines(coverKicker, generatedCoverTitle);
 
   const loadDetailIfNeeded = async (id: string) => {
     if (detail || menuLoading) return;
@@ -214,13 +224,11 @@ const CourseCard = ({
           <img className={styles.cover} src={coverImage} alt={title} loading="lazy" />
         ) : (
           <div className={styles.generatedCover} aria-hidden="true">
-            <span>{coverKicker}</span>
             <strong>
-              {generatedCoverTitle.split("\n").map((line) => (
+              {generatedCoverLines.map((line) => (
                 <em key={line}>{line}</em>
               ))}
             </strong>
-            <i>知光</i>
           </div>
         )}
         {showPlayBadge ? (

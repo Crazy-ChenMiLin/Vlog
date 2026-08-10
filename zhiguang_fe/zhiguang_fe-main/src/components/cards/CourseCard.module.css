@@ -185,7 +185,6 @@
   aspect-ratio: 16 / 10;
   display: grid;
   place-items: center;
-  gap: 8px;
   padding: 24px 18px;
   overflow: hidden;
   border-radius: 12px;
@@ -212,55 +211,31 @@
   display: none;
 }
 
-.generatedCover span,
-.generatedCover strong,
-.generatedCover i {
+.generatedCover strong {
   position: relative;
   z-index: 1;
 }
 
-.generatedCover span {
-  align-self: end;
-  width: fit-content;
-  color: #080706;
-  font-family: "Segoe Script", "Brush Script MT", "Comic Sans MS", cursive;
-  font-size: clamp(24px, 4.2vw, 34px);
-  font-style: italic;
-  font-weight: 800;
-  line-height: 0.9;
-  transform: rotate(-4deg);
-  text-shadow: 0.8px 0 #080706;
-}
-
 .generatedCover strong {
-  align-self: start;
   display: grid;
-  gap: 5px;
+  gap: 8px;
   justify-items: center;
   max-width: 96%;
   color: #080706;
-  font-family: "FZYaoti", "STXingkai", "KaiTi", "Kaiti SC", "LXGW WenKai", var(--font-display);
-  font-size: clamp(25px, 4vw, 36px);
-  line-height: 1.08;
+  font-family: "Segoe Script", "Brush Script MT", "FZYaoti", "STXingkai", "KaiTi", "Kaiti SC", "LXGW WenKai", cursive;
+  font-size: clamp(29px, 4.7vw, 42px);
+  line-height: 0.98;
+  font-style: italic;
   font-weight: 900;
   letter-spacing: 0;
   text-align: center;
-  text-shadow: 0.7px 0 #080706, 0 0.7px #080706;
+  text-shadow: 0.9px 0 #080706, 0 0.8px #080706;
+  transform: rotate(-3deg);
 }
 
 .generatedCover strong em {
   display: block;
   font-style: normal;
-}
-
-.generatedCover i {
-  position: absolute;
-  right: 16px;
-  bottom: 12px;
-  font-style: normal;
-  font-weight: 800;
-  color: rgba(8, 7, 6, 0.28);
-  font-size: 12px;
 }
 
 .variantHorizontal {
