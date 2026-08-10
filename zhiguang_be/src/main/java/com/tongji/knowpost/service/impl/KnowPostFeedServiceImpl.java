@@ -37,6 +37,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     private final HotKeyDetector hotKey;
     private static final Logger log = LoggerFactory.getLogger(KnowPostFeedServiceImpl.class);
     private static final int LAYOUT_VER = 1;
+    private static final long PUBLIC_FEED_SHUFFLE_INTERVAL_MILLIS = 30_000L;
     private final ConcurrentHashMap<String, Object> singleFlight = new ConcurrentHashMap<>();
 
     /**
@@ -74,8 +75,12 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
      * @param size 每页大小
      * @return Redis/Page 缓存的 Key
      */
-    private String cacheKey(int page, int size) {
-        return "feed:public:" + size + ":" + page + ":v" + LAYOUT_VER;
+    private String cacheKey(int page, int size, long shuffleSlot) {
+        return "feed:public:" + size + ":" + page + ":s" + shuffleSlot + ":v" + LAYOUT_VER;
+    }
+
+    private long publicFeedShuffleSlot() {
+        return System.currentTimeMillis() / PUBLIC_FEED_SHUFFLE_INTERVAL_MILLIS;
     }
 
     /**
@@ -89,14 +94,15 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     public FeedPageResponse getPublicFeed(int page, int size, Long currentUserIdNullable) {
         int safeSize = Math.min(Math.max(size, 1), 50);
         int safePage = Math.max(page, 1);
+        long shuffleSlot = publicFeedShuffleSlot();
         // 这个 localPageKey 是本地缓存的页面 Key（非 Redis）
-        String localPageKey = cacheKey(safePage, safeSize);
+        String localPageKey = cacheKey(safePage, safeSize, shuffleSlot);
 
         // 按小时分片的片段缓存键：降低跨小时内容更新导致的大面积失效风险
         // 将分页维度（size/page）与时间维度（hourSlot）组合，避免热门页在整站失效时同时回源
         long hourSlot = System.currentTimeMillis() / 3600000L;
-        String idsKey = "feed:public:ids:" + safeSize + ":" + hourSlot + ":" + safePage;
-        String hasMoreKey = "feed:public:ids:" + safeSize + ":" + hourSlot + ":" + safePage + ":hasMore";
+        String idsKey = "feed:public:ids:" + safeSize + ":" + hourSlot + ":" + safePage + ":s" + shuffleSlot;
+        String hasMoreKey = idsKey + ":hasMore";
 
         // L1: 先从本地缓存拿数据，高并发时抗 80% 流量
         FeedPageResponse local = feedPublicCache.getIfPresent(localPageKey);
@@ -186,6 +192,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             if (hasMore) {
                 rows = rows.subList(0, safeSize);
             }
+            rows = shuffledCopy(rows);
 
             // 构建基础列表（计数已填充），liked/faved 置为 null 以免污染用户维度缓存
 //不写带有用户维度 liked/faved
@@ -271,6 +278,14 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         for (FeedItemResponse item : page.items()) {
             recordItemHotKey(item.id());
         }
+    }
+
+    private List<KnowPostFeedRow> shuffledCopy(List<KnowPostFeedRow> rows) {
+        List<KnowPostFeedRow> shuffled = new ArrayList<>(rows);
+        if (shuffled.size() > 1) {
+            Collections.shuffle(shuffled, ThreadLocalRandom.current());
+        }
+        return shuffled;
     }
 
     private FeedPageResponse readPageCache(String pageKey) {

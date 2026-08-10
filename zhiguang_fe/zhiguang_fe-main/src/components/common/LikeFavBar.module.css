@@ -10,7 +10,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0;
+  padding: 3px 0;
   border: 0;
   outline: none;
   background: transparent;
@@ -18,9 +18,9 @@
   user-select: none;
 }
 
-.btn:hover { color: var(--color-text); }
+.btn:hover { color: var(--color-text-strong); }
 
-.liked { color: #e74c3c; }
+.liked { color: var(--color-danger); }
 .faved { color: var(--color-primary-strong); }
 
 .count {

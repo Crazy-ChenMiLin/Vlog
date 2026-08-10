@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ArrowRightIcon, ChatBubbleIcon, CloseIcon, MinimizeIcon, SparkIcon } from "@/components/icons/Icon";
+import { ArrowRightIcon, CloseIcon, MinimizeIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
 import { AgentStep, useRagStream } from "@/features/rag/hooks/useRagStream";
 import { resolveApiUrl } from "@/services/apiClient";
@@ -135,11 +135,11 @@ const GlobalRagChat = () => {
           <header className={styles.header}>
             <div className={styles.titleGroup}>
               <span className={styles.spark} aria-hidden="true">
-                <SparkIcon width={18} height={18} />
+                <img src="/rag-pony.png" alt="" />
               </span>
               <div>
-                <h2 id="global-rag-title" className={styles.title}>知光知识库</h2>
-                <span className={styles.scope}>全库智能问答</span>
+                <h2 id="global-rag-title" className={styles.title}>小马知识库</h2>
+                <span className={styles.scope}>陪你翻全库答案</span>
               </div>
             </div>
 
@@ -175,8 +175,13 @@ const GlobalRagChat = () => {
           </header>
 
           <div className={styles.greeting}>
-            <strong>你好！我是知光知识库助手</strong>
-            <span>可以向我提问知识库里的技术内容。</span>
+            <div className={styles.greetingAvatar} aria-hidden="true">
+              <img src="/rag-pony.png" alt="" />
+            </div>
+            <div>
+              <strong>你好，我是小马知识库助手</strong>
+              <span>问我技术概念、项目知识或缓存/RAG 细节，我会从知光知识库里找线索。</span>
+            </div>
           </div>
 
           <div ref={answerViewportRef} className={styles.answerViewport} aria-live="polite">
@@ -305,8 +310,10 @@ const GlobalRagChat = () => {
         aria-label={expanded ? "收起知识问答" : "展开知识问答"}
         title={expanded ? "收起知识问答" : "知识问答"}
       >
-        <ChatBubbleIcon width={24} height={24} aria-hidden="true" />
-        <span className={styles.floatLabel}>知识问答</span>
+        <span className={styles.floatAvatar} aria-hidden="true">
+          <img src="/rag-pony.png" alt="" />
+        </span>
+        <span className={styles.floatLabel}>问小马</span>
       </button>
     </div>
   );

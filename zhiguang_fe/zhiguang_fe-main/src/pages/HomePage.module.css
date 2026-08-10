@@ -1,20 +1,43 @@
 .feedSection {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-top: 4px;
+  gap: 22px;
+  max-width: 1120px;
+  padding-top: 8px;
 }
 
 .feedHeader {
+  position: relative;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 4px;
+  padding: 0 0 16px;
+  border-bottom: 0;
+}
+
+.feedHeader::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 28%;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(83, 75, 64, 0.17), rgba(83, 75, 64, 0.07), transparent);
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-strong);
 }
 
 .feedHeader h2 {
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: 1.12;
   font-weight: 700;
   color: var(--color-text-strong);
 }
@@ -26,10 +49,11 @@
 
 .feedError {
   padding: 12px 14px;
-  color: #b53b32;
-  background: #fff3f1;
-  border-left: 3px solid #d86559;
-  border-radius: 6px;
+  color: var(--color-danger);
+  background: #fff8f3;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px rgba(180, 63, 53, 0.18);
 }
 
 .feedState {
@@ -47,21 +71,21 @@
 
 .loadMoreButton {
   min-width: 132px;
-  height: 40px;
-  border: 1px solid rgba(255, 126, 54, 0.35);
-  border-radius: 8px;
-  background: #fffaf4;
-  color: #ff6f2a;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 253, 247, 0.78);
+  box-shadow: inset 0 0 0 1px var(--color-border-soft);
+  color: var(--color-text-strong);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
 .loadMoreButton:hover:not(:disabled) {
-  background: #fff2e6;
-  border-color: rgba(255, 126, 54, 0.55);
-  transform: translateY(-1px);
+  background: #eeeae1;
+  border-color: transparent;
 }
 
 .loadMoreButton:disabled {
@@ -75,35 +99,34 @@
 }
 
 .masonry {
-  column-count: 4;
-  column-gap: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .masonryItem {
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  margin-bottom: 24px;
-  /* 保持卡片宽度由列宽决定，不额外增加内边距 */
+  min-width: 0;
 }
 
 @media (max-width: 1200px) {
   .masonry {
-    column-count: 3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 760px) {
   .masonry {
-    column-count: 2;
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 700px) {
-  .masonry {
-    column-count: 1;
+  .feedHeader {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .masonryItem {
-    margin-bottom: 16px;
+  .feedHeader h2 {
+    font-size: 28px;
   }
 }

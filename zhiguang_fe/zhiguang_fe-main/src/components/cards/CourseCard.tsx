@@ -29,6 +29,27 @@ const renderEmHighlightedText = (text: string): ReactNode => {
   return parts.length ? <>{parts}</> : text;
 };
 
+const compactCoverTitle = (value: string) => {
+  const cleaned = value
+    .replace(/【[^】]+】/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/（[^）]*）/g, "")
+    .trim();
+  const parts = cleaned.split(/[·｜|:：\-—]/).map(part => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return parts.slice(-2).join("\n");
+  }
+  return cleaned.length > 12 ? `${cleaned.slice(0, 12)}\n${cleaned.slice(12, 20)}` : cleaned;
+};
+
+const coverTopic = (tags: string[]) => {
+  const latinTag = tags.find(tag => /[A-Za-z]/.test(tag));
+  if (latinTag) {
+    return latinTag.replace(/^#/, "").toUpperCase();
+  }
+  return (tags[0] ?? "知光").replace(/^#/, "");
+};
+
 export type CourseCardProps = {
   id: string;
   title: string;
@@ -83,6 +104,8 @@ const CourseCard = ({
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const coverKicker = coverTopic(tags ?? []);
+  const generatedCoverTitle = compactCoverTitle(title);
 
   const loadDetailIfNeeded = async (id: string) => {
     if (detail || menuLoading) return;
@@ -186,18 +209,28 @@ const CourseCard = ({
     <>
       {/* 取消免费标识展示，保持卡片简洁 */}
       {/* 图片置于卡片顶部，保持原始比例；播放标识覆盖在封面中央 */}
-      {coverImage ? (
-        <div className={styles.coverWrap}>
+      <div className={styles.coverWrap}>
+        {coverImage ? (
           <img className={styles.cover} src={coverImage} alt={title} loading="lazy" />
-          {showPlayBadge ? (
-            <div className={styles.playBadge}>
-              <svg width="24" height="24" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <polygon points="6,4 12,8 6,12" fill="currentColor" />
-              </svg>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+        ) : (
+          <div className={styles.generatedCover} aria-hidden="true">
+            <span>{coverKicker}</span>
+            <strong>
+              {generatedCoverTitle.split("\n").map((line) => (
+                <em key={line}>{line}</em>
+              ))}
+            </strong>
+            <i>知光</i>
+          </div>
+        )}
+        {showPlayBadge ? (
+          <div className={styles.playBadge}>
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <polygon points="6,4 12,8 6,12" fill="currentColor" />
+            </svg>
+          </div>
+        ) : null}
+      </div>
 
       <div className={styles.content}>
         <h3 className={styles.title}>{title}</h3>
