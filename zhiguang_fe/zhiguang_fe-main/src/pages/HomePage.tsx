@@ -86,7 +86,7 @@ const HomePage = () => {
       header={
         <MainHeader
           headline="知光 · 让思想有温度，让知识会发光"
-          subtitle="按最新发布浏览知文、专题与作者线索。页面会定时轻量打乱，让固定缓存列表也能保持一点流动感。"
+          subtitle="按最新发布浏览知文、专题与作者线索。"
           rightSlot={<AuthStatus />}
         />
       }
