@@ -51,6 +51,7 @@ services:
       CANAL_DESTINATION: ${CANAL_DESTINATION:-example}
       CANAL_USERNAME: ${CANAL_USERNAME:-canal}
       CANAL_PASSWORD: ${CANAL_PASSWORD:-change-me}
+      CANAL_FILTER: ${CANAL_FILTER:-zhiguang_auth\\.outbox}
     depends_on:
       mysql:
         condition: service_healthy

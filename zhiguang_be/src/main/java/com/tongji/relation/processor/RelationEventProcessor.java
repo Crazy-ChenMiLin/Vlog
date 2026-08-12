@@ -36,6 +36,7 @@ public class RelationEventProcessor {
             return;
         }
         if ("FollowCreated".equals(evt.type())) {
+            boolean alreadyActive = mapper.existsFollower(evt.toUserId(), evt.fromUserId()) > 0;
             // 异步插入粉丝表
             mapper.insertFollower(evt.id(), evt.toUserId(), evt.fromUserId(), 1);
             long now = System.currentTimeMillis();
@@ -47,9 +48,12 @@ public class RelationEventProcessor {
             redis.expire("uf:fans:" + evt.toUserId(), Duration.ofHours(2));
 
             // 更新关注数与粉丝数
-            userCounterService.incrementFollowings(evt.fromUserId(), 1);
-            userCounterService.incrementFollowers(evt.toUserId(), 1);
+            if (!alreadyActive) {
+                userCounterService.incrementFollowings(evt.fromUserId(), 1);
+                userCounterService.incrementFollowers(evt.toUserId(), 1);
+            }
         } else if ("FollowCanceled".equals(evt.type())) {
+            boolean wasActive = mapper.existsFollower(evt.toUserId(), evt.fromUserId()) > 0;
             mapper.cancelFollower(evt.toUserId(), evt.fromUserId());
 
             // 更新关注表与粉丝表缓存：移除 ZSet 项并刷新 TTL
@@ -59,8 +63,10 @@ public class RelationEventProcessor {
             redis.expire("uf:fans:" + evt.toUserId(), Duration.ofHours(2));
 
             // 更新关注数与粉丝数
-            userCounterService.incrementFollowings(evt.fromUserId(), -1);
-            userCounterService.incrementFollowers(evt.toUserId(), -1);
+            if (wasActive) {
+                userCounterService.incrementFollowings(evt.fromUserId(), -1);
+                userCounterService.incrementFollowers(evt.toUserId(), -1);
+            }
         }
     }
 }

@@ -28,6 +28,7 @@ public class CanalOutboxConsumerSearch {
     @KafkaListener(topics = OutboxTopics.CANAL_OUTBOX, groupId = "search-index-consumer")
     public void onMessage(String message, Acknowledgment ack) {
         try {
+            // 1. 解析 Kafka 消息里的行
             List<JsonNode> rows = OutboxMessageUtil.extractRows(objectMapper, message);
 
             if (rows.isEmpty()) {
@@ -36,24 +37,26 @@ public class CanalOutboxConsumerSearch {
             }
 
             for (JsonNode row : rows) {
+
                 JsonNode payloadNode = row.get("payload");
                 if (payloadNode == null) {
                     continue;
                 }
-
+                // 2. 解析 payload → 拿到 entity, op, id
                 JsonNode payload = objectMapper.readTree(payloadNode.asText());
                 String entity = text(payload.get("entity"));
                 String op = text(payload.get("op"));
                 Long id = asLong(payload.get("id"));
+                // 3. 按 op 类型调 ES 索引服务
                 if (!"knowpost".equals(entity) || id == null) {
                     continue;
                 }
 
                 // 软删与 upsert，均覆盖写入同一文档 ID，保证幂等
                 if ("delete".equalsIgnoreCase(op)) {
-                    indexService.softDeleteKnowPost(id);
+                    indexService.softDeleteKnowPost(id);// 软删
                 } else {
-                    indexService.upsertKnowPost(id);
+                    indexService.upsertKnowPost(id);// upsert（新增/覆盖）
                 }
             }
             // 提交位点，确保“已处理”的语义

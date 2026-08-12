@@ -191,12 +191,14 @@ public class KnowPostServiceImpl implements KnowPostService {
      */
     @Transactional
     public void publish(long creatorId, long id) {
+        // ── 1. 核心发布：改 know_posts 状态为 published（失败则抛异常，事务回滚）──
         int updated = mapper.publish(id, creatorId);
 
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
-        //额外来自另一个service的点赞数量的更新
+
+        // ── 2. 技术板块：初始化计数器（点赞/收藏归零 + 作者发帖数+1，失败只记日志）──
         try {
             counterService.initZeroCountsIfAbsent("knowpost", String.valueOf(id), List.of("like", "fav"));
         } catch (Exception e) {
@@ -206,7 +208,9 @@ public class KnowPostServiceImpl implements KnowPostService {
             userCounterService.incrementPosts(creatorId, 1);
         } catch (Exception ignored) {}
 
-        // 写入 Outbox 事件，驱动搜索索引增量更新
+        // ── 3. 展示板块：写 Outbox 事件，驱动 ES 搜索索引异步同步 ──
+        //    链路: outbox 表 → Canal 监听 → Kafka → 消费者用 ID 查库 → 写 ES
+        //    失败只记日志，搜索索引靠 Canal 重放兜底
         try {
             long outId = idGen.nextId();
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "upsert", "id", id));
@@ -215,7 +219,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             log.warn("Outbox event after publish failed, post {}: {}", id, e.getMessage());
         }
 
-        // 发布成功后触发一次预索引，减少首次问答冷启动
+        // ── 4. RAG 预索引：发布后预热向量索引，减少首次问答冷启动 ──
+        //    失败只记日志，用户提问时会按需补建
         try {
             ragIndexService.ensureIndexed(id);
         } catch (Exception e) {

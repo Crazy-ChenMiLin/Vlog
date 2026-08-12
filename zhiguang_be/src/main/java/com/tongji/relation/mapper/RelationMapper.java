@@ -66,6 +66,9 @@ public interface RelationMapper {
     int existsFollowing(@Param("fromUserId") Long fromUserId,
                         @Param("toUserId") Long toUserId);
 
+    int existsFollower(@Param("toUserId") Long toUserId,
+                       @Param("fromUserId") Long fromUserId);
+
     /**
      * 列出关注用户ID（偏移分页）。
      * @param fromUserId 发起者

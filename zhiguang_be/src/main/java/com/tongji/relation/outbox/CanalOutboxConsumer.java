@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.relation.event.RelationEvent;
 import com.tongji.relation.processor.RelationEventProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,8 @@ import com.tongji.common.util.OutboxMessageUtil;
  */
 @Service
 public class CanalOutboxConsumer {
+    private static final Logger log = LoggerFactory.getLogger(CanalOutboxConsumer.class);
+
     private final ObjectMapper objectMapper;
     private final RelationEventProcessor processor;
 
@@ -49,11 +53,24 @@ public class CanalOutboxConsumer {
                 if (payloadNode == null) {
                     continue;
                 }
-                
-                RelationEvent evt = objectMapper.readValue(payloadNode.asText(), RelationEvent.class);
+
+                JsonNode payload = objectMapper.readTree(payloadNode.asText());
+                String type = text(payload.get("type"));
+                if (!"FollowCreated".equals(type) && !"FollowCanceled".equals(type)) {
+                    continue;
+                }
+
+                RelationEvent evt = objectMapper.treeToValue(payload, RelationEvent.class);
                 processor.process(evt);
             }
             ack.acknowledge();
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("Relation outbox message skipped: {}", e.getMessage());
+            ack.acknowledge();
+        }
+    }
+
+    private String text(JsonNode n) {
+        return n == null ? null : n.asText();
     }
 }
