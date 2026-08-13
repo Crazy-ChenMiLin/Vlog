@@ -37,6 +37,25 @@ class AgentPlannerServiceTest {
     }
 
     @Test
+    void relationQuestionKeepsRelationTypeEvenWhenPlannerChoosesHybrid() throws Exception {
+        RagAgentPlan plan = service.parse("""
+                {
+                  "questionType": "RELATION_QA",
+                  "retrievalMode": "HYBRID",
+                  "needKeywordSearch": true,
+                  "needVectorSearch": true,
+                  "needHyde": true,
+                  "needRerank": true,
+                  "initialTopK": 5,
+                  "reason": "关系题但模型没有显式打开 graph_trace"
+                }
+                """, 5);
+
+        assertThat(plan.questionType()).isEqualTo(QuestionType.RELATION_QA);
+        assertThat(plan.retrievalMode()).isEqualTo(RetrievalMode.HYBRID);
+    }
+
+    @Test
     void badPlannerJsonThrowsSoCallerCanFallback() {
         assertThatThrownBy(() -> service.parse("not-json", 5))
                 .isInstanceOf(Exception.class);

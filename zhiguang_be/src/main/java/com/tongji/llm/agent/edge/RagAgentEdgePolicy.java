@@ -21,7 +21,7 @@ public class RagAgentEdgePolicy {
     }
 
     public boolean shouldQueryGraph(RagAgentPlan plan) {
-        return plan.needGraphTrace();
+        return plan.questionType() == QuestionType.RELATION_QA || plan.needGraphTrace();
     }
 
     public boolean shouldRerank(RagAgentState state) {

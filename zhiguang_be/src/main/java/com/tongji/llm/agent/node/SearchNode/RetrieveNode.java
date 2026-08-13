@@ -1,6 +1,7 @@
 package com.tongji.llm.agent.node.SearchNode;
 
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.graphService.model.GraphContext;
@@ -30,11 +31,12 @@ public class RetrieveNode {
     }
 
     private RagRetrievalOptions options(RagAgentPlan plan, GraphContext graphContext) {
+        boolean useGraph = plan.questionType() == QuestionType.RELATION_QA || plan.needGraphTrace();
         return new RagRetrievalOptions(
                 plan.needVectorSearch(),
                 plan.needHyde(),
                 plan.needKeywordSearch(),
-                plan.needGraphTrace(),
+                useGraph,
                 graphContext
         );
     }
