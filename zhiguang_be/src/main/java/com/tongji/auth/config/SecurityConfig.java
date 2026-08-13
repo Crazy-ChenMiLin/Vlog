@@ -58,8 +58,6 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/search", "/api/v1/search/suggest").permitAll()
                         // 知文详情页 RAG 问答（SSE 流式输出）允许匿名访问
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/*/qa/stream").permitAll()
-                        // 首页全库 RAG 问答（SSE 流式输出）允许匿名访问
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/qa/stream").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/send-code",
                                 "/api/v1/auth/register",
@@ -84,7 +82,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // TODO replace with product whitelist
+        // 产品前端域名白名单；若后续绑定新域名或启用 HTTPS，需同步更新此处的 Origin
+        configuration.setAllowedOrigins(List.of("http://47.108.66.230"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(false);

@@ -14,8 +14,8 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        // 允许任意来源；如需限制可改为具体域名
-        config.setAllowedOriginPatterns(List.of("*"));
+        // 来源白名单：与 SecurityConfig 保持一致（nginx 同域反代，前端实际源为 http://47.108.66.230）
+        config.setAllowedOriginPatterns(List.of("http://47.108.66.230"));
         // 允许常见跨域方法，包括预检
         config.setAllowedMethods(List.of("PATCH", "POST", "GET", "OPTIONS"));
         // 允许所有请求头，包含 Authorization、Content-Type 等
