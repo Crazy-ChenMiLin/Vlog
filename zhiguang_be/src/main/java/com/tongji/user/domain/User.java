@@ -21,6 +21,8 @@ public class User {
     private String avatar;
     private String bio;
     private String zgId;
+    /** 学校统一身份认证（CAS）学号，验证码/密码登录用户为 null */
+    private String casId;
     private String gender;
     private LocalDate birthday;
     private String school;

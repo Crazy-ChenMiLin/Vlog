@@ -20,5 +20,11 @@ public interface UserService {
 
     User createUser(User user);
 
+    /** 根据 CAS 学号查询用户 */
+    Optional<User> findByCasId(String casId);
+
+    /** 根据 CAS 学号查用户，不存在则自动创建（首次 CAS 登录） */
+    User findOrCreateByCasId(String casId);
+
     void updatePassword(User user);
 }

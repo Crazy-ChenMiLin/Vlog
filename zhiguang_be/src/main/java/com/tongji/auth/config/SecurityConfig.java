@@ -50,7 +50,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info", "/cas-test.html").permitAll()
                         // 公开内容：首页 Feed 不需要登录
                         .requestMatchers("/api/v1/knowposts/feed").permitAll()
                         // 知文详情（公开已发布内容，非公开由服务层校验）
@@ -64,7 +64,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/token/refresh",
                                 "/api/v1/auth/logout",
-                                "/api/v1/auth/password/reset"
+                                "/api/v1/auth/password/reset",
+                                "/api/v1/auth/casLogin"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

@@ -19,6 +19,7 @@ public enum ErrorCode {
     RAG_INDEX_FAILED("RAG_INDEX_FAILED", "知识索引处理失败"),
     RAG_RETRIEVAL_FAILED("RAG_RETRIEVAL_FAILED", "知识检索失败"),
     BAD_REQUEST("BAD_REQUEST", "请求参数错误"),
+    CAS_TICKET_INVALID("CAS_TICKET_INVALID", "CAS 票据无效或已过期"),
     INTERNAL_ERROR("INTERNAL_ERROR", "服务器内部错误");
 
     private final String code;

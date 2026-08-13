@@ -12,6 +12,8 @@ public interface UserMapper {
 
     User findByEmail(@Param("email") String email);
 
+    User findByCasId(@Param("casId") String casId);
+
     boolean existsByPhone(@Param("phone") String phone);
 
     boolean existsByEmail(@Param("email") String email);

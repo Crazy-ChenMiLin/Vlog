@@ -13,6 +13,7 @@
         <result column="avatar" property="avatar"/>
         <result column="bio" property="bio"/>
         <result column="zg_id" property="zgId"/>
+        <result column="cas_id" property="casId"/>
         <result column="gender" property="gender"/>
         <result column="birthday" property="birthday"/>
         <result column="school" property="school"/>
@@ -32,6 +33,13 @@
         SELECT *
         FROM users
         WHERE email = #{email}
+        LIMIT 1
+    </select>
+
+    <select id="findByCasId" parameterType="string" resultMap="UserResultMap">
+        SELECT *
+        FROM users
+        WHERE cas_id = #{casId}
         LIMIT 1
     </select>
 
@@ -61,6 +69,7 @@
             avatar,
             bio,
             zg_id,
+            cas_id,
             gender,
             birthday,
             school,
@@ -75,6 +84,7 @@
             #{avatar},
             #{bio},
             #{zgId},
+            #{casId},
             #{gender},
             #{birthday},
             #{school},

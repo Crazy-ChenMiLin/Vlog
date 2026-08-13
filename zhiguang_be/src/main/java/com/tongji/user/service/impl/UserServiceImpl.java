@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.tongji.user.service.UserService;
 import com.tongji.user.mapper.UserMapper;
@@ -85,6 +86,37 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(now);
         userMapper.insert(user);
         return user;
+    }
+
+    /**
+     * 根据 CAS 学号查询用户。
+     *
+     * @param casId 学校统一身份认证学号。
+     * @return 用户 Optional。
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> findByCasId(String casId) {
+        return Optional.ofNullable(userMapper.findByCasId(casId));
+    }
+
+    /**
+     * 根据 CAS 学号查用户，不存在则自动创建（首次 CAS 登录场景）。
+     * <p>
+     * 新用户无手机号/邮箱/密码，仅设置 casId 与随机昵称；用户后续可补充资料。
+     *
+     * @param casId 学校统一身份认证学号。
+     * @return 已存在或新建的用户实体。
+     */
+    @Transactional
+    public User findOrCreateByCasId(String casId) {
+        return findByCasId(casId).orElseGet(() -> {
+            User newUser = User.builder()
+                    .casId(casId)
+                    .nickname("知光用户" + UUID.randomUUID().toString().substring(0, 8))
+                    .tagsJson("[]")
+                    .build();
+            return createUser(newUser);
+        });
     }
 
     /**
