@@ -131,8 +131,13 @@ public class SearchIndexService {
             doc.put("favorite_count", counts.getOrDefault("fav", 0L));
             doc.put("view_count", 0L);
 
-            if (row.getTitle() != null && !row.getTitle().isBlank()) {
-                doc.put("title_suggest", row.getTitle());
+            List<String> tags = parseStringArray(row.getTags());
+            List<String> suggestInputs = buildSuggestInputs(row.getTitle(), tags);
+            if (!suggestInputs.isEmpty()) {
+                doc.put("title_suggest", Map.of(
+                        "input", suggestInputs,
+                        "weight", 1
+                ));
             }
 
             // 刷新策略：wait_for，保证写入后即刻可检索
@@ -278,5 +283,35 @@ public class SearchIndexService {
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    private List<String> buildSuggestInputs(String title, List<String> tags) {
+        Map<String, Boolean> seen = new java.util.LinkedHashMap<>();
+        addSuggestInput(seen, title);
+
+        if (tags != null) {
+            for (String tag : tags) {
+                addSuggestInput(seen, tag);
+            }
+        }
+
+        if (title != null) {
+            for (String part : title.split("[\\s:：·\\-—（）()【】\\[\\]、,，]+")) {
+                addSuggestInput(seen, part);
+            }
+        }
+
+        return new java.util.ArrayList<>(seen.keySet());
+    }
+
+    private void addSuggestInput(Map<String, Boolean> seen, String value) {
+        if (value == null) {
+            return;
+        }
+        String text = value.trim();
+        if (text.length() < 2) {
+            return;
+        }
+        seen.putIfAbsent(text, Boolean.TRUE);
     }
 }

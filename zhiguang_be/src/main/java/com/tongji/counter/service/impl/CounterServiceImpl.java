@@ -189,6 +189,7 @@ public class CounterServiceImpl implements CounterService {
                     if (idx == null) {
                         continue;
                     }
+                    //bitcountShardsPipelined：管道化 BITCOUNT 汇总，按分片求和
                     long sum = bitCountShardsPipelined(m, entityType, entityId);
                     writeInt32BE(newSds, idx * CounterSchema.FIELD_SIZE, sum);
                     result.put(m, sum);

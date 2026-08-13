@@ -74,8 +74,9 @@ public class CounterAggregationConsumer {
         if (keys.isEmpty()) {
             return;
         }
-
+        // 扫描所有聚合桶
         for (String aggKey : keys) {
+            // 拿到 Hash 里攒的增量
             Map<Object, Object> entries = redis.opsForHash().entries(aggKey);
             if (entries.isEmpty()) {
                 continue;
@@ -87,7 +88,7 @@ public class CounterAggregationConsumer {
             }
 
             String cntKey = CounterKeys.sdsKey(parts[2], parts[3]);
-
+            //delta是偏移量
             for (Map.Entry<Object, Object> e : entries.entrySet()) {
                 String field = String.valueOf(e.getKey());
                 // 增量
@@ -105,7 +106,7 @@ public class CounterAggregationConsumer {
                 } catch (NumberFormatException nfe) {
                     continue;
                 }
-
+                // 用 Lua 脚本把增量写到 SDS
                 try {
                     redis.execute(incrScript, List.of(cntKey),
                             String.valueOf(CounterSchema.SCHEMA_LEN),

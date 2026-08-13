@@ -187,7 +187,10 @@ public class SearchServiceImpl implements SearchService {
                     var comp = s.completion();
                     if (comp != null && comp.options() != null) {
                         for (var opt : comp.options()) {
-                            String text = opt.text();
+                            String text = sourceTitle(opt.source());
+                            if (text == null || text.isBlank()) {
+                                text = opt.text();
+                            }
                             if (text != null && !text.isBlank()) {
                                 items.add(text);
                             }
@@ -197,6 +200,14 @@ public class SearchServiceImpl implements SearchService {
             }
         } catch (Exception ignored) {}
         return new SuggestResponse(items);
+    }
+
+    private String sourceTitle(Map<String, Object> source) {
+        if (source == null) {
+            return null;
+        }
+        Object title = source.get("title");
+        return title == null ? null : String.valueOf(title);
     }
 
     /**

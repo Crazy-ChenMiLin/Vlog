@@ -86,6 +86,7 @@ services:
     image: redis:7.2
     container_name: zhiguang-redis
     restart: unless-stopped
+    #    aof
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${SPRING_DATA_REDIS_PASSWORD}"]
     ports:
       - "6379:6379"
