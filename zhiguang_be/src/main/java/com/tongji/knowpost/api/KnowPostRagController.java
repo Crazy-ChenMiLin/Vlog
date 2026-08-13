@@ -2,6 +2,7 @@ package com.tongji.knowpost.api;
 
 import com.tongji.auth.token.JwtService;
 import com.tongji.knowpost.api.dto.RagChatStreamRequest;
+import com.tongji.limit.AiRateLimiter;
 import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import com.tongji.llm.debugservice.RagDebugService;
 import com.tongji.llm.searchService.RagIndexService;
@@ -13,6 +14,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 
 @RestController
@@ -37,6 +40,7 @@ public class KnowPostRagController {
     private final RagQueryService ragQueryService;
     private final RagDebugService ragDebugService;
     private final JwtService jwtService;
+    private final AiRateLimiter rateLimiter;
 
     /**
      * 单篇知文 RAG 问答，保持默认 SSE message 以兼容现有前端。
@@ -66,6 +70,15 @@ public class KnowPostRagController {
             @Valid @RequestBody RagChatStreamRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         long userId = jwtService.extractUserId(jwt);
+
+        // 三道闸门：全局令牌桶 → 信号量 → 每用户滑动窗口，任一失败 → 429
+        String reject = rateLimiter.tryAcquire(userId);
+        if (reject != null) {
+            return Flux.error(new ResponseStatusException(
+                    HttpStatus.TOO_MANY_REQUESTS, reject));
+        }
+
+        // 通过 → 流式返回，结束时释放信号量
         return ragQueryService.streamChatAnswerFlux(
                 userId,
                 request.conversationId(),
@@ -73,7 +86,7 @@ public class KnowPostRagController {
                 request.postId(),
                 request.question().trim(),
                 request.safeTopK()
-        );
+        ).doFinally(signal -> rateLimiter.release());
     }
 
     @GetMapping("/{id}/qa/debug")
