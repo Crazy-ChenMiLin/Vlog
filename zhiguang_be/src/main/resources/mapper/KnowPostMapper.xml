@@ -141,6 +141,7 @@
             p.description,
             p.tags,
             p.img_urls AS imgUrls,
+            p.content_object_key AS contentObjectKey,
             p.content_url AS contentUrl,
             p.content_etag AS contentEtag,
             p.content_sha256 AS contentSha256,

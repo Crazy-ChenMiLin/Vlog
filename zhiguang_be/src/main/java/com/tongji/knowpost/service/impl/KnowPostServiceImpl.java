@@ -55,7 +55,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final Cache<String, KnowPostDetailResponse> knowPostDetailCache;
     private final HotKeyDetector hotKey;
     private static final Logger log = LoggerFactory.getLogger(KnowPostServiceImpl.class);
-    private static final int DETAIL_LAYOUT_VER = 1;
+    private static final int DETAIL_LAYOUT_VER = 2;
     private final ConcurrentHashMap<String, Object> singleFlight = new ConcurrentHashMap<>();
     private final RagIndexService ragIndexService;
     private final OutboxMapper outboxMapper;
@@ -336,6 +336,13 @@ public class KnowPostServiceImpl implements KnowPostService {
         return base + publicObjectPath(base, objectKey);
     }
 
+    private String normalizeContentUrl(String objectKey, String storedUrl) {
+        if (objectKey != null && !objectKey.isBlank()) {
+            return publicUrl(objectKey);
+        }
+        return storedUrl;
+    }
+
     private String publicObjectPath(String base, String objectKey) {
         return hasPath(base)
                 ? "/" + objectKey
@@ -450,7 +457,7 @@ public class KnowPostServiceImpl implements KnowPostService {
                     String.valueOf(row.getId()),
                     row.getTitle(),
                     row.getDescription(),
-                    row.getContentUrl(),
+                    normalizeContentUrl(row.getContentObjectKey(), row.getContentUrl()),
                     images,
                     tags,
                     String.valueOf(row.getCreatorId()),
