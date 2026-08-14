@@ -20,6 +20,7 @@ public enum ErrorCode {
     RAG_RETRIEVAL_FAILED("RAG_RETRIEVAL_FAILED", "知识检索失败"),
     BAD_REQUEST("BAD_REQUEST", "请求参数错误"),
     GITHUB_OAUTH_FAILED("GITHUB_OAUTH_FAILED", "GitHub 授权失败"),
+    CAMPUS_OAUTH_FAILED("CAMPUS_OAUTH_FAILED", "校园账号授权失败"),
     INTERNAL_ERROR("INTERNAL_ERROR", "服务器内部错误");
 
     private final String code;

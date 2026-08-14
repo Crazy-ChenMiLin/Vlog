@@ -14,6 +14,8 @@ public interface UserMapper {
 
     User findByGithubId(@Param("githubId") String githubId);
 
+    User findByCampusId(@Param("campusId") String campusId);
+
     boolean existsByPhone(@Param("phone") String phone);
 
     boolean existsByEmail(@Param("email") String email);

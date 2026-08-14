@@ -120,6 +120,37 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * 根据校园认证用户 ID 查询用户。
+     *
+     * @param campusId 校园认证用户 ID（OIDC sub）。
+     * @return 用户 Optional。
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> findByCampusId(String campusId) {
+        return Optional.ofNullable(userMapper.findByCampusId(campusId));
+    }
+
+    /**
+     * 根据校园认证用户 ID 查用户，不存在则自动创建（首次校园登录场景）。
+     * <p>
+     * 新用户无手机号/密码，仅设置 campusId 与随机昵称；用户后续可补充资料。
+     *
+     * @param campusId 校园认证用户 ID（OIDC sub）。
+     * @return 已存在或新建的用户实体。
+     */
+    @Transactional
+    public User findOrCreateByCampusId(String campusId) {
+        return findByCampusId(campusId).orElseGet(() -> {
+            User newUser = User.builder()
+                    .campusId(campusId)
+                    .nickname("知光用户" + UUID.randomUUID().toString().substring(0, 8))
+                    .tagsJson("[]")
+                    .build();
+            return createUser(newUser);
+        });
+    }
+
+    /**
      * 更新用户密码哈希并写入更新时间。
      *
      * @param user 用户实体（需包含 ID 与新的 passwordHash）。

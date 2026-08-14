@@ -26,6 +26,12 @@ public interface UserService {
     /** 根据 GitHub 用户 ID 查用户，不存在则自动创建（首次 GitHub 登录） */
     User findOrCreateByGithubId(String githubId);
 
+    /** 根据校园认证用户 ID 查询用户 */
+    Optional<User> findByCampusId(String campusId);
+
+    /** 根据校园认证用户 ID 查用户，不存在则自动创建（首次校园登录） */
+    User findOrCreateByCampusId(String campusId);
+
     void updateProfile(User user);
 
     void updatePassword(User user);

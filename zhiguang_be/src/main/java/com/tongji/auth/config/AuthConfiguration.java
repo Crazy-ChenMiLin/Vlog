@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -75,5 +76,19 @@ public class AuthConfiguration {
         AuthProperties.Jwt jwtProps = properties.getJwt();
         RSAPublicKey publicKey = PemUtils.readPublicKey(jwtProps.getPublicKey());
         return NimbusJwtDecoder.withPublicKey(publicKey).build();
+    }
+
+    /**
+     * 创建校园认证（CQUT-Auth）id_token 解码器。
+     *
+     * <p>使用 CQUT-Auth 的 JWKS 端点校验 id_token 签名。</p>
+     *
+     * @param jwksUri CQUT-Auth JWKS 端点地址。
+     * @return 基于 JWKS 的 {@link JwtDecoder}。
+     */
+    @Bean("campusIdTokenDecoder")
+    public JwtDecoder campusIdTokenDecoder(
+            @Value("${CAMPUS_JWKS_URI:${campus.jwks-uri:https://oidc.ciallichannel.com/jwks}}") String jwksUri) {
+        return NimbusJwtDecoder.withJwkSetUri(jwksUri).build();
     }
 }

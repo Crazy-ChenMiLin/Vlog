@@ -68,6 +68,18 @@ const LoginPage = () => {
     }
   };
 
+  const handleCampusLogin = async () => {
+    setError(null);
+    try {
+      const response = await authService.getCampusLoginUrl();
+      if (response.code === 10001 && response.loginUrl) {
+        window.location.href = response.loginUrl;
+      }
+    } catch {
+      setError("获取校园账号授权链接失败");
+    }
+  };
+
   const handleSendCode = async () => {
     if (!phone) {
       setError("请先填写手机号");
@@ -188,6 +200,24 @@ const LoginPage = () => {
           }}
         >
           GitHub 登录
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCampusLogin}
+          style={{
+            width: "100%",
+            padding: "12px",
+            fontSize: "16px",
+            cursor: "pointer",
+            marginTop: "12px",
+            background: "var(--color-primary-strong, #2f6fed)",
+            color: "white",
+            border: "none",
+            borderRadius: "8px"
+          }}
+        >
+          校园账号登录
         </button>
       </div>
     </div>

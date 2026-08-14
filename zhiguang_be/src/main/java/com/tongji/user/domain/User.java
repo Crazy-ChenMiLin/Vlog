@@ -23,6 +23,8 @@ public class User {
     private String zgId;
     /** GitHub 用户 ID（OAuth 登录用户），验证码/密码登录用户为 null */
     private String githubId;
+    /** 校园认证（CQUT-Auth OIDC）用户唯一标识，sub 声明 */
+    private String campusId;
     private String gender;
     private LocalDate birthday;
     private String school;

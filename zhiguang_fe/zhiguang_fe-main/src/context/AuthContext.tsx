@@ -29,6 +29,7 @@ type AuthContextValue = {
   tokens: AuthTokens | null;
   login: (payload: LoginRequest) => Promise<void>;
   loginWithGitHubCode: (code: string) => Promise<void>;
+  loginWithCampusCode: (code: string, state: string) => Promise<void>;
   register: (payload: RegisterRequest) => Promise<AuthenticatedUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -174,6 +175,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     [fetchUser]
   );
 
+  const loginWithCampusCode = useCallback(
+    async (code: string, state: string) => {
+      const response = await authService.campusCallback(code, state);
+      const nextTokens = toTokens(response.token);
+      setTokens(nextTokens);
+      persistTokens(nextTokens);
+      setUser(response.user);
+      persistUser(response.user);
+      await fetchUser(nextTokens.accessToken);
+    },
+    [fetchUser]
+  );
+
   const register = useCallback(async (payload: RegisterRequest) => {
     const result = await authService.register(payload);
     // 注册成功后直接登录：写入令牌与用户信息
@@ -241,12 +255,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       isLoading,
       login,
       loginWithGitHubCode,
+      loginWithCampusCode,
       register,
       logout,
       refresh,
       reloadUser
     }),
-    [user, tokens, isLoading, login, loginWithGitHubCode, register, logout, refresh, reloadUser]
+    [user, tokens, isLoading, login, loginWithGitHubCode, loginWithCampusCode, register, logout, refresh, reloadUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

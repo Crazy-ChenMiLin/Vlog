@@ -9,6 +9,7 @@ import CourseDetailPage from "./pages/CourseDetailPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import GitHubCallbackPage from "./pages/GitHubCallbackPage";
+import CampusCallbackPage from "./pages/CampusCallbackPage";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/callback" element={<GitHubCallbackPage />} />
+      <Route path="/callback/campus" element={<CampusCallbackPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

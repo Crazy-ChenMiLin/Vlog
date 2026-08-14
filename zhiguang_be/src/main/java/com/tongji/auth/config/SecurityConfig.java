@@ -65,7 +65,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/token/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/password/reset",
-                                "/api/v1/auth/github/**"
+                                "/api/v1/auth/github/**",
+                                "/api/v1/auth/campus/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

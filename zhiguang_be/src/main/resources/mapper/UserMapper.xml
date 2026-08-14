@@ -14,6 +14,7 @@
         <result column="bio" property="bio"/>
         <result column="zg_id" property="zgId"/>
         <result column="github_id" property="githubId"/>
+        <result column="campus_id" property="campusId"/>
         <result column="gender" property="gender"/>
         <result column="birthday" property="birthday"/>
         <result column="school" property="school"/>
@@ -40,6 +41,13 @@
         SELECT *
         FROM users
         WHERE github_id = #{githubId}
+        LIMIT 1
+    </select>
+
+    <select id="findByCampusId" parameterType="string" resultMap="UserResultMap">
+        SELECT *
+        FROM users
+        WHERE campus_id = #{campusId}
         LIMIT 1
     </select>
 
@@ -70,6 +78,7 @@
             bio,
             zg_id,
             github_id,
+            campus_id,
             gender,
             birthday,
             school,
@@ -85,6 +94,7 @@
             #{bio},
             #{zgId},
             #{githubId},
+            #{campusId},
             #{gender},
             #{birthday},
             #{school},

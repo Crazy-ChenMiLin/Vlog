@@ -60,5 +60,15 @@ export const authService = {
   githubCallback: (code: string) =>
     apiFetch<LoginResponse>(
       `${AUTH_PREFIX}/github/callback?code=${encodeURIComponent(code)}`
+    ),
+
+  getCampusLoginUrl: () =>
+    apiFetch<{ code: number; message: string; loginUrl: string }>(
+      `${AUTH_PREFIX}/campus/login-url`
+    ),
+
+  campusCallback: (code: string, state: string) =>
+    apiFetch<LoginResponse>(
+      `${AUTH_PREFIX}/campus/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`
     )
 };
