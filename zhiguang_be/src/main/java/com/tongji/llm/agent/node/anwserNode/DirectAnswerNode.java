@@ -1,6 +1,7 @@
 package com.tongji.llm.agent.node.anwserNode;
 
 import com.tongji.llm.agent.state.RagAgentState;
+import com.tongji.llm.config.RagLlmProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DirectAnswerNode {
     private final ChatClient chatClient;
+    private final RagLlmProperties ragLlmProperties;
 
     /**
      * Handles small-talk or questions that do not need knowledge-base retrieval.
@@ -20,6 +22,7 @@ public class DirectAnswerNode {
                 .system("你是中文助手。用户的问题不需要知识库检索时，直接简洁回答；如果涉及实时信息，请说明无法确认实时状态。")
                 .user(state.originalQuestion())
                 .options(OpenAiChatOptions.builder()
+                        .model(ragLlmProperties.directAnswerModel())
                         .temperature(0.2)
                         .build())
                 .call()

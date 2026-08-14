@@ -1,5 +1,6 @@
 package com.tongji.llm.enhanceService;
 
+import com.tongji.llm.config.RagLlmProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -15,6 +16,7 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class HyDEService {
     private final ChatClient chatClient;
+    private final RagLlmProperties ragLlmProperties;
 
     /**
      * 生成用于检索的假设性答案。生成失败时返回 null，由调用方退回原问题。
@@ -34,6 +36,7 @@ public class HyDEService {
                     .system(system)
                     .user(user)
                     .options(OpenAiChatOptions.builder()
+                            .model(ragLlmProperties.hydeModel())
                             .temperature(0.3)
                             .build())
                     .call()

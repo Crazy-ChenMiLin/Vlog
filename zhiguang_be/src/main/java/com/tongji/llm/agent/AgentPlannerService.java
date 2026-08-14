@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RetrievalMode;
+import com.tongji.llm.config.RagLlmProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -25,6 +27,7 @@ import org.springframework.util.StringUtils;
 public class AgentPlannerService {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
+    private final RagLlmProperties ragLlmProperties;
 
     public RagAgentPlan plan(String question, int requestedTopK) {
         if (!StringUtils.hasText(question)) {
@@ -66,7 +69,11 @@ public class AgentPlannerService {
                     .system(system)
                     .user(user)
                     .options(OpenAiChatOptions.builder()
+                            .model(ragLlmProperties.plannerModel())
                             .temperature(0.0)
+                            .responseFormat(ResponseFormat.builder()
+                                    .type(ResponseFormat.Type.JSON_OBJECT)
+                                    .build())
                             .build())
                     .call()
                     .content();

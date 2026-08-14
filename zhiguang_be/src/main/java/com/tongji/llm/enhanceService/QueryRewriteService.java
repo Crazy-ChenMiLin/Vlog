@@ -1,6 +1,7 @@
 package com.tongji.llm.enhanceService;
 
 import com.tongji.llm.chat.model.RagChatRole;
+import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.memoryService.model.RagMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class QueryRewriteService {
     private final ChatClient chatClient;
+    private final RagLlmProperties ragLlmProperties;
 
     public String rewrite(String originalQuestion, List<RagMessage> recentMessages) {
         if (!StringUtils.hasText(originalQuestion) || recentMessages == null || recentMessages.isEmpty()) {
@@ -37,6 +39,7 @@ public class QueryRewriteService {
                     .system(system)
                     .user(user)
                     .options(OpenAiChatOptions.builder()
+                            .model(ragLlmProperties.rewriteModel())
                             .temperature(0.0)
                             .build())
                     .call()

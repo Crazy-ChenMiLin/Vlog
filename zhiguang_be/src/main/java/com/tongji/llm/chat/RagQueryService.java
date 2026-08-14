@@ -7,6 +7,7 @@ import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
+import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
@@ -37,6 +38,7 @@ public class RagQueryService {
     private final RagConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
     private final ObjectMapper objectMapper;
+    private final RagLlmProperties ragLlmProperties;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
         RagAgentState state = ragMainAgent.run("post", postId, question, question, topK);
@@ -173,6 +175,7 @@ public class RagQueryService {
                 .system(system)
                 .user(user)
                 .options(OpenAiChatOptions.builder()
+                        .model(ragLlmProperties.finalAnswerModel())
                         .temperature(0.2)
                         .build())
                 .stream()
@@ -214,6 +217,7 @@ public class RagQueryService {
                 .system(system)
                 .user(user)
                 .options(OpenAiChatOptions.builder()
+                        .model(ragLlmProperties.finalAnswerModel())
                         .temperature(0.2)
                         .build())
                 .stream()

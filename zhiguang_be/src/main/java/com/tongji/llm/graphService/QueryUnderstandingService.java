@@ -2,12 +2,14 @@ package com.tongji.llm.graphService;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.graphService.model.GraphEntity;
 import com.tongji.llm.graphService.model.GraphQueryUnderstanding;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -29,6 +31,7 @@ import java.util.Set;
 public class QueryUnderstandingService {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
+    private final RagLlmProperties ragLlmProperties;
 
     @Value("${rag.graph.understanding-enabled:true}")
     private boolean enabled;
@@ -63,7 +66,11 @@ public class QueryUnderstandingService {
                     .system(system)
                     .user(user)
                     .options(OpenAiChatOptions.builder()
+                            .model(ragLlmProperties.graphModel())
                             .temperature(0.0)
+                            .responseFormat(ResponseFormat.builder()
+                                    .type(ResponseFormat.Type.JSON_OBJECT)
+                                    .build())
                             .build())
                     .call()
                     .content();

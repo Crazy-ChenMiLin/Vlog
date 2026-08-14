@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.state.EvidenceAction;
 import com.tongji.llm.agent.state.EvidenceResult;
+import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.graphService.model.GraphContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 public class EvidenceCheckService {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
+    private final RagLlmProperties ragLlmProperties;
 
     public EvidenceResult check(String question, List<Document> docs, GraphContext graphContext, int topK, int retryCount) {
         if (docs == null || docs.isEmpty()) {
@@ -59,7 +62,11 @@ public class EvidenceCheckService {
                     .system(system)
                     .user(user)
                     .options(OpenAiChatOptions.builder()
+                            .model(ragLlmProperties.evidenceModel())
                             .temperature(0.0)
+                            .responseFormat(ResponseFormat.builder()
+                                    .type(ResponseFormat.Type.JSON_OBJECT)
+                                    .build())
                             .build())
                     .call()
                     .content();
