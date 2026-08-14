@@ -26,3 +26,5 @@ __pycache__/
 
 # OS
 .DS_Store
+/zhiguang_be/docs/Redis SDS计数内存占用对比.md
+/简历_发布系统_STAR重写.md

@@ -20,11 +20,13 @@ public interface UserService {
 
     User createUser(User user);
 
-    /** 根据 CAS 学号查询用户 */
-    Optional<User> findByCasId(String casId);
+    /** 根据 GitHub 用户 ID 查询用户 */
+    Optional<User> findByGithubId(String githubId);
 
-    /** 根据 CAS 学号查用户，不存在则自动创建（首次 CAS 登录） */
-    User findOrCreateByCasId(String casId);
+    /** 根据 GitHub 用户 ID 查用户，不存在则自动创建（首次 GitHub 登录） */
+    User findOrCreateByGithubId(String githubId);
+
+    void updateProfile(User user);
 
     void updatePassword(User user);
 }

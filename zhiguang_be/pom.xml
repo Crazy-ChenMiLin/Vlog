@@ -92,13 +92,6 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Apereo CAS Client：Cas30ServiceTicketValidator 验票能力（学校统一身份认证） -->
-        <dependency>
-            <groupId>org.apereo.cas.client</groupId>
-            <artifactId>cas-client-core</artifactId>
-            <version>4.0.4</version>
-        </dependency>
-
         <!-- Spring AI OpenAI Starter：接入 OpenAI 模型调用能力 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>

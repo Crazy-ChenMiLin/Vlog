@@ -12,7 +12,7 @@ public interface UserMapper {
 
     User findByEmail(@Param("email") String email);
 
-    User findByCasId(@Param("casId") String casId);
+    User findByGithubId(@Param("githubId") String githubId);
 
     boolean existsByPhone(@Param("phone") String phone);
 

@@ -50,5 +50,15 @@ export const authService = {
       body: { refreshToken },
       // 刷新接口不应携带（已过期的）access token
       accessToken: null
-    })
+    }),
+
+  getGitHubLoginUrl: () =>
+    apiFetch<{ code: number; message: string; loginUrl: string }>(
+      `${AUTH_PREFIX}/github/login-url`
+    ),
+
+  githubCallback: (code: string) =>
+    apiFetch<LoginResponse>(
+      `${AUTH_PREFIX}/github/callback?code=${encodeURIComponent(code)}`
+    )
 };

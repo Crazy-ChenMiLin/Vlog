@@ -56,6 +56,18 @@ const LoginPage = () => {
     }
   };
 
+  const handleGitHubLogin = async () => {
+    setError(null);
+    try {
+      const response = await authService.getGitHubLoginUrl();
+      if (response.code === 10001 && response.loginUrl) {
+        window.location.href = response.loginUrl;
+      }
+    } catch {
+      setError("获取 GitHub 授权链接失败");
+    }
+  };
+
   const handleSendCode = async () => {
     if (!phone) {
       setError("请先填写手机号");
@@ -157,6 +169,26 @@ const LoginPage = () => {
             </div>
           </div>
         </form>
+
+        <div style={{ textAlign: "center", margin: "16px 0", color: "var(--color-text-secondary, #999)", fontSize: "14px" }}>
+          或
+        </div>
+        <button
+          type="button"
+          onClick={handleGitHubLogin}
+          style={{
+            width: "100%",
+            padding: "12px",
+            fontSize: "16px",
+            cursor: "pointer",
+            background: "#24292e",
+            color: "white",
+            border: "none",
+            borderRadius: "8px"
+          }}
+        >
+          GitHub 登录
+        </button>
       </div>
     </div>
   );

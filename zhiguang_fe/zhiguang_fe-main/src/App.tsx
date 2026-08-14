@@ -8,6 +8,7 @@ import EditProfilePage from "./pages/EditProfilePage";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import GitHubCallbackPage from "./pages/GitHubCallbackPage";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
       <Route path="/post/:id" element={<CourseDetailPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/callback" element={<GitHubCallbackPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

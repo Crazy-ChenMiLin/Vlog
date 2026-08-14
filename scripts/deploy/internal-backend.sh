@@ -67,6 +67,18 @@ if [[ -n "${SMTP:-}" ]]; then
   update_env_value "$RUNTIME/.env" "SPRING_MAIL_PASSWORD" "$SMTP"
 fi
 
+if [[ -n "${GITHUB_CLIENT_ID:-}" ]]; then
+  update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
+fi
+
+if [[ -n "${GITHUB_CLIENT_SECRET:-}" ]]; then
+  update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
+fi
+
+if [[ -n "${GITHUB_REDIRECT_URI:-}" ]]; then
+  update_env_value "$RUNTIME/.env" "GITHUB_REDIRECT_URI" "$GITHUB_REDIRECT_URI"
+fi
+
 MINIO_ACCESS_KEY_VALUE="${MINIO_ACCESS_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_ACCESS_KEY")}"
 MINIO_SECRET_KEY_VALUE="${MINIO_SECRET_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_SECRET_KEY")}"
 
@@ -95,6 +107,9 @@ services:
       OSS_ACCESS_KEY_ID: \${OSS_ACCESS_KEY_ID}
       OSS_ACCESS_KEY_SECRET: \${OSS_ACCESS_KEY_SECRET}
       OSS_BUCKET: \${OSS_BUCKET}
+      GITHUB_CLIENT_ID: \${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: \${GITHUB_CLIENT_SECRET}
+      GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-http://47.108.66.230/callback}
 EOF
 
 sudo_cmd docker compose \
