@@ -55,6 +55,16 @@ read_env_value() {
   sudo_cmd awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
 }
 
+require_env_value() {
+  local key="$1"
+  local value="$2"
+
+  if [[ -z "$value" ]]; then
+    echo "Required deploy environment variable is missing: $key" >&2
+    exit 1
+  fi
+}
+
 sudo_cmd mkdir -p "$REPO"
 sudo_cmd rsync -a --delete \
   --exclude '.git' \
@@ -67,13 +77,10 @@ if [[ -n "${SMTP:-}" ]]; then
   update_env_value "$RUNTIME/.env" "SPRING_MAIL_PASSWORD" "$SMTP"
 fi
 
-if [[ -n "${GITHUB_CLIENT_ID:-}" ]]; then
-  update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
-fi
-
-if [[ -n "${GITHUB_CLIENT_SECRET:-}" ]]; then
-  update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
-fi
+require_env_value "GITHUB_CLIENT_ID" "${GITHUB_CLIENT_ID:-}"
+require_env_value "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET:-}"
+update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
+update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
 
 if [[ -n "${GITHUB_REDIRECT_URI:-}" ]]; then
   update_env_value "$RUNTIME/.env" "GITHUB_REDIRECT_URI" "$GITHUB_REDIRECT_URI"

@@ -52,13 +52,13 @@ public class GitHubOAuthService {
     private final LoginLogService loginLogService;
     private final ObjectMapper objectMapper;
 
-    @Value("${github.client-id}")
+    @Value("${GITHUB_CLIENT_ID:${github.client-id:}}")
     private String clientId;
 
-    @Value("${github.client-secret}")
+    @Value("${GITHUB_CLIENT_SECRET:${github.client-secret:}}")
     private String clientSecret;
 
-    @Value("${github.redirect-uri}")
+    @Value("${GITHUB_REDIRECT_URI:${github.redirect-uri:http://47.108.66.230/callback}}")
     private String redirectUri;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
