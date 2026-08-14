@@ -82,7 +82,7 @@ public class CampusOAuthService {
     @Value("${CAMPUS_TOKEN_ENDPOINT:${campus.token-endpoint:https://oidc.ciallichannel.com/token}}")
     private String tokenEndpoint;
 
-    @Value("${CAMPUS_SCOPES:${campus.scopes:openid profile email student}}")
+    @Value("${CAMPUS_SCOPES:${campus.scopes:openid profile}}")
     private String scopes;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
