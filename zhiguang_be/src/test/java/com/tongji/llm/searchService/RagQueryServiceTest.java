@@ -8,6 +8,7 @@ import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.agent.state.RagAgentStepTrace;
 import com.tongji.llm.chat.RagQueryService;
 import com.tongji.llm.chat.model.RagChatRole;
+import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
@@ -159,12 +160,18 @@ class RagQueryServiceTest {
     }
 
     private RagQueryService createService() {
-        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper);
+        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper, ragLlmProperties());
     }
 
     private RagAgentState state(String question, int topK, List<Document> answerDocs) {
         RagAgentState state = new RagAgentState(question, question, topK);
         state.answerDocs(answerDocs);
         return state;
+    }
+
+    private RagLlmProperties ragLlmProperties() {
+        RagLlmProperties properties = new RagLlmProperties();
+        properties.setDefaultModel("test-model");
+        return properties;
     }
 }

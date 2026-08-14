@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RetrievalMode;
+import com.tongji.llm.config.RagLlmProperties;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentPlannerServiceTest {
 
-    private final AgentPlannerService service = new AgentPlannerService(null, new ObjectMapper());
+    private final AgentPlannerService service = new AgentPlannerService(null, new ObjectMapper(), ragLlmProperties());
 
     @Test
     void parsePlannerJson() throws Exception {
@@ -59,5 +60,11 @@ class AgentPlannerServiceTest {
     void badPlannerJsonThrowsSoCallerCanFallback() {
         assertThatThrownBy(() -> service.parse("not-json", 5))
                 .isInstanceOf(Exception.class);
+    }
+
+    private RagLlmProperties ragLlmProperties() {
+        RagLlmProperties properties = new RagLlmProperties();
+        properties.setDefaultModel("test-model");
+        return properties;
     }
 }
