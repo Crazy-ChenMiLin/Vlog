@@ -114,6 +114,14 @@ services:
       OSS_ACCESS_KEY_ID: \${OSS_ACCESS_KEY_ID}
       OSS_ACCESS_KEY_SECRET: \${OSS_ACCESS_KEY_SECRET}
       OSS_BUCKET: \${OSS_BUCKET}
+      # The runtime compose file is intentionally stable; explicitly forward
+      # Nacos bootstrap settings so a later code deployment cannot drop them.
+      SPRING_CONFIG_IMPORT: \${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?refreshEnabled=true}
+      SPRING_CLOUD_NACOS_SERVER_ADDR: \${NACOS_SERVER_ADDR}
+      SPRING_CLOUD_NACOS_USERNAME: \${NACOS_USERNAME}
+      SPRING_CLOUD_NACOS_PASSWORD: \${NACOS_PASSWORD}
+      SPRING_CLOUD_NACOS_CONFIG_GROUP: \${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}
+      SPRING_CLOUD_NACOS_CONFIG_NAMESPACE: \${NACOS_NAMESPACE}
       GITHUB_CLIENT_ID: \${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: \${GITHUB_CLIENT_SECRET}
       GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-http://47.108.66.230/callback}
