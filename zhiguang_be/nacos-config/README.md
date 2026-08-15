@@ -63,6 +63,35 @@ Spring AI client.
 The import only saves the configuration in Nacos. It becomes active only after
 the backend is upgraded to load this Data ID with `refreshEnabled=true`.
 
+## Automated deployment
+
+After the first manual import, later updates do not need another ZIP upload.
+The GitHub Actions deployment publishes
+`nacos-import/ZHIGUANG_GROUP/zhiguang-runtime.yaml` to the same Data ID before
+restarting the backend.
+
+The repository must contain only non-sensitive runtime settings and environment
+variable placeholders. Configure these one-time GitHub values instead:
+
+| GitHub setting | Where | Purpose |
+| --- | --- | --- |
+| `NACOS_SERVER_ADDR` | Actions Variable (optional) | Nacos address; defaults to `100.83.242.114:8848` |
+| `NACOS_USERNAME` | Actions Secret | Nacos login username |
+| `NACOS_PASSWORD` | Actions Secret | Nacos login password |
+
+The deployment then follows one path:
+
+```text
+edit code or zhiguang-runtime.yaml
+  -> git push
+  -> Action publishes this Data ID to Nacos
+  -> Action writes bootstrap values to the internal runtime .env
+  -> backend starts and subscribes to the same Data ID
+```
+
+The runtime `.env` is still required, but Action maintains its Nacos bootstrap
+keys automatically. It is not a second hand-maintained configuration source.
+
 ## Rollback
 
 - Before a later edit, use Nacos Configuration History to inspect and roll back

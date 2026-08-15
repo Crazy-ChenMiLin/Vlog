@@ -28,6 +28,14 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Publish runtime configuration to Nacos
+        env:
+          NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
+          NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
+          NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
+          NACOS_CONFIG_GROUP: ZHIGUANG_GROUP
+        run: bash scripts/deploy/sync-nacos-config.sh zhiguang_be/nacos-config/nacos-import/ZHIGUANG_GROUP/zhiguang-runtime.yaml
+
       - name: Deploy backend on internal server
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
@@ -36,6 +44,10 @@ jobs:
           GITHUB_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
           GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'http://47.108.66.230/callback' }}
+          NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
+          NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
+          NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
+          NACOS_CONFIG_GROUP: ZHIGUANG_GROUP
         run: bash scripts/deploy/internal-backend.sh
 
       - name: Set up Node

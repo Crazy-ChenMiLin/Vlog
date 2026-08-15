@@ -82,6 +82,20 @@ require_env_value "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET:-}"
 update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
 update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
 
+# Nacos is part of the application's bootstrap path: the container needs these
+# values before it can load the hot-reloadable runtime configuration from Nacos.
+# Keep the values in GitHub Secrets/Variables and materialize them only on the
+# internal server's runtime .env during deployment.
+require_env_value "NACOS_SERVER_ADDR" "${NACOS_SERVER_ADDR:-}"
+require_env_value "NACOS_USERNAME" "${NACOS_USERNAME:-}"
+require_env_value "NACOS_PASSWORD" "${NACOS_PASSWORD:-}"
+update_env_value "$RUNTIME/.env" "SPRING_CONFIG_IMPORT" "${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?refreshEnabled=true}"
+update_env_value "$RUNTIME/.env" "NACOS_SERVER_ADDR" "$NACOS_SERVER_ADDR"
+update_env_value "$RUNTIME/.env" "NACOS_USERNAME" "$NACOS_USERNAME"
+update_env_value "$RUNTIME/.env" "NACOS_PASSWORD" "$NACOS_PASSWORD"
+update_env_value "$RUNTIME/.env" "NACOS_CONFIG_GROUP" "${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}"
+update_env_value "$RUNTIME/.env" "NACOS_NAMESPACE" "${NACOS_NAMESPACE:-}"
+
 if [[ -n "${GITHUB_REDIRECT_URI:-}" ]]; then
   update_env_value "$RUNTIME/.env" "GITHUB_REDIRECT_URI" "$GITHUB_REDIRECT_URI"
 fi
