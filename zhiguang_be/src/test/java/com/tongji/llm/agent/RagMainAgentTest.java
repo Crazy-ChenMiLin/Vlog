@@ -17,6 +17,7 @@ import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.agent.state.RetrievalMode;
 import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.config.RagConfig;
+import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.enhanceService.RerankService;
 import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
@@ -41,6 +42,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class RagMainAgentTest {
@@ -156,7 +158,7 @@ class RagMainAgentTest {
                 new RetrieveNode(retrievalService, ragConfig()),
                 new RerankNode(rerankService),
                 new ExpandTopKNode(),
-                new DirectAnswerNode(chatClient, ragLlmProperties()),
+                new DirectAnswerNode(chatClient, ragLlmProperties(), mock(RagPromptService.class)),
                 new RagAgentEdgePolicy()
         );
     }

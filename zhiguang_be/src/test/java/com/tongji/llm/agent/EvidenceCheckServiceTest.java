@@ -4,14 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.state.EvidenceAction;
 import com.tongji.llm.agent.state.EvidenceResult;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class EvidenceCheckServiceTest {
 
-    private final EvidenceCheckService service = new EvidenceCheckService(null, new ObjectMapper(), ragLlmProperties());
+    private final EvidenceCheckService service = new EvidenceCheckService(null, new ObjectMapper(), ragLlmProperties(), mock(RagPromptService.class));
 
     @Test
     void parseEvidenceJson() throws Exception {

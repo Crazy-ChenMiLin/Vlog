@@ -9,6 +9,7 @@ import com.tongji.llm.agent.state.RagAgentStepTrace;
 import com.tongji.llm.chat.RagQueryService;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class RagQueryServiceTest {
@@ -160,7 +162,7 @@ class RagQueryServiceTest {
     }
 
     private RagQueryService createService() {
-        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper, ragLlmProperties());
+        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper, ragLlmProperties(), mock(RagPromptService.class));
     }
 
     private RagAgentState state(String question, int topK, List<Document> answerDocs) {

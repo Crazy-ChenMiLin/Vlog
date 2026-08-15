@@ -5,14 +5,16 @@ import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RetrievalMode;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class AgentPlannerServiceTest {
 
-    private final AgentPlannerService service = new AgentPlannerService(null, new ObjectMapper(), ragLlmProperties());
+    private final AgentPlannerService service = new AgentPlannerService(null, new ObjectMapper(), ragLlmProperties(), mock(RagPromptService.class));
 
     @Test
     void parsePlannerJson() throws Exception {
