@@ -8,6 +8,7 @@ import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
@@ -39,6 +40,7 @@ public class RagQueryService {
     private final QueryRewriteService queryRewriteService;
     private final ObjectMapper objectMapper;
     private final RagLlmProperties ragLlmProperties;
+    private final RagPromptService ragPromptService;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
         RagAgentState state = ragMainAgent.run("post", postId, question, question, topK);
@@ -163,7 +165,7 @@ public class RagQueryService {
         }
 
         String context = String.join("\n\n---\n\n", contexts);
-        String system = "你是中文知识助手。只能依据提供的知识库上下文和 Neo4j graph trace 回答；无法确定时请说明不确定。";
+        String system = ragPromptService.getSystemPrompt(RagPromptService.KEY_FINAL_ANSWER);
         String user = "问题：\n" + question
                 + graphTrace(state.graphContext())
                 + "\n\n知识库上下文如下（可能不完整）：\n"
@@ -201,10 +203,7 @@ public class RagQueryService {
         }
 
         String context = String.join("\n\n---\n\n", contexts);
-        String system = """
-                你是中文知识助手。对话历史只用于理解用户当前问题，改写问题只表示系统对当前问题的理解。
-                最终答案必须基于提供的知识库上下文和 Neo4j graph trace；无法确定时请说明不确定。
-                """;
+        String system = ragPromptService.getSystemPrompt(RagPromptService.KEY_FINAL_ANSWER_WITH_HISTORY);
         String user = "最近对话：\n" + formatHistory(recentMessages)
                 + "\n\n用户当前原始问题：\n" + originalQuestion
                 + "\n\n系统改写后的检索问题：\n" + standaloneQuestion

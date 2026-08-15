@@ -2,6 +2,7 @@ package com.tongji.llm.enhanceService;
 
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.memoryService.model.RagMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,17 +19,14 @@ import java.util.List;
 public class QueryRewriteService {
     private final ChatClient chatClient;
     private final RagLlmProperties ragLlmProperties;
+    private final RagPromptService ragPromptService;
 
     public String rewrite(String originalQuestion, List<RagMessage> recentMessages) {
         if (!StringUtils.hasText(originalQuestion) || recentMessages == null || recentMessages.isEmpty()) {
             return originalQuestion;
         }
 
-        String system = """
-                你是 RAG 查询改写器。根据最近对话历史，把用户当前问题改写成一个独立、完整、适合向量检索的中文问题。
-                只输出改写后的问题，不要回答问题，不要解释，不要添加编号。
-                如果当前问题已经完整，原样或轻微补全后输出。
-                """;
+        String system = ragPromptService.getSystemPrompt(RagPromptService.KEY_REWRITE);
         String user = "最近对话：\n" + formatHistory(recentMessages)
                 + "\n\n用户当前问题：\n" + originalQuestion.trim()
                 + "\n\n请输出独立检索问题：";

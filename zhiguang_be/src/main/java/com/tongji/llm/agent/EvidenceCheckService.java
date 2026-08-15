@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.state.EvidenceAction;
 import com.tongji.llm.agent.state.EvidenceResult;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.graphService.model.GraphContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,24 +33,14 @@ public class EvidenceCheckService {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
     private final RagLlmProperties ragLlmProperties;
+    private final RagPromptService ragPromptService;
 
     public EvidenceResult check(String question, List<Document> docs, GraphContext graphContext, int topK, int retryCount) {
         if (docs == null || docs.isEmpty()) {
             return new EvidenceResult(false, 0.0, "No retrieved chunks.", EvidenceAction.EXPAND_TOP_K);
         }
 
-        String system = """
-                You judge whether retrieved RAG evidence is enough to answer a Chinese user question.
-                Return JSON only. Do not answer the question.
-                Schema:
-                {
-                  "sufficient": true,
-                  "score": 0.0,
-                  "reason": "short Chinese reason",
-                  "suggestedAction": "NONE|EXPAND_TOP_K|ANSWER_WITH_LIMITATION"
-                }
-                Use EXPAND_TOP_K only if more candidates may help. Use ANSWER_WITH_LIMITATION if evidence is still weak but retry is already used.
-                """;
+        String system = ragPromptService.getSystemPrompt(RagPromptService.KEY_EVIDENCE);
         String user = "Question:\n" + question
                 + "\n\nCurrent topK: " + topK
                 + "\nRetry count: " + retryCount

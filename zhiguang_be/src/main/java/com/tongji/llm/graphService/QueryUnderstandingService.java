@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.config.RagConfig;
+import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.graphService.model.GraphEntity;
 import com.tongji.llm.graphService.model.GraphQueryUnderstanding;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class QueryUnderstandingService {
     private final ObjectMapper objectMapper;
     private final RagLlmProperties ragLlmProperties;
     private final RagConfig ragConfig;
+    private final RagPromptService ragPromptService;
 
     /**
      * 抽取实体、关系意图和问题类型。
@@ -44,18 +46,7 @@ public class QueryUnderstandingService {
             return GraphQueryUnderstanding.empty();
         }
 
-        String system = """
-                You extract graph retrieval signals from a Chinese technical RAG question.
-                Return JSON only. Do not answer the question.
-                Schema:
-                {
-                  "entities": ["canonical technical concept names"],
-                  "relationIntent": "COMPARE|CAUSE|PART_OF|SOLUTION|RELATED|UNKNOWN",
-                  "questionType": "RELATION|CONCEPT|SOLUTION|TEST|UNKNOWN"
-                }
-                Use canonical Chinese concept names when possible, for example:
-                缓存命中, 缓存击穿, 缓存穿透, 缓存雪崩, 布隆过滤器, 分布式锁, Redis.
-                """;
+        String system = ragPromptService.getSystemPrompt(RagPromptService.KEY_GRAPH_UNDERSTANDING);
         String user = "Question:\n" + question.trim();
 
         try {

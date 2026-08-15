@@ -6,6 +6,7 @@ import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RetrievalMode;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagPromptService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -28,39 +29,14 @@ public class AgentPlannerService {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
     private final RagLlmProperties ragLlmProperties;
+    private final RagPromptService ragPromptService;
 
     public RagAgentPlan plan(String question, int requestedTopK) {
         if (!StringUtils.hasText(question)) {
             return directPlan(requestedTopK, "Empty or blank question.");
         }
 
-        String system = """
-                You are the planner of a Chinese RAG main agent.
-                Return JSON only. Do not answer the user's question.
-                Available tools:
-                - direct_answer: answer small talk without retrieval.
-                - keyword_search: exact keyword/BM25/Elasticsearch search.
-                - vector_search: semantic vector search.
-                - hyde: generate a hypothetical answer for semantic retrieval.
-                - graph_trace: query Neo4j graph trace for relation/comparison questions.
-                - rerank: rerank retrieved chunks before answering.
-                Schema:
-                {
-                  "questionType": "CHAT|KEYWORD_LOOKUP|NORMAL_QA|RELATION_QA",
-                  "retrievalMode": "NONE|KEYWORD_ONLY|HYBRID|GRAPH_AUGMENTED_HYBRID",
-                  "needDirectAnswer": true,
-                  "needKeywordSearch": false,
-                  "needVectorSearch": false,
-                  "needHyde": false,
-                  "needGraphTrace": false,
-                  "needRerank": false,
-                  "initialTopK": 5,
-                  "reason": "short Chinese reason"
-                }
-                Prefer RELATION_QA and graph_trace for comparison, relation, cause, influence, difference questions.
-                Prefer KEYWORD_LOOKUP for very short technical terms.
-                Prefer NORMAL_QA for definitions, why/how/principle questions.
-                """;
+        String system = ragPromptService.getSystemPrompt(RagPromptService.KEY_PLANNER);
         String user = "Question:\n" + question.trim() + "\nRequested topK: " + requestedTopK;
 
         try {
