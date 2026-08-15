@@ -16,6 +16,7 @@ import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.agent.state.RetrievalMode;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagConfig;
 import com.tongji.llm.enhanceService.RerankService;
 import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
@@ -152,7 +153,7 @@ class RagMainAgentTest {
                 new PlanNode(plannerService),
                 new EvidenceCheckNode(evidenceCheckService),
                 new GraphTraceNode(graphService),
-                new RetrieveNode(retrievalService),
+                new RetrieveNode(retrievalService, ragConfig()),
                 new RerankNode(rerankService),
                 new ExpandTopKNode(),
                 new DirectAnswerNode(chatClient, ragLlmProperties()),
@@ -164,6 +165,10 @@ class RagMainAgentTest {
         RagLlmProperties properties = new RagLlmProperties();
         properties.setDefaultModel("test-model");
         return properties;
+    }
+
+    private RagConfig ragConfig() {
+        return new RagConfig();
     }
 
     private RagRetrievalResultDTO retrieval(List<Document> docs, GraphContext graphContext) {

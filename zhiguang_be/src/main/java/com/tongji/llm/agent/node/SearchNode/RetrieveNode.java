@@ -4,6 +4,7 @@ import com.tongji.llm.DTO.RagRetrievalResultDTO;
 import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
+import com.tongji.llm.config.RagConfig;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.searchService.RagRetrievalOptions;
 import com.tongji.llm.searchService.RagRetrievalService;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RetrieveNode {
     private final RagRetrievalService retrievalService;
+    private final RagConfig ragConfig;
 
     public RagRetrievalResultDTO execute(RagAgentState state, String scope, Long postId) {
         RagRetrievalOptions options = options(state.plan(), state.graphContext());
@@ -31,11 +33,12 @@ public class RetrieveNode {
     }
 
     private RagRetrievalOptions options(RagAgentPlan plan, GraphContext graphContext) {
+        RagConfig.Retrieval retrieval = ragConfig.getRetrieval();
         boolean useGraph = plan.questionType() == QuestionType.RELATION_QA || plan.needGraphTrace();
         return new RagRetrievalOptions(
                 plan.needVectorSearch(),
                 plan.needHyde(),
-                plan.needKeywordSearch(),
+                retrieval.isBm25Enabled() && plan.needKeywordSearch(),
                 useGraph,
                 graphContext
         );
