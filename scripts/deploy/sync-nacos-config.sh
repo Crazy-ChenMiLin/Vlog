@@ -29,10 +29,11 @@ if [[ "$SERVER_ADDR" != http://* && "$SERVER_ADDR" != https://* ]]; then
 fi
 SERVER_ADDR="${SERVER_ADDR%/}"
 
-# Authenticate once, then publish the reviewed repository YAML. The token is
-# intentionally kept in a shell variable and never printed to Action logs.
+# Nacos 3 uses a separate administrative configuration API. Keep the access
+# token only in this shell process so it never appears in Action logs.
+echo "Authenticating with Nacos 3 at $SERVER_ADDR"
 LOGIN_RESPONSE="$(curl --fail --silent --show-error \
-  --request POST "$SERVER_ADDR/nacos/v1/auth/login" \
+  --request POST "$SERVER_ADDR/nacos/v3/auth/user/login" \
   --data-urlencode "username=$NACOS_USERNAME" \
   --data-urlencode "password=$NACOS_PASSWORD")"
 ACCESS_TOKEN="$(printf '%s' "$LOGIN_RESPONSE" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')"
@@ -42,15 +43,17 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
   exit 1
 fi
 
+echo "Publishing $DATA_ID to Nacos group $GROUP"
 PUBLISH_RESPONSE="$(curl --fail --silent --show-error \
-  --request POST "$SERVER_ADDR/nacos/v1/cs/configs" \
-  --data-urlencode "accessToken=$ACCESS_TOKEN" \
+  --request POST "$SERVER_ADDR/nacos/v3/admin/cs/config" \
+  --header "accessToken: $ACCESS_TOKEN" \
+  --data-urlencode "namespaceId=${NACOS_NAMESPACE:-public}" \
   --data-urlencode "dataId=$DATA_ID" \
-  --data-urlencode "group=$GROUP" \
+  --data-urlencode "groupName=$GROUP" \
   --data-urlencode "type=yaml" \
   --data-urlencode "content@$CONFIG_FILE")"
 
-if [[ "$PUBLISH_RESPONSE" != "true" ]]; then
+if [[ "$PUBLISH_RESPONSE" != *'"code":0'* ]]; then
   echo "Nacos rejected configuration publication for $DATA_ID in $GROUP" >&2
   exit 1
 fi
