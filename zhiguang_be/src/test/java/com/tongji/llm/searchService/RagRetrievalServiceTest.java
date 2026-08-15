@@ -3,6 +3,7 @@ package com.tongji.llm.searchService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.config.RagConfig;
 import com.tongji.llm.enhanceService.HyDEService;
 import com.tongji.llm.enhanceService.RrfFusionService;
 import com.tongji.llm.graphService.MainService;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.document.Document;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -161,16 +161,21 @@ class RagRetrievalServiceTest {
     }
 
     private RagRetrievalService createService(boolean bm25Enabled, boolean graphEnabled) {
+        RagConfig ragConfig = new RagConfig();
+        ragConfig.getRetrieval().setBm25Enabled(bm25Enabled);
+        ragConfig.getRetrieval().setGraphEnabled(graphEnabled);
+        // Keep these route tests focused on retrieval behavior rather than candidate expansion.
+        ragConfig.getRetrieval().setCandidateMultiplier(1);
+        ragConfig.getRetrieval().setMaxCandidates(5);
         RagRetrievalService service = new RagRetrievalService(
                 indexService,
                 vectorRetrievalService,
                 bm25RetrievalService,
                 graphContextService,
                 hydeService,
-                rrfFusion
+                rrfFusion,
+                ragConfig
         );
-        ReflectionTestUtils.setField(service, "bm25Enabled", bm25Enabled);
-        ReflectionTestUtils.setField(service, "graphEnabled", graphEnabled);
         return service;
     }
 

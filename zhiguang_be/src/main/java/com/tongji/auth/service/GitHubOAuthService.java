@@ -64,6 +64,7 @@ public class GitHubOAuthService {
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
+    private static final Duration GITHUB_API_TIMEOUT = Duration.ofSeconds(8);
 
     /**
      * 拼接 GitHub 授权页 URL，前端拿到后 window.location.href 跳转。
@@ -143,6 +144,7 @@ public class GitHubOAuthService {
                     .uri(URI.create("https://github.com/login/oauth/access_token"))
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/x-www-form-urlencoded")
+                    .timeout(GITHUB_API_TIMEOUT)
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
@@ -175,6 +177,7 @@ public class GitHubOAuthService {
                     .header("Authorization", "Bearer " + accessToken)
                     .header("Accept", "application/json")
                     .header("User-Agent", "zhiguang")
+                    .timeout(GITHUB_API_TIMEOUT)
                     .GET()
                     .build();
 
