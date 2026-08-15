@@ -108,6 +108,45 @@ class RagMainAgentTest {
         verify(retrievalService).retrieveGlobal(eq("缓存命中和缓存击穿有什么区别"), eq(10), any(RagRetrievalOptions.class));
     }
 
+    @Test
+    void relationQuestionDoesNotShortCircuitWhenPlannerMistakenlyRequestsDirectAnswer() {
+        String question = "Redis 和 MySQL 是什么关系？";
+        RagAgentPlan plan = new RagAgentPlan(
+                QuestionType.RELATION_QA,
+                RetrievalMode.GRAPH_AUGMENTED_HYBRID,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                5,
+                "Planner mistakenly marked relation question as direct answer."
+        );
+        GraphContext graphContext = graphContext();
+        Document doc = document("1#relation");
+        RagRetrievalResultDTO retrieval = retrieval(List.of(doc), graphContext);
+
+        when(plannerService.plan(question, 5)).thenReturn(plan);
+        when(graphService.build(question)).thenReturn(graphContext);
+        when(retrievalService.retrieveGlobal(eq(question), eq(5), any(RagRetrievalOptions.class)))
+                .thenReturn(retrieval);
+        when(rerankService.rerank(eq(question), eq(List.of(doc)), eq(5), eq(graphContext)))
+                .thenReturn(List.of(doc));
+        when(evidenceCheckService.check(eq(question), eq(List.of(doc)), eq(graphContext), eq(5), eq(0)))
+                .thenReturn(EvidenceResult.sufficient("关系证据足够"));
+
+        RagMainAgent agent = createAgent();
+        RagAgentState state = agent.run("global", null, question, question, 5);
+
+        assertThat(state.finalAnswer()).isNull();
+        assertThat(state.steps()).extracting("stepName")
+                .contains("graph_trace", "retrieve", "rerank", "evidence_check")
+                .doesNotContain("direct_answer");
+        verify(graphService).build(question);
+        verify(retrievalService).retrieveGlobal(eq(question), eq(5), any(RagRetrievalOptions.class));
+    }
+
     private RagMainAgent createAgent() {
         return new RagMainAgent(
                 new PlanNode(plannerService),

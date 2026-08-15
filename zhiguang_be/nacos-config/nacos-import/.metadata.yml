@@ -1,0 +1,6 @@
+metadata:
+  - dataId: zhiguang-runtime.yaml
+    group: ZHIGUANG_GROUP
+    type: yaml
+    appName: zhiguang-be
+    desc: Zhiguang runtime RAG configuration

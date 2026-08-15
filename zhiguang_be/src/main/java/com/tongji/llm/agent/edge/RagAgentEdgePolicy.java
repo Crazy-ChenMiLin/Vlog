@@ -5,6 +5,7 @@ import com.tongji.llm.agent.state.EvidenceResult;
 import com.tongji.llm.agent.state.QuestionType;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
+import com.tongji.llm.agent.state.RetrievalMode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,7 +18,18 @@ import org.springframework.stereotype.Component;
 public class RagAgentEdgePolicy {
 
     public boolean shouldDirectAnswer(RagAgentPlan plan) {
-        return plan.questionType() == QuestionType.CHAT || plan.needDirectAnswer();
+        if (plan.questionType() == QuestionType.CHAT) {
+            return true;
+        }
+        // direct_answer is only a small-talk/no-retrieval shortcut. Technical and
+        // relation questions must still pass through graph/retrieval even if the
+        // planner accidentally marks needDirectAnswer=true.
+        return plan.needDirectAnswer()
+                && plan.retrievalMode() == RetrievalMode.NONE
+                && !plan.needKeywordSearch()
+                && !plan.needVectorSearch()
+                && !plan.needHyde()
+                && !plan.needGraphTrace();
     }
 
     public boolean shouldQueryGraph(RagAgentPlan plan) {

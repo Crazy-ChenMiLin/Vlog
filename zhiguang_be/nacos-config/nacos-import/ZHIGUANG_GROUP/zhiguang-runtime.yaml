@@ -1,0 +1,66 @@
+# Nacos Data ID: zhiguang-runtime.yaml
+# Nacos Group: ZHIGUANG_GROUP
+#
+# Runtime-only settings. The backend will subscribe to this Data ID after the
+# Spring Cloud Alibaba Nacos Config integration is added.
+
+rag:
+  llm:
+    default-model: ${RAG_LLM_DEFAULT_MODEL:deepseek-v4-flash-0731}
+    planner-model: ${RAG_LLM_PLANNER_MODEL:${rag.llm.default-model}}
+    graph-model: ${RAG_LLM_GRAPH_MODEL:${rag.llm.default-model}}
+    evidence-model: ${RAG_LLM_EVIDENCE_MODEL:${rag.llm.default-model}}
+    rewrite-model: ${RAG_LLM_REWRITE_MODEL:${rag.llm.default-model}}
+    hyde-model: ${RAG_LLM_HYDE_MODEL:${rag.llm.default-model}}
+    direct-answer-model: ${RAG_LLM_DIRECT_ANSWER_MODEL:deepseek-v4-flash}
+    final-answer-model: ${RAG_LLM_FINAL_ANSWER_MODEL:deepseek-v4-flash}
+
+  retrieval:
+    bm25-enabled: true
+    graph-enabled: false
+    candidate-multiplier: 2
+    max-candidates: 20
+
+  graph:
+    understanding-enabled: true
+
+  answer:
+    max-tokens: 1024
+
+  rerank:
+    enabled: true
+    base-url: ${RAG_RERANK_BASE_URL:https://ai.api.nvidia.com}
+    api-key: ${RAG_RERANK_API_KEY:}
+    model: nvidia/llama-nemotron-rerank-1b-v2
+    path: /v1/retrieval/nvidia/llama-nemotron-rerank-1b-v2/reranking
+    graph-relation-boost: 0.35
+    graph-entity-boost: 0.12
+
+  observability:
+    elasticsearch:
+      enabled: true
+      index-prefix: zhiguang-agent-observability
+
+counter:
+  rebuild:
+    enabled: false
+    lock:
+      ttl-ms: 5000
+      watchdog-ms: 30000
+    rate:
+      permits: 3
+      window-seconds: 10
+    backoff:
+      base-ms: 500
+      max-ms: 30000
+
+cache:
+  hotkey:
+    window-seconds: 60
+    segment-seconds: 10
+    level-low: 50
+    level-medium: 200
+    level-high: 500
+    extend-low-seconds: 20
+    extend-medium-seconds: 60
+    extend-high-seconds: 120
