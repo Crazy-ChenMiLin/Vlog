@@ -52,7 +52,8 @@ Spring AI client.
 
    `.metadata.yml` declares the configuration's `dataId`, `group`, and `type`.
    The second file carries its YAML content. Nacos rejects the package as empty
-   when the root metadata file is missing.
+   when the root metadata file is missing. The entry separator must be `/`, not
+   Windows `\\`; use the supplied script so the ZIP stays portable.
 2. Open Nacos Configuration Management -> Configuration List -> Import.
 3. Keep namespace as `public` and choose `Abort import` as the conflict policy.
 4. Upload `dist/zhiguang-nacos-import.zip`.

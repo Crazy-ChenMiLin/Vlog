@@ -3,6 +3,7 @@ package com.tongji.llm.graphService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.config.RagLlmProperties;
+import com.tongji.llm.config.RagConfig;
 import com.tongji.llm.graphService.model.GraphEntity;
 import com.tongji.llm.graphService.model.GraphQueryUnderstanding;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.ResponseFormat;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -32,9 +32,7 @@ public class QueryUnderstandingService {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
     private final RagLlmProperties ragLlmProperties;
-
-    @Value("${rag.graph.understanding-enabled:true}")
-    private boolean enabled;
+    private final RagConfig ragConfig;
 
     /**
      * 抽取实体、关系意图和问题类型。
@@ -42,7 +40,7 @@ public class QueryUnderstandingService {
      * <p>失败时返回空理解结果，让链路自然退回到词典匹配，避免大模型波动影响主检索可用性。</p>
      */
     public GraphQueryUnderstanding understand(String question) {
-        if (!enabled || !StringUtils.hasText(question)) {
+        if (!ragConfig.getGraph().isUnderstandingEnabled() || !StringUtils.hasText(question)) {
             return GraphQueryUnderstanding.empty();
         }
 

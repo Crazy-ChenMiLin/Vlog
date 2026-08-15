@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.graphService.model.GraphEntity;
 import com.tongji.llm.graphService.model.GraphRelation;
+import com.tongji.llm.config.RagConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -24,27 +24,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RerankService {
     private final RestClient.Builder restClientBuilder;
-
-    @Value("${rag.rerank.enabled}")
-    private boolean enabled;
-
-    @Value("${rag.rerank.base-url}")
-    private String baseUrl;
-
-    @Value("${rag.rerank.api-key:}")
-    private String apiKey;
-
-    @Value("${rag.rerank.model}")
-    private String model;
-
-    @Value("${rag.rerank.path}")
-    private String path;
-
-    @Value("${rag.rerank.graph-relation-boost:0.35}")
-    private double graphRelationBoost;
-
-    @Value("${rag.rerank.graph-entity-boost:0.12}")
-    private double graphEntityBoost;
+    private final RagConfig ragConfig;
 
     public List<Document> rerank(String standaloneQuestion, List<Document> fusedDocs, int topK) {
         return rerank(standaloneQuestion, fusedDocs, topK, GraphContext.empty());
@@ -54,7 +34,8 @@ public class RerankService {
         if (fusedDocs == null || fusedDocs.isEmpty() || topK <= 0) {
             return List.of();
         }
-        if (!enabled || !StringUtils.hasText(apiKey) || !StringUtils.hasText(standaloneQuestion)) {
+        RagConfig.Rerank rerank = ragConfig.getRerank();
+        if (!rerank.isEnabled() || !StringUtils.hasText(rerank.getApiKey()) || !StringUtils.hasText(standaloneQuestion)) {
             return fallback(fusedDocs, topK, graphContext);
         }
 
@@ -62,7 +43,7 @@ public class RerankService {
         //没有title
         try {
             RerankRequest request = new RerankRequest(
-                    model,
+                    rerank.getModel(),
                     new TextInput(standaloneQuestion),
                     fusedDocs.stream()
                             .map(this::buildRerankText)
@@ -76,13 +57,13 @@ public class RerankService {
             }
 
             RerankResponse response = restClientBuilder
-                    .baseUrl(baseUrl)
+                    .baseUrl(rerank.getBaseUrl())
                     .build()
                     .post()
-                    .uri(path)
+                    .uri(rerank.getPath())
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
-                    .headers(headers -> headers.setBearerAuth(apiKey))
+                    .headers(headers -> headers.setBearerAuth(rerank.getApiKey()))
                     .body(request)
                     .retrieve()
                     .body(RerankResponse.class);
@@ -141,7 +122,7 @@ public class RerankService {
         double boost = 0;
         for (GraphRelation relation : graphContext.relations()) {
             if (containsTerm(text, relation.source()) && containsTerm(text, relation.target())) {
-                boost += graphRelationBoost;
+                boost += ragConfig.getRerank().getGraphRelationBoost();
             }
         }
         if (boost > 0) {
@@ -152,7 +133,7 @@ public class RerankService {
                 .filter(term -> containsTerm(text, term))
                 .limit(2)
                 .count();
-        return matchedEntityCount >= 2 ? graphEntityBoost : 0;
+        return matchedEntityCount >= 2 ? ragConfig.getRerank().getGraphEntityBoost() : 0;
     }
 
     private Set<String> graphEntityTerms(GraphContext graphContext) {

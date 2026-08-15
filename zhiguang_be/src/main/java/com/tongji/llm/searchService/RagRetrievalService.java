@@ -3,12 +3,12 @@ package com.tongji.llm.searchService;
 import com.tongji.llm.enhanceService.HyDEService;
 import com.tongji.llm.enhanceService.RrfFusionService;
 import com.tongji.llm.DTO.RagRetrievalResultDTO;
+import com.tongji.llm.config.RagConfig;
 import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -28,23 +28,15 @@ public class RagRetrievalService {
     private final MainService graphContextService;
     private final HyDEService hydeService;
     private final RrfFusionService rrfFusion;
-
-    @Value("${rag.retrieval.bm25-enabled:false}")
-    private boolean bm25Enabled;
-    @Value("${rag.retrieval.graph-enabled:false}")
-    private boolean graphEnabled;
-    @Value("${rag.retrieval.candidate-multiplier:2}")
-    private int candidateMultiplier;
-    @Value("${rag.retrieval.max-candidates:20}")
-    private int maxCandidates;
+    private final RagConfig ragConfig;
 
     public RagRetrievalResultDTO retrieveForPost(long postId, String question, int topK) {
         indexService.ensureIndexed(postId);
-        return retrieveInternal(postId, question, topK, RagRetrievalOptions.defaults(bm25Enabled, graphEnabled));
+        return retrieveInternal(postId, question, topK, defaultOptions());
     }
 
     public RagRetrievalResultDTO retrieveGlobal(String question, int topK) {
-        return retrieveInternal(null, question, topK, RagRetrievalOptions.defaults(bm25Enabled, graphEnabled));
+        return retrieveInternal(null, question, topK, defaultOptions());
     }
 
     public RagRetrievalResultDTO retrieveForPost(long postId, String question, int topK, RagRetrievalOptions options) {
@@ -58,7 +50,7 @@ public class RagRetrievalService {
 
     private RagRetrievalResultDTO retrieveInternal(Long postId, String question, int topK, RagRetrievalOptions options) {
         int candidateK = candidateK(topK);
-        options = options == null ? RagRetrievalOptions.defaults(bm25Enabled, graphEnabled) : options;
+        options = options == null ? defaultOptions() : options;
         GraphContext graphContext = resolveGraphContext(question, options);
         String bm25Query = options.useGraph() && !graphContext.isEmpty() ? graphContext.keywordQuery(question) : question;
 
@@ -134,9 +126,14 @@ public class RagRetrievalService {
 
     private int candidateK(int topK) {
         int safeTopK = Math.max(1, topK);
-        int multiplier = Math.max(1, candidateMultiplier);
-        int cap = Math.max(safeTopK, maxCandidates);
+        int multiplier = Math.max(1, ragConfig.getRetrieval().getCandidateMultiplier());
+        int cap = Math.max(safeTopK, ragConfig.getRetrieval().getMaxCandidates());
         return Math.min(cap, safeTopK * multiplier);
+    }
+
+    private RagRetrievalOptions defaultOptions() {
+        RagConfig.Retrieval retrieval = ragConfig.getRetrieval();
+        return RagRetrievalOptions.defaults(retrieval.isBm25Enabled(), retrieval.isGraphEnabled());
     }
 
     private String enrichHydeQuestion(String question, GraphContext graphContext) {
