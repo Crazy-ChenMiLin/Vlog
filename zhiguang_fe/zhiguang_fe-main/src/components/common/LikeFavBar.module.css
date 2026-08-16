@@ -35,3 +35,77 @@
   opacity: 0.6;
   pointer-events: none;
 }
+
+/* ====== 抖音式点赞动画 ====== */
+.likeWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bigHeart {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  z-index: 30;
+  color: #ff2d55;
+  filter: drop-shadow(0 4px 12px rgba(255, 45, 85, 0.55));
+}
+
+.bigHeart.anim {
+  animation: bigHeartAnim 0.95s cubic-bezier(0.22, 0.9, 0.3, 1) forwards;
+}
+
+@keyframes bigHeartAnim {
+  0% { transform: translate(-50%, -50%) scale(0) rotate(-18deg); opacity: 0; }
+  18% { transform: translate(-50%, -50%) scale(1.25) rotate(6deg); opacity: 1; }
+  32% { transform: translate(-50%, -50%) scale(0.92) rotate(-4deg); opacity: 1; }
+  46% { transform: translate(-50%, -50%) scale(1.05) rotate(2deg); opacity: 1; }
+  58% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  85% { transform: translate(-50%, -50%) scale(1.1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.35) rotate(0deg); opacity: 0; }
+}
+
+.miniHeart {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 29;
+}
+
+.miniHeart.burst {
+  animation: fly1 var(--dur, 0.8s) ease-out forwards;
+}
+
+@keyframes fly1 {
+  to {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2);
+    opacity: 0;
+  }
+}
+
+.likeBtn.pop {
+  animation: likeBtnPop 0.45s ease;
+}
+
+@keyframes likeBtnPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35, 0.75); }
+  50% { transform: scale(0.85, 1.2); }
+  70% { transform: scale(1.15, 0.9); }
+  100% { transform: scale(1); }
+}
+
+.count.bump {
+  display: inline-block;
+  animation: countBump 0.4s ease;
+}
+
+@keyframes countBump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4); color: #ff2d55; }
+  100% { transform: scale(1); }
+}

@@ -20,8 +20,8 @@
 
 .panel {
   width: min(420px, calc(100vw - 32px));
-  height: min(calc(100vh * 2 / 3), calc(100vh - 60px));
-  min-height: 430px;
+  height: min(calc(100vh * 4 / 5), calc(100vh - 60px));
+  min-height: 520px;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -118,7 +118,6 @@
   animation: statusPulse 1.2s ease-in-out infinite;
 }
 
-.windowButton {
 .emptyState button:focus-visible,
 .floatButton:focus-visible,
 .actions button:focus-visible,
@@ -597,7 +596,7 @@
 
   .panel {
     width: calc(100vw - 32px);
-    height: min(calc(100vh * 2 / 3), calc(100vh - 60px));
+    height: min(calc(100vh * 4 / 5), calc(100vh - 60px));
   }
 
   .header {
@@ -622,7 +621,7 @@
 
 @media (max-width: 420px) {
   .panel {
-    min-height: 390px;
+    min-height: 460px;
   }
 
   .status {
@@ -647,4 +646,4 @@
     .windowButton {
         transition: none;
     }
-}}
+}
