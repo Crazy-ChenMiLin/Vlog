@@ -1,6 +1,7 @@
 package com.tongji.limit;
 
 import org.redisson.api.RRateLimiter;
+import org.redisson.api.RSemaphore;
 import org.redisson.api.RateIntervalUnit;
 import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
@@ -13,13 +14,12 @@ import jakarta.annotation.PostConstruct;
 
 import java.util.Collections;
 import java.util.UUID;
-import java.util.concurrent.Semaphore;
 
 /**
  * AI 接口限流器：三道闸门保护 RAG chat 接口。
  * <p>
  * ① 全局令牌桶（Redisson RRateLimiter，QPS 由 Nacos 配置）—— 分布式共享，限总速率<br>
- * ② 信号量（Java Semaphore，80）—— 单机，限同时并发数（写死，不放 Nacos）<br>
+ * ② 信号量（Redisson RSemaphore，80）—— 分布式，限同时并发数（写死，不放 Nacos）<br>
  * ③ 每用户滑动窗口（Redis ZSet + Lua，窗口与次数由 Nacos 配置）—— 分布式共享，防个人刷
  * <p>
  * 顺序：便宜的先查，拿不到直接拒绝。第三道失败要手动释放第二道的信号量。
@@ -31,7 +31,7 @@ public class AiRateLimiter {
     private final RedissonClient redisson;
     private final StringRedisTemplate redis;
     private final RRateLimiter globalLimiter;
-    private final Semaphore streamSem = new Semaphore(80);
+    private final RSemaphore streamSem;
     private final RagRateLimitProperties properties;
 
     /**
@@ -59,6 +59,7 @@ public class AiRateLimiter {
         this.redis = redis;
         this.properties = properties;
         this.globalLimiter = redisson.getRateLimiter("rag:chat:limiter:global");
+        this.streamSem = redisson.getSemaphore("rag:chat:semaphore");
         this.slidingScript = new DefaultRedisScript<>(SLIDING_WINDOW_LUA, Long.class);
     }
 
@@ -70,6 +71,7 @@ public class AiRateLimiter {
     @PostConstruct
     public void init() {
         globalLimiter.trySetRate(RateType.OVERALL, properties.getGlobalQps(), 1, RateIntervalUnit.SECONDS);
+        streamSem.trySetPermits(80);
     }
 
     /**
