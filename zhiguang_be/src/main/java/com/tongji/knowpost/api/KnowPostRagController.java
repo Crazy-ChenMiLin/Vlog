@@ -71,11 +71,16 @@ public class KnowPostRagController {
             @AuthenticationPrincipal Jwt jwt) {
         long userId = jwtService.extractUserId(jwt);
 
-        // 三道闸门：全局令牌桶 → 信号量 → 每用户滑动窗口，任一失败 → 429
+        // 三道闸门：全局令牌桶 → 信号量 → 每用户滑动窗口，任一失败 → emit SSE error 事件
+        // 不抛 ResponseStatusException 走 GlobalExceptionHandler，否则 text/event-stream 媒体类型不匹配
+        // 会抛 HttpMediaTypeNotAcceptableException（前端 EventSource 显示"暂时不可用"）
         String reject = rateLimiter.tryAcquire(userId);
         if (reject != null) {
-            return Flux.error(new ResponseStatusException(
-                    HttpStatus.TOO_MANY_REQUESTS, reject));
+            return Flux.just(ServerSentEvent.<String>builder()
+                    .event("error")
+                    .data("{\"code\":\"" + HttpStatus.TOO_MANY_REQUESTS.value()
+                            + "\",\"message\":\"" + reject + "\"}")
+                    .build());
         }
 
         // 通过 → 流式返回，结束时释放信号量
