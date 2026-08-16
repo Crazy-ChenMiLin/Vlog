@@ -125,6 +125,19 @@ CREATE TABLE IF NOT EXISTS rag_conversation (
     CONSTRAINT fk_rag_conversation_post FOREIGN KEY (post_id) REFERENCES know_posts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 文章评论表
+CREATE TABLE IF NOT EXISTS comments (
+    id BIGINT UNSIGNED NOT NULL COMMENT '雪花算法生成',
+    post_id BIGINT UNSIGNED NOT NULL COMMENT '关联知文ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '评论者用户ID',
+    content VARCHAR(1024) NOT NULL COMMENT '评论内容',
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY ix_comments_post_ct (post_id, create_time),
+    CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES know_posts(id),
+    CONSTRAINT fk_comments_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS rag_message (
     id BIGINT UNSIGNED NOT NULL,
     conversation_id BIGINT UNSIGNED NOT NULL,

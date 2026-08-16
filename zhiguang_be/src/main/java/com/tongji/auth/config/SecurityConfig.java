@@ -60,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/knowposts/feed").permitAll()
                         // 知文详情（公开已发布内容，非公开由服务层校验）
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/detail/*").permitAll()
+                        // 评论列表（公开读取，发评论需鉴权由 POST 路径默认 authenticated 覆盖）
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/comments").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/search", "/api/v1/search/suggest").permitAll()
                         // 知文详情页 RAG 问答（SSE 流式输出）允许匿名访问
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/*/qa/stream").permitAll()

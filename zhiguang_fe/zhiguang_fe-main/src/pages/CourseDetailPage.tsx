@@ -14,6 +14,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import FollowButton from "@/components/common/FollowButton";
+import CommentSection from "@/components/common/CommentSection";
 import { useRagStream } from "@/features/rag/hooks/useRagStream";
 import { resolveApiUrl } from "@/services/apiClient";
 
@@ -309,6 +310,8 @@ const CourseDetailPage = () => {
             </div>
           </aside>
         </div>
+
+        {detail ? <CommentSection postId={detail.id} /> : null}
 
         {previewOpen && detail?.images?.length ? (
           <div className={styles.previewOverlay} onClick={() => setPreviewOpen(false)}>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.comment.mapper.CommentMapper">
+
+    <insert id="insert" parameterType="com.tongji.comment.model.Comment">
+        INSERT INTO comments (id, post_id, user_id, content, create_time)
+        VALUES (#{id}, #{postId}, #{userId}, #{content}, #{createTime})
+    </insert>
+
+    <select id="listByPostId" resultType="com.tongji.comment.api.dto.CommentResponse">
+        SELECT
+            c.id,
+            c.post_id AS postId,
+            c.user_id AS userId,
+            c.content,
+            u.nickname,
+            u.avatar,
+            c.create_time AS createTime
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.post_id = #{postId}
+        ORDER BY c.create_time ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>
