@@ -1,6 +1,6 @@
 services:
   zhiguang-logstash:
-    image: docker.elastic.co/logstash/logstash:9.4.2
+    image: logstash:9.5.1
     container_name: zhiguang-logstash
     restart: unless-stopped
     environment:

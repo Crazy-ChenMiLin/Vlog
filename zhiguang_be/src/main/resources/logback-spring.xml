@@ -46,10 +46,15 @@
     </appender>
 
     <springProfile name="elk">
-        <root level="INFO">
+        <!-- 框架日志（Spring/Tomcat/Hibernate 等）只输出到控制台，不发 logstash，避免噪音 -->
+        <root level="WARN">
             <appender-ref ref="CONSOLE_JSON"/>
-            <appender-ref ref="LOGSTASH"/>
         </root>
+        <!-- RAG 业务包：INFO 起发 logstash + 控制台，保证 ELK 里只看到业务步骤 -->
+        <logger name="com.tongji.llm" level="INFO" additivity="false">
+            <appender-ref ref="LOGSTASH"/>
+            <appender-ref ref="CONSOLE_JSON"/>
+        </logger>
     </springProfile>
 
     <springProfile name="!elk">
