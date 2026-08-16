@@ -7,8 +7,6 @@ import { AgentStep, useRagStream } from "@/features/rag/hooks/useRagStream";
 import { resolveApiUrl } from "@/services/apiClient";
 import styles from "./GlobalRagChat.module.css";
 
-const TOP_K_OPTIONS = [3, 5, 8, 12];
-
 type ChatTurn = {
   id: string;
   question: string;
@@ -25,7 +23,6 @@ const GlobalRagChat = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [topK, setTopK] = useState(5);
   const answerViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const activeTurnIdRef = useRef<string | null>(null);
@@ -100,8 +97,7 @@ const GlobalRagChat = () => {
         conversationId,
         scope: "global",
         postId: null,
-        question: normalizedQuestion,
-        topK
+        question: normalizedQuestion
       },
       onMeta: (meta) => {
         if (typeof meta === "object" && meta !== null && "conversationId" in meta) {
@@ -145,14 +141,6 @@ const GlobalRagChat = () => {
 
             <div className={styles.headerControls}>
               {loading ? <span className={styles.status}><i />正在生成</span> : null}
-              <label className={styles.topKControl}>
-                <span>Top K</span>
-                <select value={topK} onChange={(event) => setTopK(Number(event.target.value))}>
-                  {TOP_K_OPTIONS.map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
               <button
                 type="button"
                 className={styles.windowButton}
