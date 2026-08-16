@@ -14,10 +14,8 @@ import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.agent.state.RagAgentStepTrace;
 import com.tongji.llm.graphService.model.GraphContext;
-import com.tongji.llm.observability.AgentObservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -45,9 +43,6 @@ public class RagMainAgent {
     private final ExpandTopKNode expandTopKNode;
     private final DirectAnswerNode directAnswerNode;
     private final RagAgentEdgePolicy edgePolicy;
-
-    @Autowired(required = false)
-    private AgentObservationService observationService;
 
     public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK) {
         return run(scope, postId, originalQuestion, standaloneQuestion, topK, null);
@@ -131,9 +126,6 @@ public class RagMainAgent {
 
     private void recordStep(RagAgentState state, RagAgentStepTrace step) {
         state.addStep(step);
-        if (observationService != null) {
-            observationService.recordStep(state, step);
-        }
         log.info("rag_agent_step",
                 kv("event_type", "rag_agent_step"),
                 kv("trace_id", state.traceId()),
@@ -148,9 +140,6 @@ public class RagMainAgent {
 
     private void logAgentCompleted(RagAgentState state) {
         EvidenceResult evidence = state.evidenceResult();
-        if (observationService != null) {
-            observationService.recordCompleted(state);
-        }
         log.info("rag_agent_completed",
                 kv("event_type", "rag_agent_completed"),
                 kv("trace_id", state.traceId()),
@@ -166,9 +155,6 @@ public class RagMainAgent {
     }
 
     private void logAgentFailed(RagAgentState state, Exception exception) {
-        if (observationService != null) {
-            observationService.recordFailed(state, exception);
-        }
         log.warn("rag_agent_failed",
                 kv("event_type", "rag_agent_failed"),
                 kv("trace_id", state.traceId()),
