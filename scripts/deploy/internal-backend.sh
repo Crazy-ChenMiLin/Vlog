@@ -89,7 +89,9 @@ update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
 require_env_value "NACOS_SERVER_ADDR" "${NACOS_SERVER_ADDR:-}"
 require_env_value "NACOS_USERNAME" "${NACOS_USERNAME:-}"
 require_env_value "NACOS_PASSWORD" "${NACOS_PASSWORD:-}"
-update_env_value "$RUNTIME/.env" "SPRING_CONFIG_IMPORT" "${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?refreshEnabled=true}"
+# The import query is authoritative here. If group is omitted, Spring Cloud
+# Nacos falls back to DEFAULT_GROUP even when NACOS_CONFIG_GROUP is exported.
+update_env_value "$RUNTIME/.env" "SPRING_CONFIG_IMPORT" "${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?group=${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}&refreshEnabled=true}"
 update_env_value "$RUNTIME/.env" "NACOS_SERVER_ADDR" "$NACOS_SERVER_ADDR"
 update_env_value "$RUNTIME/.env" "NACOS_USERNAME" "$NACOS_USERNAME"
 update_env_value "$RUNTIME/.env" "NACOS_PASSWORD" "$NACOS_PASSWORD"
@@ -98,6 +100,12 @@ update_env_value "$RUNTIME/.env" "NACOS_NAMESPACE" "${NACOS_NAMESPACE:-}"
 
 if [[ -n "${GITHUB_REDIRECT_URI:-}" ]]; then
   update_env_value "$RUNTIME/.env" "GITHUB_REDIRECT_URI" "$GITHUB_REDIRECT_URI"
+fi
+
+# Optional read-only credential used only by the external Go knowledge provider.
+# Keep it in GitHub Actions Secrets and the server runtime .env, never in source.
+if [[ -n "${GITHUB_EXTERNAL_SEARCH_TOKEN:-}" ]]; then
+  update_env_value "$RUNTIME/.env" "GITHUB_EXTERNAL_SEARCH_TOKEN" "$GITHUB_EXTERNAL_SEARCH_TOKEN"
 fi
 
 MINIO_ACCESS_KEY_VALUE="${MINIO_ACCESS_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_ACCESS_KEY")}"
@@ -130,7 +138,7 @@ services:
       OSS_BUCKET: \${OSS_BUCKET}
       # The runtime compose file is intentionally stable; explicitly forward
       # Nacos bootstrap settings so a later code deployment cannot drop them.
-      SPRING_CONFIG_IMPORT: \${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?refreshEnabled=true}
+      SPRING_CONFIG_IMPORT: \${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?group=ZHIGUANG_GROUP&refreshEnabled=true}
       SPRING_CLOUD_NACOS_SERVER_ADDR: \${NACOS_SERVER_ADDR}
       SPRING_CLOUD_NACOS_USERNAME: \${NACOS_USERNAME}
       SPRING_CLOUD_NACOS_PASSWORD: \${NACOS_PASSWORD}
@@ -139,6 +147,7 @@ services:
       GITHUB_CLIENT_ID: \${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: \${GITHUB_CLIENT_SECRET}
       GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-http://47.108.66.230/callback}
+      GITHUB_EXTERNAL_SEARCH_TOKEN: \${GITHUB_EXTERNAL_SEARCH_TOKEN:-}
       CAMPUS_CLIENT_ID: \${CAMPUS_CLIENT_ID}
       CAMPUS_CLIENT_SECRET: \${CAMPUS_CLIENT_SECRET}
       CAMPUS_REDIRECT_URI: \${CAMPUS_REDIRECT_URI:-http://47.108.66.230/callback/campus}
