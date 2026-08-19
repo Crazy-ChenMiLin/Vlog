@@ -37,6 +37,7 @@ public record AgentStepEventDTO(
             case "rerank" -> "重排候选片段";
             case "evidence_check" -> "检查证据是否足够";
             case "retry" -> "扩大检索范围";
+            case "external_knowledge" -> "查找官方外部资料";
             case "direct_answer" -> "直接回答";
             default -> "执行 Agent 步骤";
         };

@@ -36,6 +36,14 @@ rag:
     graph-relation-boost: 0.35
     graph-entity-boost: 0.12
 
+  external:
+    github-official-go:
+      enabled: ${RAG_EXTERNAL_GITHUB_OFFICIAL_GO_ENABLED:true}
+      token: ${GITHUB_EXTERNAL_SEARCH_TOKEN:}
+      base-url: ${GITHUB_EXTERNAL_SEARCH_BASE_URL:https://api.github.com}
+      repository: ${GITHUB_EXTERNAL_SEARCH_REPOSITORY:golang/go}
+      max-results: 3
+
   observability:
     elasticsearch:
       enabled: true

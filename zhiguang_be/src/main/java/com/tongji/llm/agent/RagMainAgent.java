@@ -13,14 +13,16 @@ import com.tongji.llm.agent.state.EvidenceResult;
 import com.tongji.llm.agent.state.RagAgentPlan;
 import com.tongji.llm.agent.state.RagAgentState;
 import com.tongji.llm.agent.state.RagAgentStepTrace;
+import com.tongji.llm.external.ExternalKnowledgeProvider;
+import com.tongji.llm.external.ExternalKnowledgeResource;
 import com.tongji.llm.graphService.model.GraphContext;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static net.logstash.logback.argument.StructuredArguments.kv;
 
@@ -33,7 +35,6 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RagMainAgent {
     private final PlanNode planNode;
     private final EvidenceCheckNode evidenceCheckNode;
@@ -43,6 +44,42 @@ public class RagMainAgent {
     private final ExpandTopKNode expandTopKNode;
     private final DirectAnswerNode directAnswerNode;
     private final RagAgentEdgePolicy edgePolicy;
+    private final List<ExternalKnowledgeProvider> externalKnowledgeProviders;
+
+    public RagMainAgent(
+            PlanNode planNode,
+            EvidenceCheckNode evidenceCheckNode,
+            GraphTraceNode graphTraceNode,
+            RetrieveNode retrieveNode,
+            RerankNode rerankNode,
+            ExpandTopKNode expandTopKNode,
+            DirectAnswerNode directAnswerNode,
+            RagAgentEdgePolicy edgePolicy,
+            List<ExternalKnowledgeProvider> externalKnowledgeProviders) {
+        this.planNode = planNode;
+        this.evidenceCheckNode = evidenceCheckNode;
+        this.graphTraceNode = graphTraceNode;
+        this.retrieveNode = retrieveNode;
+        this.rerankNode = rerankNode;
+        this.expandTopKNode = expandTopKNode;
+        this.directAnswerNode = directAnswerNode;
+        this.edgePolicy = edgePolicy;
+        this.externalKnowledgeProviders = externalKnowledgeProviders == null ? List.of() : List.copyOf(externalKnowledgeProviders);
+    }
+
+    /** Keeps existing unit tests and callers source-compatible while no provider is configured. */
+    public RagMainAgent(
+            PlanNode planNode,
+            EvidenceCheckNode evidenceCheckNode,
+            GraphTraceNode graphTraceNode,
+            RetrieveNode retrieveNode,
+            RerankNode rerankNode,
+            ExpandTopKNode expandTopKNode,
+            DirectAnswerNode directAnswerNode,
+            RagAgentEdgePolicy edgePolicy) {
+        this(planNode, evidenceCheckNode, graphTraceNode, retrieveNode, rerankNode, expandTopKNode,
+                directAnswerNode, edgePolicy, List.of());
+    }
 
     public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK) {
         return run(scope, postId, originalQuestion, standaloneQuestion, topK, null);
@@ -75,6 +112,8 @@ public class RagMainAgent {
                 executeRetrievalRound(state, scope, postId);
                 checkEvidence(state);
             }
+
+            discoverExternalLinksWhenNeeded(state);
 
             logAgentCompleted(state);
             return state;
@@ -110,6 +149,41 @@ public class RagMainAgent {
 
     private EvidenceResult checkEvidence(RagAgentState state) {
         return timed(state, "evidence_check", "CHECK_TOP" + state.currentTopK(), () -> evidenceCheckNode.execute(state));
+    }
+
+    /**
+     * Link-only MVP fallback. The provider receives the question, but no external
+     * document text is ever inserted into the LLM context or the local vector store.
+     */
+    private void discoverExternalLinksWhenNeeded(RagAgentState state) {
+        EvidenceResult evidence = state.evidenceResult();
+        if (evidence == null || evidence.sufficient() || externalKnowledgeProviders.isEmpty()) {
+            return;
+        }
+        List<ExternalKnowledgeResource> resources = externalKnowledgeProviders.stream()
+                .filter(provider -> provider.supports(state.standaloneQuestion()))
+                .flatMap(provider -> provider.findResources(state.standaloneQuestion(), 3).stream())
+                .limit(3)
+                .toList();
+        recordStep(state, new RagAgentStepTrace(
+                "external_knowledge",
+                "OFFICIAL_LINK_FALLBACK",
+                true,
+                0,
+                "official resources=" + resources.size()
+        ));
+        if (!resources.isEmpty()) {
+            state.finalAnswer(externalLinkAnswer(resources));
+        }
+    }
+
+    private String externalLinkAnswer(List<ExternalKnowledgeResource> resources) {
+        String links = resources.stream()
+                .map(resource -> "- [" + resource.title() + "](" + resource.url() + ")"
+                        + " — `" + resource.repository() + "/" + resource.path() + "`")
+                .collect(Collectors.joining("\n"));
+        return "站内知识库暂未找到足够证据回答这个 Go 问题。以下是 GitHub 官方资料，可继续查阅：\n\n" + links
+                + "\n\n> 此处仅推荐外部官方资料，未将外部内容写入站内知识库，也未由 AI 基于外部正文生成回答。";
     }
 
     private <T> T timed(RagAgentState state, String stepName, String decision, Supplier<T> supplier) {

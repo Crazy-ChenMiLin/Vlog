@@ -19,6 +19,8 @@ import com.tongji.llm.config.RagLlmProperties;
 import com.tongji.llm.config.RagConfig;
 import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.enhanceService.RerankService;
+import com.tongji.llm.external.ExternalKnowledgeProvider;
+import com.tongji.llm.external.ExternalKnowledgeResource;
 import com.tongji.llm.graphService.MainService;
 import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.graphService.model.GraphEntity;
@@ -150,7 +152,38 @@ class RagMainAgentTest {
         verify(retrievalService).retrieveGlobal(eq(question), eq(5), any(RagRetrievalOptions.class));
     }
 
+    @Test
+    void insufficientGoEvidenceReturnsProviderLinksWithoutCallingAnswerModel() {
+        String question = "Go 的 goroutine 如何调度？";
+        RagAgentPlan plan = RagAgentPlan.defaultHybrid(5, "Go question");
+        Document doc = document("1#go");
+        ExternalKnowledgeProvider provider = mock(ExternalKnowledgeProvider.class);
+
+        when(plannerService.plan(question, 5)).thenReturn(plan);
+        when(retrievalService.retrieveGlobal(eq(question), eq(5), any(RagRetrievalOptions.class)))
+                .thenReturn(retrieval(List.of(doc), GraphContext.empty()));
+        when(rerankService.rerank(eq(question), eq(List.of(doc)), eq(5), eq(GraphContext.empty())))
+                .thenReturn(List.of(doc));
+        when(evidenceCheckService.check(eq(question), eq(List.of(doc)), eq(GraphContext.empty()), eq(5), eq(0)))
+                .thenReturn(new EvidenceResult(false, 0.2, "不足", EvidenceAction.ANSWER_WITH_LIMITATION));
+        when(provider.supports(question)).thenReturn(true);
+        when(provider.findResources(question, 3)).thenReturn(List.of(new ExternalKnowledgeResource(
+                "GitHub", "Go spec", "golang/go", "doc/go_spec.html",
+                "https://github.com/golang/go/blob/master/doc/go_spec.html", "官方规范"
+        )));
+
+        RagAgentState state = createAgent(List.of(provider)).run("global", null, question, question, 5);
+
+        assertThat(state.finalAnswer()).contains("GitHub 官方资料", "Go spec", "未将外部内容写入站内知识库");
+        assertThat(state.steps()).extracting("stepName").contains("external_knowledge");
+        verify(provider).findResources(question, 3);
+    }
+
     private RagMainAgent createAgent() {
+        return createAgent(List.of());
+    }
+
+    private RagMainAgent createAgent(List<ExternalKnowledgeProvider> providers) {
         return new RagMainAgent(
                 new PlanNode(plannerService),
                 new EvidenceCheckNode(evidenceCheckService),
@@ -159,7 +192,8 @@ class RagMainAgentTest {
                 new RerankNode(rerankService),
                 new ExpandTopKNode(),
                 new DirectAnswerNode(chatClient, ragLlmProperties(), mock(RagPromptService.class)),
-                new RagAgentEdgePolicy()
+                new RagAgentEdgePolicy(),
+                providers
         );
     }
 
