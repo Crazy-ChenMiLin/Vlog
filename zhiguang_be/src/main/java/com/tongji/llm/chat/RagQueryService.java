@@ -15,6 +15,7 @@ import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
 import com.tongji.llm.memoryService.model.RagMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class RagQueryService {
     private static final String EMPTY_POST_MESSAGE =
@@ -75,15 +77,18 @@ public class RagQueryService {
             int topK) {
         String emptyMsg = emptyResultMessage(scope);
         return Mono.fromCallable(() -> {
-                    // 同步阻塞调用全在 boundedElastic 线程跑，避免占用 Tomcat exec 线程；
-                    // Spring MVC 拿到 Flux 立即开 SSE 响应，前端不再因为 controller 同步阻塞而长时间 0 数据。
+                    // 临时诊断日志：定位 streamChatAnswerFlux 异步链卡在哪一步（确认后可删，或留给后续观测性）
+                    log.info("streamChat [1/6] resolveConversation start, userId={}, conversationId={}", userId, conversationId);
                     RagConversation conversation = memoryService.resolveConversation(conversationId, userId, scope, postId);
+                    log.info("streamChat [2/6] loadRecentMessages start, conversationId={}", conversation.getId());
                     List<RagMessage> recentMessages = memoryService.loadRecentMessages(
                             userId,
                             conversation.getId(),
                             RagConversationMemoryService.DEFAULT_HISTORY_LIMIT
                     );
+                    log.info("streamChat [3/6] rewrite start, recentCount={}", recentMessages == null ? 0 : recentMessages.size());
                     String standaloneQuestion = queryRewriteService.rewrite(originalQuestion, recentMessages);
+                    log.info("streamChat [4/6] ragMainAgent.run start, standalone={}", standaloneQuestion);
                     RagAgentState state = ragMainAgent.run(
                             RagChatScope.POST.is(scope) ? "post" : "global",
                             postId,
@@ -91,7 +96,9 @@ public class RagQueryService {
                             standaloneQuestion,
                             topK
                     );
+                    log.info("streamChat [5/6] appendMessage start, state.steps={}", state.steps() == null ? 0 : state.steps().size());
                     memoryService.appendMessage(userId, conversation.getId(), RagChatRole.USER, originalQuestion);
+                    log.info("streamChat [6/6] ChatContext built, ready to emit SSE");
                     return new ChatContext(conversation, recentMessages, standaloneQuestion, state);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
