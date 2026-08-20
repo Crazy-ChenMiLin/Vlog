@@ -75,68 +75,67 @@ public class RagQueryService {
             Long postId,
             String originalQuestion,
             int topK) {
+        // 临时诊断日志：定位 streamChatAnswerFlux 同步链慢在哪一步（确认后可删或留作观测性）。
+        // 上一版用 Mono.fromCallable + subscribeOn(boundedElastic) 异步化，但实际运行时 lambda 根本没执行
+        // （commit dfe1fe5 诊断证实 [1/6] 一条都没输出），Spring MVC 异步处理后 Mono 没被订阅到 lambda 层。
+        // 回退同步版本——和 GET /qa/stream 一样会阻塞 Tomcat exec ~13 秒，但已证明 work，不阻塞并发（Tomcat 默认 200 exec 线程）。
+        log.info("streamChat [1/6] resolveConversation start, userId={}, conversationId={}", userId, conversationId);
+        RagConversation conversation = memoryService.resolveConversation(conversationId, userId, scope, postId);
+        log.info("streamChat [2/6] loadRecentMessages start, conversationId={}", conversation.getId());
+        List<RagMessage> recentMessages = memoryService.loadRecentMessages(
+                userId,
+                conversation.getId(),
+                RagConversationMemoryService.DEFAULT_HISTORY_LIMIT
+        );
+        log.info("streamChat [3/6] rewrite start, recentCount={}", recentMessages == null ? 0 : recentMessages.size());
+        String standaloneQuestion = queryRewriteService.rewrite(originalQuestion, recentMessages);
+        log.info("streamChat [4/6] ragMainAgent.run start, standalone={}", standaloneQuestion);
+        RagAgentState state = ragMainAgent.run(
+                RagChatScope.POST.is(scope) ? "post" : "global",
+                postId,
+                originalQuestion,
+                standaloneQuestion,
+                topK
+        );
+        log.info("streamChat [5/6] appendMessage start, state.steps={}", state.steps() == null ? 0 : state.steps().size());
+        memoryService.appendMessage(userId, conversation.getId(), RagChatRole.USER, originalQuestion);
+        log.info("streamChat [6/6] SSE Flux constructed, ready to emit");
+
+        StringBuilder assistantAnswer = new StringBuilder();
         String emptyMsg = emptyResultMessage(scope);
-        return Mono.fromCallable(() -> {
-                    // 临时诊断日志：定位 streamChatAnswerFlux 异步链卡在哪一步（确认后可删，或留给后续观测性）
-                    log.info("streamChat [1/6] resolveConversation start, userId={}, conversationId={}", userId, conversationId);
-                    RagConversation conversation = memoryService.resolveConversation(conversationId, userId, scope, postId);
-                    log.info("streamChat [2/6] loadRecentMessages start, conversationId={}", conversation.getId());
-                    List<RagMessage> recentMessages = memoryService.loadRecentMessages(
-                            userId,
-                            conversation.getId(),
-                            RagConversationMemoryService.DEFAULT_HISTORY_LIMIT
-                    );
-                    log.info("streamChat [3/6] rewrite start, recentCount={}", recentMessages == null ? 0 : recentMessages.size());
-                    String standaloneQuestion = queryRewriteService.rewrite(originalQuestion, recentMessages);
-                    log.info("streamChat [4/6] ragMainAgent.run start, standalone={}", standaloneQuestion);
-                    RagAgentState state = ragMainAgent.run(
-                            RagChatScope.POST.is(scope) ? "post" : "global",
-                            postId,
-                            originalQuestion,
-                            standaloneQuestion,
-                            topK
-                    );
-                    log.info("streamChat [5/6] appendMessage start, state.steps={}", state.steps() == null ? 0 : state.steps().size());
-                    memoryService.appendMessage(userId, conversation.getId(), RagChatRole.USER, originalQuestion);
-                    log.info("streamChat [6/6] ChatContext built, ready to emit SSE");
-                    return new ChatContext(conversation, recentMessages, standaloneQuestion, state);
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(ctx -> {
-                    StringBuilder assistantAnswer = new StringBuilder();
-                    Flux<ServerSentEvent<String>> meta = Flux.just(ServerSentEvent.<String>builder()
-                            .event("meta")
-                            .data("{\"conversationId\":\"" + ctx.conversation().getId() + "\"}")
-                            .build());
-                    Flux<ServerSentEvent<AgentStepEventDTO>> agentSteps = agentStepEvents(ctx.state());
-                    Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
-                            ctx.state(),
-                            originalQuestion,
-                            ctx.standaloneQuestion(),
-                            ctx.recentMessages(),
-                            emptyMsg
-                    )
-                            .doOnNext(assistantAnswer::append)
-                            .map(chunk -> ServerSentEvent.<String>builder()
-                                    .event("message")
-                                    .data(chunk)
-                                    .build())
-                            .doFinally(signalType -> {
-                                if (signalType == SignalType.ON_COMPLETE && !assistantAnswer.isEmpty()) {
-                                    memoryService.appendMessage(
-                                            userId,
-                                            ctx.conversation().getId(),
-                                            RagChatRole.ASSISTANT,
-                                            assistantAnswer.toString()
-                                    );
-                                }
-                            });
-                    Flux<ServerSentEvent<String>> done = Flux.just(ServerSentEvent.<String>builder()
-                            .event("done")
-                            .data("{}")
-                            .build());
-                    return Flux.concat(meta, agentSteps.map(this::stringEvent), answer, done);
-                })
+        Flux<ServerSentEvent<String>> meta = Flux.just(ServerSentEvent.<String>builder()
+                .event("meta")
+                .data("{\"conversationId\":\"" + conversation.getId() + "\"}")
+                .build());
+        Flux<ServerSentEvent<AgentStepEventDTO>> agentSteps = agentStepEvents(state);
+        Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
+                state,
+                originalQuestion,
+                standaloneQuestion,
+                recentMessages,
+                emptyMsg
+        )
+                .doOnNext(assistantAnswer::append)
+                .map(chunk -> ServerSentEvent.<String>builder()
+                        .event("message")
+                        .data(chunk)
+                        .build())
+                .doFinally(signalType -> {
+                    if (signalType == SignalType.ON_COMPLETE && !assistantAnswer.isEmpty()) {
+                        memoryService.appendMessage(
+                                userId,
+                                conversation.getId(),
+                                RagChatRole.ASSISTANT,
+                                assistantAnswer.toString()
+                        );
+                    }
+                });
+        Flux<ServerSentEvent<String>> done = Flux.just(ServerSentEvent.<String>builder()
+                .event("done")
+                .data("{}")
+                .build());
+        // 保留 60s 超时兜底（保护 answer 流式 LLM 卡的情况）+ onError emit error 事件优雅结束。
+        return Flux.concat(meta, agentSteps.map(this::stringEvent), answer, done)
                 .timeout(Duration.ofSeconds(60))
                 .onErrorResume(TimeoutException.class, e ->
                         Flux.just(ServerSentEvent.<String>builder()
@@ -149,14 +148,6 @@ public class RagQueryService {
                                 .data("{\"code\":\"500\",\"message\":\"" + (e.getMessage() == null ? "处理失败" : e.getMessage().replace("\"", "'")) + "\"}")
                                 .build()));
     }
-
-    /** streamChatAnswerFlux 异步化后，把同步阶段产出的中间结果打包传给 flatMapMany。 */
-    private record ChatContext(
-            RagConversation conversation,
-            List<RagMessage> recentMessages,
-            String standaloneQuestion,
-            RagAgentState state
-    ) {}
 
     private Flux<ServerSentEvent<AgentStepEventDTO>> agentStepEvents(RagAgentState state) {
         return Flux.fromIterable(state.steps())
