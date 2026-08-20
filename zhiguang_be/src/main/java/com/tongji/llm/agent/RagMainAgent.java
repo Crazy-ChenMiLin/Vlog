@@ -17,6 +17,7 @@ import com.tongji.llm.external.ExternalKnowledgeProvider;
 import com.tongji.llm.external.ExternalKnowledgeResource;
 import com.tongji.llm.graphService.model.GraphContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -46,6 +47,7 @@ public class RagMainAgent {
     private final RagAgentEdgePolicy edgePolicy;
     private final List<ExternalKnowledgeProvider> externalKnowledgeProviders;
 
+    @Autowired
     public RagMainAgent(
             PlanNode planNode,
             EvidenceCheckNode evidenceCheckNode,
