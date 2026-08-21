@@ -5,6 +5,8 @@ COPY pom.xml .
 RUN mvn -q -DskipTests dependency:go-offline
 
 COPY src ./src
+# Gold 数据集由 pom.xml 映射到 classpath:benchmark，构建镜像时必须一并复制。
+COPY scripts/rag-eval/gold-dataset-v1.json ./scripts/rag-eval/gold-dataset-v1.json
 RUN mvn -q -DskipTests package
 
 FROM eclipse-temurin:21-jre
