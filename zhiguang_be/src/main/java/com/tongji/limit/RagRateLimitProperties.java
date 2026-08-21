@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 /**
  * RAG 限流参数（由 Nacos 的 {@code rag.rate-limit.*} 配置绑定）。
  * <p>
- * 字段不写默认值，仅作占位：运行时由 Nacos 配置中心绑定；配合 {@code @RefreshScope}，
- * 配置变更后热更新。</p>
+ * 运行时可由 Nacos 覆盖；保留安全默认值，避免配置中心漏配时将每用户上限绑定为 0，
+ * 从而拒绝所有问答请求。</p>
  */
 @Component
 @RefreshScope
@@ -16,13 +16,13 @@ import org.springframework.stereotype.Component;
 public class RagRateLimitProperties {
 
     /** ① 全局令牌桶 QPS（分布式共享） */
-    private long globalQps;
+    private long globalQps = 10;
 
     /** ③ 每用户滑动窗口：窗口时长（毫秒） */
-    private long perUserWindowMs;
+    private long perUserWindowMs = 60_000;
 
     /** ③ 每用户滑动窗口：窗口内最大次数 */
-    private int perUserMaxReq;
+    private int perUserMaxReq = 10;
 
     public long getGlobalQps() {
         return globalQps;

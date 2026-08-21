@@ -5,6 +5,11 @@
 # Spring Cloud Alibaba Nacos Config integration is added.
 
 rag:
+  rate-limit:
+    global-qps: 10
+    per-user-window-ms: 60000
+    per-user-max-req: 10
+
   llm:
     default-model: ${RAG_LLM_DEFAULT_MODEL:deepseek-v4-flash-0731}
     planner-model: ${RAG_LLM_PLANNER_MODEL:${rag.llm.default-model}}
