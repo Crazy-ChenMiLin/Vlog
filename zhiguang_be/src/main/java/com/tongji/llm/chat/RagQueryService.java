@@ -15,6 +15,9 @@ import com.tongji.llm.graphService.model.GraphContext;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
 import com.tongji.llm.memoryService.model.RagMessage;
+import com.tongji.llm.observability.assembler.RagRuntimeTranscriptAssembler;
+import com.tongji.llm.observability.model.dto.transcript.RagTranscriptDTO;
+import com.tongji.llm.observability.service.RagTranscriptRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -25,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
@@ -48,25 +52,42 @@ public class RagQueryService {
     private final ObjectMapper objectMapper;
     private final RagLlmProperties ragLlmProperties;
     private final RagPromptService ragPromptService;
+    private final RagTranscriptRecorder transcriptRecorder;
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK) {
         RagAgentState state = ragMainAgent.run("post", postId, question, question, topK);
-        return streamAnswerInternal(state, question, EMPTY_POST_MESSAGE);
+        return recordTranscriptOnComplete("post", state, streamAnswerInternal(state, question, EMPTY_POST_MESSAGE));
     }
 
     public Flux<String> streamPostAnswerFlux(long postId, String question, int topK, String evalRunId) {
         RagAgentState state = ragMainAgent.run("post", postId, question, question, topK, evalRunId);
-        return streamAnswerInternal(state, question, EMPTY_POST_MESSAGE);
+        return recordTranscriptOnComplete("post", state, streamAnswerInternal(state, question, EMPTY_POST_MESSAGE));
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK) {
         RagAgentState state = ragMainAgent.run("global", null, question, question, topK);
-        return streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE);
+        return recordTranscriptOnComplete("global", state, streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE));
     }
 
     public Flux<String> streamGlobalAnswerFlux(String question, int topK, String evalRunId) {
         RagAgentState state = ragMainAgent.run("global", null, question, question, topK, evalRunId);
-        return streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE);
+        return recordTranscriptOnComplete("global", state, streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE));
+    }
+
+    /**
+     * 仅供内部 Benchmark 调用：执行一次全库 RAG，并返回同一次执行的完整 Transcript。
+     *
+     * <p>它不会走 HTTP，也不会重新请求 debug 接口。普通前端仍使用原有的流式方法。
+     */
+    public Mono<RagTranscriptDTO> generateGlobalTranscript(String question, int topK, String evalRunId) {
+        RagAgentState state = ragMainAgent.run("global", null, question, question, topK, evalRunId);
+        return streamAnswerInternal(state, question, EMPTY_GLOBAL_MESSAGE)
+                .reduceWith(StringBuilder::new, StringBuilder::append)
+                .map(answer -> {
+                    String finalAnswer = answer.toString();
+                    transcriptRecorder.recordCompleted("global", state, finalAnswer);
+                    return RagRuntimeTranscriptAssembler.assemble("global", state, finalAnswer);
+                });
     }
 
     public Flux<ServerSentEvent<String>> streamChatAnswerFlux(
@@ -162,6 +183,7 @@ public class RagQueryService {
                                 assistantAnswer.toString()
                         );
                             }
+                            transcriptRecorder.recordCompleted(scope, state, assistantAnswer.toString());
                             emit(sink, cancelled, ServerSentEvent.<String>builder()
                                     .event("done")
                                     .data("{}")
@@ -172,6 +194,18 @@ public class RagQueryService {
         } catch (Exception e) {
             sink.error(e);
         }
+    }
+
+    private Flux<String> recordTranscriptOnComplete(
+            String scope,
+            RagAgentState state,
+            Flux<String> answerStream) {
+        return Flux.defer(() -> {
+            StringBuilder fullAnswer = new StringBuilder();
+            return answerStream
+                    .doOnNext(fullAnswer::append)
+                    .doOnComplete(() -> transcriptRecorder.recordCompleted(scope, state, fullAnswer.toString()));
+        });
     }
 
     private void emit(

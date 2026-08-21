@@ -1,0 +1,682 @@
+[
+  {
+    "id": "gold-001",
+    "question": "RAG 在内部知识库问答中解决什么问题？",
+    "expected_chunk_ids": [
+      "102003327239193266#1"
+    ],
+    "scenario_tags": [
+      "RAG",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】AI大模型 · RAG（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 检索增强生成先取相关文档再作答，缓解幻觉。 在「AI大模型」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-002",
+    "question": "向量数据库在 RAG 系统中承担什么职责？",
+    "expected_chunk_ids": [
+      "102003327239193272#1"
+    ],
+    "scenario_tags": [
+      "RAG",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】AI大模型 · 向量数据库（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 存 Embedding 并做相似检索，是 RAG 的记忆层。 在「AI大模型」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-003",
+    "question": "HyDE 如何帮助 RAG 提升语义召回？",
+    "expected_chunk_ids": [
+      "335239822308413440#1"
+    ],
+    "scenario_tags": [
+      "RAG",
+      "增强检索"
+    ],
+    "evidence": {
+      "title": "RAG 观测样例：HyDE 与 RRF 的职责边界",
+      "section_title": "核心结论",
+      "excerpt": "## 核心结论 HyDE 的作用是把用户问题先生成一段假设性答案，再用这段更完整的文本去做向量检索。它不直接作为最终答案展示给用户，只是帮助系统召回可能相关的知识片段。 RRF 的作用是融合多个检索列表。比如原问题检索得到一组 chunk，HyDE 检索得到另一组 chunk，RRF 会根据每个 chunk 在不同列表中的名次累加分数。一个 chunk 如果在两个列表里都靠前，它通常会排到最终结果前面。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-004",
+    "question": "RRF 如何融合原问题检索与 HyDE 检索的结果？",
+    "expected_chunk_ids": [
+      "335239822308413440#1"
+    ],
+    "scenario_tags": [
+      "RAG",
+      "融合检索"
+    ],
+    "evidence": {
+      "title": "RAG 观测样例：HyDE 与 RRF 的职责边界",
+      "section_title": "核心结论",
+      "excerpt": "## 核心结论 HyDE 的作用是把用户问题先生成一段假设性答案，再用这段更完整的文本去做向量检索。它不直接作为最终答案展示给用户，只是帮助系统召回可能相关的知识片段。 RRF 的作用是融合多个检索列表。比如原问题检索得到一组 chunk，HyDE 检索得到另一组 chunk，RRF 会根据每个 chunk 在不同列表中的名次累加分数。一个 chunk 如果在两个列表里都靠前，它通常会排到最终结果前面。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-005",
+    "question": "Redis 缓存穿透如何防护？",
+    "expected_chunk_ids": [
+      "102003327239192576#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 缓存穿透（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 查询不存在的 key 反复打到数据库，需用布隆过滤器或空值缓存拦截。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-006",
+    "question": "Redis 缓存击穿通常如何处理？",
+    "expected_chunk_ids": [
+      "102003327239192582#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 缓存击穿（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 热点 key 失效瞬间高并发回源，用互斥锁或逻辑过期防护。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-007",
+    "question": "Redis 缓存雪崩可以如何缓解？",
+    "expected_chunk_ids": [
+      "102003327239192588#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 缓存雪崩（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 大量 key 同时过期压垮数据库，靠随机过期与多级缓存缓解。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-008",
+    "question": "布隆过滤器在 Redis 缓存体系中解决什么问题？",
+    "expected_chunk_ids": [
+      "102003327239192600#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 布隆过滤器（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 用位图做存在性判定，是缓存穿透的前置防线，有误判率。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-009",
+    "question": "延迟双删用于降低哪类缓存一致性风险？",
+    "expected_chunk_ids": [
+      "102003327239192606#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 延迟双删（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 写库前后各删一次缓存，降低双写不一致窗口。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-010",
+    "question": "缓存与数据库双写不一致时可以采用什么思路？",
+    "expected_chunk_ids": [
+      "102003327239192594#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 缓存一致性（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 缓存与数据库双写易不一致，常用延迟双删或 Canal 订阅 binlog。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-011",
+    "question": "热点 key 为什么容易引发问题，应如何防护？",
+    "expected_chunk_ids": [
+      "102003327239192612#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "问题-解决方案"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 热点key（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 承载绝大部分流量的 key，失效即击穿，需本地缓存或逻辑过期。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-012",
+    "question": "多级缓存如何减少数据库回源压力？",
+    "expected_chunk_ids": [
+      "102003327239192618#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "架构设计"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 多级缓存（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 本地+分布式+CDN 分层，减少回源并抗突发流量。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-013",
+    "question": "缓存预热解决什么上线或冷启动问题？",
+    "expected_chunk_ids": [
+      "102003327239192624#1"
+    ],
+    "scenario_tags": [
+      "Redis",
+      "架构设计"
+    ],
+    "evidence": {
+      "title": "【知光精选】Redis缓存 · 缓存预热（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 上线前把热点数据提前加载进缓存，避免冷启动击穿。 在「Redis缓存」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-014",
+    "question": "为什么 InnoDB 常用 B+Tree 作为索引结构？",
+    "expected_chunk_ids": [
+      "102003327239192630#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · B+Tree索引（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 多路平衡树降低树高、减少 IO，是 InnoDB 的默认索引结构。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-015",
+    "question": "MySQL 的 MVCC 如何支持快照读？",
+    "expected_chunk_ids": [
+      "102003327239192642#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · MVCC（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 多版本并发控制通过 undo log 与隐藏事务 id 实现快照读。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-016",
+    "question": "MySQL 的事务隔离级别在解决什么问题？",
+    "expected_chunk_ids": [
+      "102003327239192636#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 事务隔离级别（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 读未提交到串行化，权衡一致性与并发，常用可重复读。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-017",
+    "question": "慢查询优化时为什么要先看 EXPLAIN 执行计划？",
+    "expected_chunk_ids": [
+      "102003327239192648#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 慢查询优化（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 用 EXPLAIN 看执行计划，重点优化全表扫描与临时表。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-018",
+    "question": "联合索引为什么要遵循最左前缀原则？",
+    "expected_chunk_ids": [
+      "102003327239192654#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 联合索引（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 最左前缀原则决定命中，区分度高的列放前面。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-019",
+    "question": "覆盖索引为什么可以减少回表？",
+    "expected_chunk_ids": [
+      "102003327239192660#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 覆盖索引（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 查询字段都在索引里可避免回表，显著提升性能。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-020",
+    "question": "MySQL 主从复制在系统中主要解决什么问题？",
+    "expected_chunk_ids": [
+      "102003327239192666#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "架构设计"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 主从复制（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 基于 binlog 异步同步，用于读写分离与容灾。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-021",
+    "question": "单表数据量过大时为什么要考虑分库分表？",
+    "expected_chunk_ids": [
+      "102003327239192672#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "架构设计"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 分库分表（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 单表过大时按规则拆分，缓解写入与存储瓶颈。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-022",
+    "question": "MySQL 死锁排查为什么要关注循环等待与加锁顺序？",
+    "expected_chunk_ids": [
+      "102003327239192678#1"
+    ],
+    "scenario_tags": [
+      "MySQL",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】MySQL数据库 · 死锁排查（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 通过 InnoDB 死锁日志定位循环等待，调整加锁顺序。 在「MySQL数据库」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-023",
+    "question": "Kafka 消费者组如何实现水平扩展与容错？",
+    "expected_chunk_ids": [
+      "102003327239192684#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 消费者组（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 同组消费者分摊分区，实现水平扩展与容错。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-024",
+    "question": "Kafka 如何保证同一业务 key 的消息顺序？",
+    "expected_chunk_ids": [
+      "102003327239192690#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 分区顺序（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 单分区内有序，跨分区不保证，需按 key 路由保序。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-025",
+    "question": "Kafka 幂等生产者解决什么重复写入问题？",
+    "expected_chunk_ids": [
+      "102003327239192696#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "可靠性"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 幂等生产者（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 启用幂等避免网络重试导致的消息重复。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-026",
+    "question": "Kafka 事务消息为什么能帮助保证跨系统一致性？",
+    "expected_chunk_ids": [
+      "102003327239192702#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "可靠性"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 事务消息（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 保证本地事务与消息发送的原子性，用于跨系统一致。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-027",
+    "question": "Kafka 死信队列适合处理哪类消息？",
+    "expected_chunk_ids": [
+      "102003327239192708#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 死信队列（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 消费多次失败的消息转入死信，便于人工兜底。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-028",
+    "question": "Kafka 消费者再均衡会带来什么影响？",
+    "expected_chunk_ids": [
+      "102003327239192714#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 再均衡（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 消费者增减触发分区重分配，期间会短暂停止消费。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-029",
+    "question": "消息队列如何帮助系统削峰填谷？",
+    "expected_chunk_ids": [
+      "102003327239192720#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "架构设计"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 削峰填谷（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 用队列缓冲突发流量，保护下游不被打垮。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-030",
+    "question": "Kafka 出现消息积压时通常从什么方向处理？",
+    "expected_chunk_ids": [
+      "102003327239192726#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 消息积压（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 消费慢导致堆积，需扩容消费者或提升处理吞吐。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-031",
+    "question": "Kafka 的 Exactly-Once 语义依赖哪些能力？",
+    "expected_chunk_ids": [
+      "102003327239192732#1"
+    ],
+    "scenario_tags": [
+      "Kafka",
+      "可靠性"
+    ],
+    "evidence": {
+      "title": "【知光精选】消息队列Kafka · 精确一次（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 幂等+事务实现端到端 Exactly-Once 语义。 在「消息队列Kafka」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-032",
+    "question": "Spring Boot 自动配置如何减少样板配置？",
+    "expected_chunk_ids": [
+      "102003327239192738#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 自动配置（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 基于 classpath 与条件注解按需装配 Bean，减少样板配置。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-033",
+    "question": "Spring Bean 生命周期为什么有助于排查注入与初始化问题？",
+    "expected_chunk_ids": [
+      "102003327239192744#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · Bean生命周期（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 从实例化到销毁经历多种回调，理解它有助于排错。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-034",
+    "question": "Spring 事务传播行为决定了什么？",
+    "expected_chunk_ids": [
+      "102003327239192750#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 事务传播（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 多个方法嵌套调用时，传播行为决定事务如何复用或新建。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-035",
+    "question": "Spring AOP 适合统一处理哪些横切关注点？",
+    "expected_chunk_ids": [
+      "102003327239192756#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "概念单跳"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · AOP（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 面向切面编程统一处理日志、鉴权、事务等横切关注点。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-036",
+    "question": "全局异常处理在 Spring Boot 中解决什么问题？",
+    "expected_chunk_ids": [
+      "102003327239192762#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "工程实践"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 异常处理（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 @ControllerAdvice 全局捕获异常，返回统一错误结构。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-037",
+    "question": "为什么要在接口入口做参数校验？",
+    "expected_chunk_ids": [
+      "102003327239192768#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "工程实践"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 参数校验（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 用 JSR-303 注解在入口校验，减少业务层判空。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-038",
+    "question": "@ConfigurationProperties 如何提升配置管理的可靠性？",
+    "expected_chunk_ids": [
+      "102003327239192774#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "工程实践"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 配置绑定（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 @ConfigurationProperties 把配置映射成类型安全对象。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-039",
+    "question": "Spring Boot 启动慢时可以从哪些配置方向优化？",
+    "expected_chunk_ids": [
+      "102003327239192780#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "问题-排查"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 启动优化（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 排除无用自动配置、懒加载可缩短 SpringBoot 启动时间。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  },
+  {
+    "id": "gold-040",
+    "question": "Spring Boot 优雅停机为什么要等待在途请求完成？",
+    "expected_chunk_ids": [
+      "102003327239192786#1"
+    ],
+    "scenario_tags": [
+      "Spring Boot",
+      "工程实践"
+    ],
+    "evidence": {
+      "title": "【知光精选】SpringBoot · 优雅停机（概念解析）",
+      "section_title": "背景",
+      "excerpt": "## 背景 关闭时先停止接收新请求并等待在途请求完成。 在「SpringBoot」领域里是被高频检索与讨论的知识点，也是知光社区沉淀实践经验的重点方向。"
+    },
+    "status": "approved"
+  }
+]

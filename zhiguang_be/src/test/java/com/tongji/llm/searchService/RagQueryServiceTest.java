@@ -13,6 +13,7 @@ import com.tongji.llm.config.RagPromptService;
 import com.tongji.llm.enhanceService.QueryRewriteService;
 import com.tongji.llm.memoryService.RagConversationMemoryService;
 import com.tongji.llm.memoryService.model.RagConversation;
+import com.tongji.llm.observability.service.RagTranscriptRecorder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -48,6 +49,8 @@ class RagQueryServiceTest {
     private RagConversationMemoryService memoryService;
     @Mock
     private QueryRewriteService queryRewriteService;
+    @Mock
+    private RagTranscriptRecorder transcriptRecorder;
     @Mock
     private ChatClient.ChatClientRequestSpec requestSpec;
     @Mock
@@ -173,12 +176,49 @@ class RagQueryServiceTest {
         verifyNoInteractions(chatClient);
     }
 
+    @Test
+    void globalAnswerRecordsTranscriptAfterTheSameAnswerStreamCompletes() {
+        RagAgentState state = state("问题", 5, List.of());
+        state.finalAnswer("真实回答");
+        when(ragMainAgent.run("global", null, "问题", "问题", 5)).thenReturn(state);
+        RagQueryService service = createService();
+
+        List<String> result = service.streamGlobalAnswerFlux("问题", 5).collectList().block();
+
+        assertThat(result).containsExactly("真实回答");
+        verify(transcriptRecorder).recordCompleted("global", state, "真实回答");
+    }
+
+    @Test
+    void internalBenchmarkMethodReturnsTranscriptFromTheSameAgentState() {
+        RagAgentState state = state("问题", 5, List.of());
+        state.finalAnswer("真实回答");
+        when(ragMainAgent.run("global", null, "问题", "问题", 5, "run-001")).thenReturn(state);
+        RagQueryService service = createService();
+
+        var transcript = service.generateGlobalTranscript("问题", 5, "run-001").block();
+
+        assertThat(transcript.traceId()).isEqualTo(state.traceId());
+        assertThat(transcript.finalAnswer()).isEqualTo("真实回答");
+        assertThat(transcript.evaluation()).isNull();
+        verify(transcriptRecorder).recordCompleted("global", state, "真实回答");
+    }
+
     private RagQueryService createService() {
         return createService(mock(RagPromptService.class));
     }
 
     private RagQueryService createService(RagPromptService promptService) {
-        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper, ragLlmProperties(), promptService);
+        return new RagQueryService(
+                chatClient,
+                ragMainAgent,
+                memoryService,
+                queryRewriteService,
+                objectMapper,
+                ragLlmProperties(),
+                promptService,
+                transcriptRecorder
+        );
     }
 
     private RagAgentState state(String question, int topK, List<Document> answerDocs) {
