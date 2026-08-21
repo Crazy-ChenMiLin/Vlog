@@ -28,6 +28,7 @@ const GlobalRagChat = () => {
   const activeTurnIdRef = useRef<string | null>(null);
   const { answer, agentSteps, loading, error, start, stop } = useRagStream();
   const { tokens } = useAuth();
+  const activeStep = agentSteps[agentSteps.length - 1];
 
   useEffect(() => {
     const viewport = answerViewportRef.current;
@@ -140,7 +141,7 @@ const GlobalRagChat = () => {
             </div>
 
             <div className={styles.headerControls}>
-              {loading ? <span className={styles.status}><i />正在生成</span> : null}
+              {loading ? <span className={styles.status}><i />{activeStep ? `正在${activeStep.title}` : "正在准备问答"}</span> : null}
               <button
                 type="button"
                 className={styles.windowButton}

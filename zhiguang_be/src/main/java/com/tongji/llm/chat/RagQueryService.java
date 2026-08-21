@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.llm.agent.RagMainAgent;
 import com.tongji.llm.agent.state.RagAgentState;
+import com.tongji.llm.agent.state.RagAgentStepTrace;
 import com.tongji.llm.chat.dto.AgentStepEventDTO;
 import com.tongji.llm.chat.model.RagChatRole;
 import com.tongji.llm.chat.model.RagChatScope;
@@ -23,12 +24,12 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
+import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeoutException;
 
 @Service
@@ -75,12 +76,44 @@ public class RagQueryService {
             Long postId,
             String originalQuestion,
             int topK) {
-        // 临时诊断日志：定位 streamChatAnswerFlux 同步链慢在哪一步（确认后可删或留作观测性）。
-        // 上一版用 Mono.fromCallable + subscribeOn(boundedElastic) 异步化，但实际运行时 lambda 根本没执行
-        // （commit dfe1fe5 诊断证实 [1/6] 一条都没输出），Spring MVC 异步处理后 Mono 没被订阅到 lambda 层。
-        // 回退同步版本——和 GET /qa/stream 一样会阻塞 Tomcat exec ~13 秒，但已证明 work，不阻塞并发（Tomcat 默认 200 exec 线程）。
+        return Flux.<ServerSentEvent<String>>create(sink -> {
+                    AtomicBoolean cancelled = new AtomicBoolean(false);
+                    sink.onCancel(() -> cancelled.set(true));
+                    Schedulers.boundedElastic().schedule(() -> produceChatStream(
+                            sink,
+                            cancelled,
+                            userId,
+                            conversationId,
+                            scope,
+                            postId,
+                            originalQuestion,
+                            topK
+                    ));
+                })
+                // With the initial Flux returned immediately, this protects each silent gap in the workflow.
+                .timeout(Duration.ofSeconds(60))
+                .onErrorResume(TimeoutException.class, e ->
+                        Flux.just(errorEvent("408", "请求超时，请重试")))
+                .onErrorResume(e ->
+                        Flux.just(errorEvent("500", e.getMessage() == null ? "处理失败" : e.getMessage().replace("\"", "'"))));
+    }
+
+    private void produceChatStream(
+            FluxSink<ServerSentEvent<String>> sink,
+            AtomicBoolean cancelled,
+            long userId,
+            Long conversationId,
+            String scope,
+            Long postId,
+            String originalQuestion,
+            int topK) {
+        try {
         log.info("streamChat [1/6] resolveConversation start, userId={}, conversationId={}", userId, conversationId);
         RagConversation conversation = memoryService.resolveConversation(conversationId, userId, scope, postId);
+        emit(sink, cancelled, ServerSentEvent.<String>builder()
+                .event("meta")
+                .data("{\"conversationId\":\"" + conversation.getId() + "\"}")
+                .build());
         log.info("streamChat [2/6] loadRecentMessages start, conversationId={}", conversation.getId());
         List<RagMessage> recentMessages = memoryService.loadRecentMessages(
                 userId,
@@ -95,73 +128,72 @@ public class RagQueryService {
                 postId,
                 originalQuestion,
                 standaloneQuestion,
-                topK
+                topK,
+                null,
+                (agentState, step) -> emit(sink, cancelled, agentStepEvent(agentState, step))
         );
         log.info("streamChat [5/6] appendMessage start, state.steps={}", state.steps() == null ? 0 : state.steps().size());
         memoryService.appendMessage(userId, conversation.getId(), RagChatRole.USER, originalQuestion);
-        log.info("streamChat [6/6] SSE Flux constructed, ready to emit");
-
+        log.info("streamChat [6/6] answer stream subscribed");
         StringBuilder assistantAnswer = new StringBuilder();
         String emptyMsg = emptyResultMessage(scope);
-        Flux<ServerSentEvent<String>> meta = Flux.just(ServerSentEvent.<String>builder()
-                .event("meta")
-                .data("{\"conversationId\":\"" + conversation.getId() + "\"}")
-                .build());
-        Flux<ServerSentEvent<AgentStepEventDTO>> agentSteps = agentStepEvents(state);
-        Flux<ServerSentEvent<String>> answer = streamAnswerInternal(
+        streamAnswerInternal(
                 state,
                 originalQuestion,
                 standaloneQuestion,
                 recentMessages,
                 emptyMsg
         )
-                .doOnNext(assistantAnswer::append)
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data(chunk)
-                        .build())
-                .doFinally(signalType -> {
-                    if (signalType == SignalType.ON_COMPLETE && !assistantAnswer.isEmpty()) {
+                .subscribe(
+                        chunk -> {
+                            assistantAnswer.append(chunk);
+                            emit(sink, cancelled, ServerSentEvent.<String>builder()
+                                    .event("message")
+                                    .data(chunk)
+                                    .build());
+                        },
+                        sink::error,
+                        () -> {
+                            if (!assistantAnswer.isEmpty()) {
                         memoryService.appendMessage(
                                 userId,
                                 conversation.getId(),
                                 RagChatRole.ASSISTANT,
                                 assistantAnswer.toString()
                         );
-                    }
-                });
-        Flux<ServerSentEvent<String>> done = Flux.just(ServerSentEvent.<String>builder()
-                .event("done")
-                .data("{}")
-                .build());
-        // 保留 60s 超时兜底（保护 answer 流式 LLM 卡的情况）+ onError emit error 事件优雅结束。
-        return Flux.concat(meta, agentSteps.map(this::stringEvent), answer, done)
-                .timeout(Duration.ofSeconds(60))
-                .onErrorResume(TimeoutException.class, e ->
-                        Flux.just(ServerSentEvent.<String>builder()
-                                .event("error")
-                                .data("{\"code\":\"408\",\"message\":\"请求超时，请重试\"}")
-                                .build()))
-                .onErrorResume(e ->
-                        Flux.just(ServerSentEvent.<String>builder()
-                                .event("error")
-                                .data("{\"code\":\"500\",\"message\":\"" + (e.getMessage() == null ? "处理失败" : e.getMessage().replace("\"", "'")) + "\"}")
-                                .build()));
+                            }
+                            emit(sink, cancelled, ServerSentEvent.<String>builder()
+                                    .event("done")
+                                    .data("{}")
+                                    .build());
+                            sink.complete();
+                        }
+                );
+        } catch (Exception e) {
+            sink.error(e);
+        }
     }
 
-    private Flux<ServerSentEvent<AgentStepEventDTO>> agentStepEvents(RagAgentState state) {
-        return Flux.fromIterable(state.steps())
-                .map(step -> ServerSentEvent.<AgentStepEventDTO>builder()
-                        .event("agent_step")
-                        .data(AgentStepEventDTO.from(state.traceId(), step))
-                        .build());
+    private void emit(
+            FluxSink<ServerSentEvent<String>> sink,
+            AtomicBoolean cancelled,
+            ServerSentEvent<String> event) {
+        if (!cancelled.get()) {
+            sink.next(event);
+        }
     }
 
-    private ServerSentEvent<String> stringEvent(ServerSentEvent<AgentStepEventDTO> event) {
-        AgentStepEventDTO data = event.data();
+    private ServerSentEvent<String> agentStepEvent(RagAgentState state, RagAgentStepTrace step) {
         return ServerSentEvent.<String>builder()
-                .event(event.event())
-                .data(toJson(data))
+                .event("agent_step")
+                .data(toJson(AgentStepEventDTO.from(state.traceId(), step)))
+                .build();
+    }
+
+    private ServerSentEvent<String> errorEvent(String code, String message) {
+        return ServerSentEvent.<String>builder()
+                .event("error")
+                .data("{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}")
                 .build();
     }
 

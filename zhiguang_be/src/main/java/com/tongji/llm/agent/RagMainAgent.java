@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,8 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 @Slf4j
 @Service
 public class RagMainAgent {
+    private static final BiConsumer<RagAgentState, RagAgentStepTrace> NO_OP_STEP_LISTENER = (state, step) -> { };
+
     private final PlanNode planNode;
     private final EvidenceCheckNode evidenceCheckNode;
     private final GraphTraceNode graphTraceNode;
@@ -84,38 +87,55 @@ public class RagMainAgent {
     }
 
     public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK) {
-        return run(scope, postId, originalQuestion, standaloneQuestion, topK, null);
+        return run(scope, postId, originalQuestion, standaloneQuestion, topK, null, NO_OP_STEP_LISTENER);
     }
 
     public RagAgentState run(String scope, Long postId, String originalQuestion, String standaloneQuestion, int topK, String evalRunId) {
+        return run(scope, postId, originalQuestion, standaloneQuestion, topK, evalRunId, NO_OP_STEP_LISTENER);
+    }
+
+    /**
+     * Runs the agent and invokes {@code stepListener} immediately after each node records its step.
+     * This keeps the synchronous state model while allowing an SSE caller to surface real-time progress.
+     */
+    public RagAgentState run(
+            String scope,
+            Long postId,
+            String originalQuestion,
+            String standaloneQuestion,
+            int topK,
+            String evalRunId,
+            BiConsumer<RagAgentState, RagAgentStepTrace> stepListener) {
+        BiConsumer<RagAgentState, RagAgentStepTrace> effectiveStepListener =
+                stepListener == null ? NO_OP_STEP_LISTENER : stepListener;
         String effectiveQuestion = StringUtils.hasText(standaloneQuestion) ? standaloneQuestion.trim() : originalQuestion;
         RagAgentState state = new RagAgentState(originalQuestion, effectiveQuestion, topK);
         state.evalRunId(evalRunId);
 
-        RagAgentPlan plan = timed(state, "plan", "PLANNER", () -> planNode.execute(state));
-        recordStep(state, new RagAgentStepTrace("plan_result", plan.retrievalMode().name(), true, 0, plan.reason()));
+        RagAgentPlan plan = timed(state, effectiveStepListener, "plan", "PLANNER", () -> planNode.execute(state));
+        recordStep(state, effectiveStepListener, new RagAgentStepTrace("plan_result", plan.retrievalMode().name(), true, 0, plan.reason()));
 
         if (edgePolicy.shouldDirectAnswer(plan)) {
-            directAnswer(state);
+            directAnswer(state, effectiveStepListener);
             return state;
         }
 
         try {
             if (edgePolicy.shouldQueryGraph(plan)) {
-                queryGraphTrace(state);
+                queryGraphTrace(state, effectiveStepListener);
             }
 
-            executeRetrievalRound(state, scope, postId);
-            EvidenceResult evidence = checkEvidence(state);
+            executeRetrievalRound(state, effectiveStepListener, scope, postId);
+            EvidenceResult evidence = checkEvidence(state, effectiveStepListener);
 
             if (edgePolicy.shouldExpandTopK(state, evidence)) {
                 String retrySummary = expandTopKNode.execute(state);
-                recordStep(state, new RagAgentStepTrace("retry", "EXPAND_TOP_K", true, 0, retrySummary));
-                executeRetrievalRound(state, scope, postId);
-                checkEvidence(state);
+                recordStep(state, effectiveStepListener, new RagAgentStepTrace("retry", "EXPAND_TOP_K", true, 0, retrySummary));
+                executeRetrievalRound(state, effectiveStepListener, scope, postId);
+                checkEvidence(state, effectiveStepListener);
             }
 
-            discoverExternalLinksWhenNeeded(state);
+            discoverExternalLinksWhenNeeded(state, effectiveStepListener);
 
             logAgentCompleted(state);
             return state;
@@ -125,13 +145,13 @@ public class RagMainAgent {
         }
     }
 
-    private void directAnswer(RagAgentState state) {
-        timed(state, "direct_answer", "LLM_DIRECT", () -> directAnswerNode.execute(state));
+    private void directAnswer(RagAgentState state, BiConsumer<RagAgentState, RagAgentStepTrace> stepListener) {
+        timed(state, stepListener, "direct_answer", "LLM_DIRECT", () -> directAnswerNode.execute(state));
     }
 
-    private void queryGraphTrace(RagAgentState state) {
-        GraphContext graphContext = timed(state, "graph_trace", "QUERY_NEO4J", () -> graphTraceNode.execute(state));
-        recordStep(state, new RagAgentStepTrace(
+    private void queryGraphTrace(RagAgentState state, BiConsumer<RagAgentState, RagAgentStepTrace> stepListener) {
+        GraphContext graphContext = timed(state, stepListener, "graph_trace", "QUERY_NEO4J", () -> graphTraceNode.execute(state));
+        recordStep(state, stepListener, new RagAgentStepTrace(
                 "graph_trace_result",
                 graphContext.isEmpty() ? "GRAPH_MISS" : "GRAPH_HIT",
                 true,
@@ -140,24 +160,30 @@ public class RagMainAgent {
         ));
     }
 
-    private void executeRetrievalRound(RagAgentState state, String scope, Long postId) {
-        timed(state, "retrieve", "TOP" + state.currentTopK(), () -> retrieveNode.execute(state, scope, postId));
+    private void executeRetrievalRound(
+            RagAgentState state,
+            BiConsumer<RagAgentState, RagAgentStepTrace> stepListener,
+            String scope,
+            Long postId) {
+        timed(state, stepListener, "retrieve", "TOP" + state.currentTopK(), () -> retrieveNode.execute(state, scope, postId));
         if (edgePolicy.shouldRerank(state)) {
-            timed(state, "rerank", "TOP" + state.currentTopK(), () -> rerankNode.execute(state));
+            timed(state, stepListener, "rerank", "TOP" + state.currentTopK(), () -> rerankNode.execute(state));
         } else {
             rerankNode.skip(state);
         }
     }
 
-    private EvidenceResult checkEvidence(RagAgentState state) {
-        return timed(state, "evidence_check", "CHECK_TOP" + state.currentTopK(), () -> evidenceCheckNode.execute(state));
+    private EvidenceResult checkEvidence(RagAgentState state, BiConsumer<RagAgentState, RagAgentStepTrace> stepListener) {
+        return timed(state, stepListener, "evidence_check", "CHECK_TOP" + state.currentTopK(), () -> evidenceCheckNode.execute(state));
     }
 
     /**
      * Link-only MVP fallback. The provider receives the question, but no external
      * document text is ever inserted into the LLM context or the local vector store.
      */
-    private void discoverExternalLinksWhenNeeded(RagAgentState state) {
+    private void discoverExternalLinksWhenNeeded(
+            RagAgentState state,
+            BiConsumer<RagAgentState, RagAgentStepTrace> stepListener) {
         EvidenceResult evidence = state.evidenceResult();
         if (evidence == null || evidence.sufficient() || externalKnowledgeProviders.isEmpty()) {
             return;
@@ -167,7 +193,7 @@ public class RagMainAgent {
                 .flatMap(provider -> provider.findResources(state.standaloneQuestion(), 3).stream())
                 .limit(3)
                 .toList();
-        recordStep(state, new RagAgentStepTrace(
+        recordStep(state, stepListener, new RagAgentStepTrace(
                 "external_knowledge",
                 "OFFICIAL_LINK_FALLBACK",
                 true,
@@ -188,19 +214,27 @@ public class RagMainAgent {
                 + "\n\n> 此处仅推荐外部官方资料，未将外部内容写入站内知识库，也未由 AI 基于外部正文生成回答。";
     }
 
-    private <T> T timed(RagAgentState state, String stepName, String decision, Supplier<T> supplier) {
+    private <T> T timed(
+            RagAgentState state,
+            BiConsumer<RagAgentState, RagAgentStepTrace> stepListener,
+            String stepName,
+            String decision,
+            Supplier<T> supplier) {
         long started = System.nanoTime();
         try {
             T result = supplier.get();
-            recordStep(state, new RagAgentStepTrace(stepName, decision, true, elapsedMs(started), summary(result)));
+            recordStep(state, stepListener, new RagAgentStepTrace(stepName, decision, true, elapsedMs(started), summary(result)));
             return result;
         } catch (Exception e) {
-            recordStep(state, new RagAgentStepTrace(stepName, decision, false, elapsedMs(started), e.getMessage()));
+            recordStep(state, stepListener, new RagAgentStepTrace(stepName, decision, false, elapsedMs(started), e.getMessage()));
             throw e;
         }
     }
 
-    private void recordStep(RagAgentState state, RagAgentStepTrace step) {
+    private void recordStep(
+            RagAgentState state,
+            BiConsumer<RagAgentState, RagAgentStepTrace> stepListener,
+            RagAgentStepTrace step) {
         state.addStep(step);
         log.info("rag_agent_step",
                 kv("event_type", "rag_agent_step"),
@@ -212,6 +246,13 @@ public class RagMainAgent {
                 kv("success", step.success()),
                 kv("cost_ms", step.costMs()),
                 kv("summary", step.summary()));
+        try {
+            stepListener.accept(state, step);
+        } catch (RuntimeException listenerError) {
+            log.warn("rag_agent_step_listener_failed", listenerError,
+                    kv("trace_id", state.traceId()),
+                    kv("step_name", step.stepName()));
+        }
     }
 
     private void logAgentCompleted(RagAgentState state) {

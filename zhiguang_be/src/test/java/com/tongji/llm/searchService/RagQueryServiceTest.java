@@ -22,12 +22,15 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import reactor.core.publisher.Flux;
 
+import java.util.function.BiConsumer;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -104,7 +107,9 @@ class RagQueryServiceTest {
         when(requestSpec.options(any(OpenAiChatOptions.class))).thenReturn(requestSpec);
         when(requestSpec.stream()).thenReturn(streamResponseSpec);
         when(streamResponseSpec.content()).thenReturn(Flux.just("回答"));
-        RagQueryService service = createService();
+        RagPromptService promptService = mock(RagPromptService.class);
+        when(promptService.getSystemPrompt(anyString())).thenReturn("system prompt");
+        RagQueryService service = createService(promptService);
 
         assertThat(service.streamGlobalAnswerFlux("问题", 5).collectList().block())
                 .containsExactly("回答");
@@ -128,7 +133,14 @@ class RagQueryServiceTest {
         RagAgentState state = state("改写问题", 5, List.of());
         state.addStep(new RagAgentStepTrace("plan", "PLANNER", true, 12, "NORMAL_QA/HYBRID"));
         state.finalAnswer("直接回答");
-        when(ragMainAgent.run("global", null, "原问题", "改写问题", 5)).thenReturn(state);
+        when(ragMainAgent.run(
+                eq("global"), isNull(), eq("原问题"), eq("改写问题"), eq(5), isNull(), any()
+        )).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            BiConsumer<RagAgentState, RagAgentStepTrace> stepListener = invocation.getArgument(6);
+            state.steps().forEach(step -> stepListener.accept(state, step));
+            return state;
+        });
 
         RagQueryService service = createService();
         List<String> events = service.streamChatAnswerFlux(7L, 1L, "global", null, "原问题", 5)
@@ -162,7 +174,11 @@ class RagQueryServiceTest {
     }
 
     private RagQueryService createService() {
-        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper, ragLlmProperties(), mock(RagPromptService.class));
+        return createService(mock(RagPromptService.class));
+    }
+
+    private RagQueryService createService(RagPromptService promptService) {
+        return new RagQueryService(chatClient, ragMainAgent, memoryService, queryRewriteService, objectMapper, ragLlmProperties(), promptService);
     }
 
     private RagAgentState state(String question, int topK, List<Document> answerDocs) {

@@ -299,6 +299,7 @@
   grid-template-columns: 10px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
+  animation: agentStepIn 220ms ease-out;
 }
 
 .agentStepDot,
@@ -588,6 +589,11 @@
   30% { opacity: 1; transform: translateY(-3px); }
 }
 
+@keyframes agentStepIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 720px) {
   .dock {
     right: 16px;
@@ -633,6 +639,10 @@
     .panel,
     .status i,
     .thinking span {
+        animation: none;
+    }
+
+    .agentStep {
         animation: none;
     }
 

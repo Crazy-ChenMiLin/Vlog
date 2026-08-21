@@ -35,6 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -98,7 +99,16 @@ class RagMainAgentTest {
                 .thenReturn(EvidenceResult.sufficient("足够"));
 
         RagMainAgent agent = createAgent();
-        RagAgentState state = agent.run("global", null, "缓存命中和缓存击穿有什么区别", "缓存命中和缓存击穿有什么区别", 5);
+        List<String> deliveredStepNames = new ArrayList<>();
+        RagAgentState state = agent.run(
+                "global",
+                null,
+                "缓存命中和缓存击穿有什么区别",
+                "缓存命中和缓存击穿有什么区别",
+                5,
+                null,
+                (ignoredState, step) -> deliveredStepNames.add(step.stepName())
+        );
 
         assertThat(state.retryCount()).isEqualTo(1);
         assertThat(state.currentTopK()).isEqualTo(10);
@@ -106,6 +116,9 @@ class RagMainAgentTest {
         assertThat(state.evidenceResult().sufficient()).isTrue();
         assertThat(state.steps()).extracting("stepName")
                 .contains("plan", "graph_trace", "retrieve", "evidence_check", "retry", "rerank");
+        assertThat(deliveredStepNames).containsExactlyElementsOf(
+                state.steps().stream().map(step -> step.stepName()).toList()
+        );
 
         InOrder inOrder = inOrder(graphService, retrievalService);
         inOrder.verify(graphService).build("缓存命中和缓存击穿有什么区别");
