@@ -5,6 +5,10 @@ CONFIG_FILE="${1:-}"
 DATA_ID="${NACOS_DATA_ID:-zhiguang-runtime.yaml}"
 GROUP="${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}"
 SERVER_ADDR="${NACOS_SERVER_ADDR:-}"
+# Nacos's built-in public namespace has an empty namespace ID. Do not send the
+# display name "public", otherwise the producer and the application can target
+# different namespaces.
+NAMESPACE_ID="${NACOS_NAMESPACE:-}"
 
 require_env_value() {
   local key="$1"
@@ -47,7 +51,7 @@ echo "Publishing $DATA_ID to Nacos group $GROUP"
 PUBLISH_RESPONSE="$(curl --fail --silent --show-error \
   --request POST "$SERVER_ADDR/nacos/v3/admin/cs/config" \
   --header "accessToken: $ACCESS_TOKEN" \
-  --data-urlencode "namespaceId=${NACOS_NAMESPACE:-public}" \
+  --data-urlencode "namespaceId=$NAMESPACE_ID" \
   --data-urlencode "dataId=$DATA_ID" \
   --data-urlencode "groupName=$GROUP" \
   --data-urlencode "type=yaml" \

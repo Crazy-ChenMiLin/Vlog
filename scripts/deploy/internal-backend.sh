@@ -91,7 +91,7 @@ require_env_value "NACOS_USERNAME" "${NACOS_USERNAME:-}"
 require_env_value "NACOS_PASSWORD" "${NACOS_PASSWORD:-}"
 # The import query is authoritative here. If group is omitted, Spring Cloud
 # Nacos falls back to DEFAULT_GROUP even when NACOS_CONFIG_GROUP is exported.
-update_env_value "$RUNTIME/.env" "SPRING_CONFIG_IMPORT" "${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?group=${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}&refreshEnabled=true}"
+update_env_value "$RUNTIME/.env" "SPRING_CONFIG_IMPORT" "${SPRING_CONFIG_IMPORT:-nacos:zhiguang-runtime.yaml?group=${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}&refreshEnabled=true}"
 update_env_value "$RUNTIME/.env" "NACOS_SERVER_ADDR" "$NACOS_SERVER_ADDR"
 update_env_value "$RUNTIME/.env" "NACOS_USERNAME" "$NACOS_USERNAME"
 update_env_value "$RUNTIME/.env" "NACOS_PASSWORD" "$NACOS_PASSWORD"
@@ -138,7 +138,7 @@ services:
       OSS_BUCKET: \${OSS_BUCKET}
       # The runtime compose file is intentionally stable; explicitly forward
       # Nacos bootstrap settings so a later code deployment cannot drop them.
-      SPRING_CONFIG_IMPORT: \${SPRING_CONFIG_IMPORT:-optional:nacos:zhiguang-runtime.yaml?group=ZHIGUANG_GROUP&refreshEnabled=true}
+      SPRING_CONFIG_IMPORT: \${SPRING_CONFIG_IMPORT:-nacos:zhiguang-runtime.yaml?group=ZHIGUANG_GROUP&refreshEnabled=true}
       SPRING_CLOUD_NACOS_SERVER_ADDR: \${NACOS_SERVER_ADDR}
       SPRING_CLOUD_NACOS_USERNAME: \${NACOS_USERNAME}
       SPRING_CLOUD_NACOS_PASSWORD: \${NACOS_PASSWORD}

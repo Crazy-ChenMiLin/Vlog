@@ -1,5 +1,6 @@
 package com.tongji.limit;
 
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RSemaphore;
 import org.redisson.api.RateIntervalUnit;
@@ -26,6 +27,7 @@ import java.util.UUID;
  */
 @Component
 @RefreshScope
+@Slf4j
 public class AiRateLimiter {
 
     private final RedissonClient redisson;
@@ -70,8 +72,14 @@ public class AiRateLimiter {
      */
     @PostConstruct
     public void init() {
-        globalLimiter.trySetRate(RateType.OVERALL, properties.getGlobalQps(), 1, RateIntervalUnit.SECONDS);
+        // setRate intentionally replaces a previous Redis value. trySetRate
+        // would leave an old value in place after a Nacos refresh.
+        globalLimiter.setRate(RateType.OVERALL, properties.getGlobalQps(), 1, RateIntervalUnit.SECONDS);
         streamSem.trySetPermits(80);
+        log.info("rag_rate_limit_config_applied globalQps={}, perUserWindowMs={}, perUserMaxReq={}",
+                properties.getGlobalQps(),
+                properties.getPerUserWindowMs(),
+                properties.getPerUserMaxReq());
     }
 
     /**
