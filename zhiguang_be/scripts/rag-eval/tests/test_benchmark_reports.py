@@ -1,0 +1,149 @@
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parents[2] / "AUTO_Benchwork"
+sys.path.insert(0, str(SCRIPT_DIR))
+
+import judge  # noqa: E402
+import report_generator  # noqa: E402
+
+
+def transcript(case_id: str, status: str, original_hit: bool, original_ranks: list[int]) -> dict[str, object]:
+    return {
+        "traceId": f"trace-{case_id}",
+        "status": status,
+        "finalAnswer": "answer" if status == "COMPLETED" else None,
+        "evaluation": {
+            "runId": "ci-run-001",
+            "caseId": case_id,
+            "expectedChunkIds": ["chunk-1"],
+        },
+        "stages": [
+            {
+                "stage": "ORIGINAL",
+                "candidates": [{"id": "chunk-1"}],
+                "goldHit": original_hit,
+                "goldRanks": original_ranks,
+            },
+            {
+                "stage": "RERANKED",
+                "candidates": [{"id": "chunk-2"}],
+                "goldHit": False,
+                "goldRanks": [],
+            },
+        ],
+    }
+
+
+class FakeResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+
+    def __enter__(self) -> "FakeResponse":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
+class BenchmarkReportsTest(unittest.TestCase):
+    def test_partial_collection_builds_hit_at_k_and_baseline_delta(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            transcripts = run_dir / "transcripts"
+            transcripts.mkdir(parents=True)
+            (transcripts / "gold-001.json").write_text(
+                json.dumps(transcript("gold-001", "COMPLETED", True, [2])), encoding="utf-8"
+            )
+            (transcripts / "gold-002.json").write_text(
+                json.dumps(transcript("gold-002", "FAILED", False, [])), encoding="utf-8"
+            )
+            baseline = Path(temp) / "baseline.json"
+            baseline.write_text(json.dumps({
+                "runId": "reviewed-baseline",
+                "stages": {
+                    "ORIGINAL": {"goldHitRate": 0.5, "meanReciprocalRank": 0.25},
+                    "RERANKED": {"goldHitRate": 0.25, "meanReciprocalRank": 0.25},
+                },
+            }), encoding="utf-8")
+
+            report = report_generator.build_report(run_dir)
+            diff = report_generator.build_diff_report(report, baseline)
+
+            self.assertEqual(1, report["completedCaseCount"])
+            self.assertEqual(1, report["nonCompletedCaseCount"])
+            self.assertEqual(1.0, report["stages"]["ORIGINAL"]["goldHitRate"])
+            self.assertEqual(0.5, report["stages"]["ORIGINAL"]["meanReciprocalRank"])
+            self.assertIn("Hit@K", report["metricDefinition"])
+            self.assertEqual("COMPARISON_AVAILABLE", diff["status"])
+            self.assertEqual(0.5, diff["stages"]["ORIGINAL"]["goldHitRateDelta"])
+            self.assertEqual(0.25, diff["stages"]["ORIGINAL"]["meanReciprocalRankDelta"])
+
+    def test_zero_successful_cases_still_produces_a_machine_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            run_dir.mkdir()
+            (run_dir / "1-2-runtime-metadata.json").write_text(
+                json.dumps({"runId": "ci-run-empty"}), encoding="utf-8"
+            )
+
+            report = report_generator.build_report(run_dir)
+
+            self.assertEqual("ci-run-empty", report["runId"])
+            self.assertEqual(0, report["inputTranscriptCount"])
+            self.assertEqual(0, report["completedCaseCount"])
+            self.assertEqual({}, report["stages"])
+
+    def test_judge_accepts_strict_json_and_can_summarize_an_empty_partial_run(self) -> None:
+        def opener(request, timeout):
+            return FakeResponse({"choices": [{"message": {"content": '{"verdict":"PASS","score":1,"reason":"证据一致"}'}}]})
+
+        judgement = judge.call_judge(
+            "https://judge.example/chat/completions", "token", "model", "prompt", 5, opener
+        )
+        self.assertEqual({"verdict": "PASS", "score": 1.0, "reason": "证据一致"}, judgement)
+
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            dataset = Path(temp) / "gold.json"
+            dataset.write_text(json.dumps([
+                {"id": "gold-001", "question": "q", "evidence": {"excerpt": "e"}},
+            ]), encoding="utf-8")
+            document = judge.run_judgements(
+                run_dir=run_dir,
+                dataset_path=dataset,
+                output_path=run_dir / "3-1-judge-report.json",
+                base_url="https://judge.example",
+                model="model",
+                api_key="token",
+                timeout_seconds=5,
+                retries=0,
+                retry_delay_seconds=0,
+                resume=False,
+                opener=opener,
+                sleeper=lambda _: None,
+            )
+            summary = judge.benchmark_summary(
+                {"runId": "ci-run-empty", "caseCount": 1, "completedCount": 0, "failedCount": 1, "skippedCount": 0, "topK": 5},
+                {"stages": {}},
+                {"status": "NO_BASELINE"},
+                document,
+            )
+
+            self.assertEqual(0, document["completedCount"])
+            self.assertTrue((run_dir / "3-1-judge-report.json").is_file())
+            self.assertIn("Hit@K uses the K recorded above (5)", summary)
+            self.assertIn("No baseline is configured", summary)
+
+
+if __name__ == "__main__":
+    unittest.main()

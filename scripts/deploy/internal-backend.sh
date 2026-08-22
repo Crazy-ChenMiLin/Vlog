@@ -82,6 +82,11 @@ require_env_value "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET:-}"
 update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
 update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
 
+# CI uses this separate service credential to call the internal Benchmark API
+# without storing a human JWT in GitHub Actions.
+require_env_value "BENCHMARK_TOKEN" "${BENCHMARK_TOKEN:-}"
+update_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN" "$BENCHMARK_TOKEN"
+
 # Nacos is part of the application's bootstrap path: the container needs these
 # values before it can load the hot-reloadable runtime configuration from Nacos.
 # Keep the values in GitHub Secrets/Variables and materialize them only on the
@@ -148,6 +153,7 @@ services:
       GITHUB_CLIENT_SECRET: \${GITHUB_CLIENT_SECRET}
       GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-http://47.108.66.230/callback}
       GITHUB_EXTERNAL_SEARCH_TOKEN: \${GITHUB_EXTERNAL_SEARCH_TOKEN:-}
+      BENCHMARK_TOKEN: \${BENCHMARK_TOKEN}
       CAMPUS_CLIENT_ID: \${CAMPUS_CLIENT_ID}
       CAMPUS_CLIENT_SECRET: \${CAMPUS_CLIENT_SECRET}
       CAMPUS_REDIRECT_URI: \${CAMPUS_REDIRECT_URI:-http://47.108.66.230/callback/campus}

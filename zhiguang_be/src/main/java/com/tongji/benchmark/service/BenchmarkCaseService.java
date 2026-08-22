@@ -14,7 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 读取版本化 Gold 数据集，并按 caseId 提供单题标准答案。
+ * 读取版本化 Gold 数据集，并按 caseId 提供题目、期望证据 chunk 与评测上下文。
  */
 @Service
 public class BenchmarkCaseService {

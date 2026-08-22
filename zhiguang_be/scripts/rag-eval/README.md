@@ -57,6 +57,29 @@ python .\scripts\rag-eval\run-rag-debug-eval.py `
   --label local-debug
 ```
 
+## 跑线上 Gold Benchmark（单题接口）
+
+该脚本只向线上 `/api/internal/rag-benchmark/single-case` 发请求，保存后端返回的原始 Full Transcript；不在 Python 中重复执行 RAG 或拼装评测结果。
+
+```powershell
+$env:BENCHMARK_TOKEN = "<仅从 GitHub Secret 或安全环境变量读取>"
+python .\scripts\AUTO_Benchwork\benchmark.py `
+  --base-url http://47.108.66.230 `
+  --run-id baseline-001 `
+  --top-k 5
+```
+
+输出默认写入：
+
+```text
+target\rag-benchmark\baseline-001\
+  run-manifest.json
+  transcripts\gold-001.json
+  ...
+```
+
+网络波动后可使用 `--resume` 只补跑没有成功落盘的 case。脚本会在任一 case 最终失败时以非零退出码结束，供 GitHub Actions 判断本次评测失败。
+
 ## 单独比较两份结果
 
 ```powershell

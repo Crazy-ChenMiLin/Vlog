@@ -1,6 +1,7 @@
 package com.tongji.benchmark.api;
 
-import com.tongji.benchmark.api.dto.BenchmarkSingleCaseRequest;
+import com.tongji.benchmark.model.dto.BenchmarkSingleCaseRequest;
+import com.tongji.benchmark.controller.BenchmarkController;
 import com.tongji.benchmark.model.dto.BenchmarkEvaluationContextDTO;
 import com.tongji.benchmark.service.BenchmarkSingleCaseService;
 import com.tongji.llm.observability.enums.RagTranscriptStatusEnum;
@@ -110,7 +111,7 @@ class BenchmarkControllerTest {
                 "回答",
                 RagTranscriptStatusEnum.COMPLETED,
                 new RagTranscriptEvaluationDTO(
-                        "local-run-001", "gold-003", "gold-dataset-v1", "scripts/rag-eval/gold-dataset-v1.json", List.of("chunk#1")
+                        "local-run-001", "gold-003", "gold-dataset-v1", "scripts/AUTO_Benchwork/gold-dataset-v1.json", List.of("chunk#1")
                 )
         );
     }

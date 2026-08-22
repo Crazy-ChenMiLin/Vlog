@@ -1,4 +1,4 @@
-package com.tongji.benchmark.api.dto;
+package com.tongji.benchmark.model.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

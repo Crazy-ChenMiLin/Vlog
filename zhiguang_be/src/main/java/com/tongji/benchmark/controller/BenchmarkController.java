@@ -1,6 +1,6 @@
-package com.tongji.benchmark.api;
+package com.tongji.benchmark.controller;
 
-import com.tongji.benchmark.api.dto.BenchmarkSingleCaseRequest;
+import com.tongji.benchmark.model.dto.BenchmarkSingleCaseRequest;
 import com.tongji.benchmark.model.dto.BenchmarkEvaluationContextDTO;
 import com.tongji.benchmark.service.BenchmarkSingleCaseService;
 import com.tongji.llm.observability.model.dto.transcript.RagTranscriptDTO;
@@ -18,8 +18,8 @@ import reactor.core.publisher.Mono;
 /**
  * 仅供评测脚本和 CI 调用的内部 Benchmark 接口。
  *
- * <p>该路径未配置为公开路径，沿用 SecurityConfig 的默认 JWT 鉴权；
- * 正常用户 RAG 接口及其返回体不受影响。
+ * <p>该路径未配置为公开路径：人工调用沿用默认 JWT 鉴权，CI 可使用
+ * {@code X-Benchmark-Token} 取得临时 Benchmark 身份。正常用户 RAG 接口及其返回体不受影响。
  */
 @RestController
 @RequestMapping("/api/internal/rag-benchmark")

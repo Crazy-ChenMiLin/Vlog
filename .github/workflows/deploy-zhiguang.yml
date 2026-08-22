@@ -45,6 +45,7 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
           GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'http://47.108.66.230/callback' }}
           GITHUB_EXTERNAL_SEARCH_TOKEN: ${{ secrets.GITHUB_EXTERNAL_SEARCH_TOKEN }}
+          BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
           NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
           NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
@@ -71,3 +72,115 @@ jobs:
           CLOUD_SSH_KEY: ${{ secrets.CLOUD_SSH_KEY }}
           CLOUD_WEB_ROOT: /var/www/zhiguang-fe
         run: bash scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
+
+  benchmark:
+    name: Run RAG Benchmark
+    needs: deploy
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[run-bench]')
+    runs-on: self-hosted
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout evaluated revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare Benchmark run
+        shell: bash
+        run: |
+          run_id="benchmark-${GITHUB_RUN_ID}-${GITHUB_SHA:0:7}"
+          run_dir="${GITHUB_WORKSPACE}/zhiguang_be/target/rag-benchmark/${run_id}"
+          echo "BENCHMARK_RUN_ID=${run_id}" >> "$GITHUB_ENV"
+          echo "BENCHMARK_RUN_DIR=${run_dir}" >> "$GITHUB_ENV"
+
+      - name: Verify deployed backend health
+        shell: bash
+        env:
+          BENCHMARK_BASE_URL: ${{ vars.BENCHMARK_BASE_URL || 'http://127.0.0.1:18080' }}
+        run: |
+          for _ in $(seq 1 20); do
+            if curl -fsS "${BENCHMARK_BASE_URL}/actuator/health" >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Benchmark backend health check failed" >&2
+          exit 1
+
+      - name: Collect 40 Java RAG Transcripts
+        id: collect
+        continue-on-error: true
+        shell: bash
+        working-directory: zhiguang_be
+        env:
+          BENCHMARK_BASE_URL: ${{ vars.BENCHMARK_BASE_URL || 'http://127.0.0.1:18080' }}
+          BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
+        run: |
+          python scripts/AUTO_Benchwork/benchmark.py \
+            --base-url "$BENCHMARK_BASE_URL" \
+            --run-id "$BENCHMARK_RUN_ID" \
+            --output-dir "$BENCHMARK_RUN_DIR"
+
+      - name: Build retrieval funnel and diff reports
+        id: report
+        if: always()
+        shell: bash
+        working-directory: zhiguang_be
+        run: |
+          report_args=(--run-dir "$BENCHMARK_RUN_DIR")
+          baseline_path="scripts/AUTO_Benchwork/baseline/funnel-report.json"
+          if [[ -f "$baseline_path" ]]; then
+            report_args+=(--baseline "$baseline_path")
+          fi
+          python scripts/AUTO_Benchwork/report_generator.py "${report_args[@]}"
+
+      - name: Judge final answers and create review summary
+        id: judge
+        if: always()
+        continue-on-error: true
+        shell: bash
+        working-directory: zhiguang_be
+        env:
+          QIANFAN_JUDGE_API_KEY: ${{ secrets.QIANFAN_JUDGE_API_KEY }}
+        run: |
+          python scripts/AUTO_Benchwork/judge.py \
+            --run-dir "$BENCHMARK_RUN_DIR"
+
+      - name: Show Benchmark summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "${BENCHMARK_RUN_DIR}/summary.md" ]]; then
+            cat "${BENCHMARK_RUN_DIR}/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Benchmark Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-benchmark-${{ github.run_id }}
+          path: ${{ env.BENCHMARK_RUN_DIR }}
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Mark Benchmark failures after publishing reports
+        if: always()
+        shell: bash
+        env:
+          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
+          REPORT_OUTCOME: ${{ steps.report.outcome }}
+          JUDGE_OUTCOME: ${{ steps.judge.outcome }}
+        run: |
+          if [[ "$COLLECT_OUTCOME" != "success" || "$REPORT_OUTCOME" != "success" || "$JUDGE_OUTCOME" != "success" ]]; then
+            echo "Benchmark has partial or complete failures; reports and artifacts were retained for review." >&2
+            exit 1
+          fi

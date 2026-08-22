@@ -272,9 +272,9 @@
             <resource>
                 <directory>src/main/resources</directory>
             </resource>
-            <!-- Gold 数据集只有 scripts/rag-eval 中的一份源文件；打包时映射到 classpath:benchmark。 -->
+            <!-- Gold 数据集只有 scripts/AUTO_Benchwork 中的一份源文件；打包时映射到 classpath:benchmark。 -->
             <resource>
-                <directory>${project.basedir}/scripts/rag-eval</directory>
+                <directory>${project.basedir}/scripts/AUTO_Benchwork</directory>
                 <includes>
                     <include>gold-dataset-v1.json</include>
                 </includes>

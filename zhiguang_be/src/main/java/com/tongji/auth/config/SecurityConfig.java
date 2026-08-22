@@ -3,12 +3,14 @@ package com.tongji.auth.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.cors.CorsConfiguration;
@@ -32,6 +34,20 @@ import java.util.List;
 public class SecurityConfig {
 
     /**
+     * 只作为 Spring Security 链中的过滤器注册。
+     *
+     * <p>不要给该过滤器加 {@code @Component}：Servlet 容器和 Security 链各注册一次
+     * 会导致 {@link org.springframework.web.filter.OncePerRequestFilter} 在错误的位置先执行，
+     * 从而跳过真正的鉴权链。</p>
+     */
+    @Bean
+    public BenchmarkTokenAuthenticationFilter benchmarkTokenAuthenticationFilter(
+            @Value("${BENCHMARK_TOKEN:}") String benchmarkToken
+    ) {
+        return new BenchmarkTokenAuthenticationFilter(benchmarkToken);
+    }
+
+    /**
      * 配置 Spring Security 过滤链。
      *
      * <p>主要包含：</p>
@@ -48,7 +64,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            @Qualifier("jwtDecoder") JwtDecoder jwtDecoder
+            @Qualifier("jwtDecoder") JwtDecoder jwtDecoder,
+            BenchmarkTokenAuthenticationFilter benchmarkTokenAuthenticationFilter
     ) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -77,6 +94,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(benchmarkTokenAuthenticationFilter, BearerTokenAuthenticationFilter.class)
                 // 站内访问令牌使用本项目的 RSA 公钥校验；校园 OIDC 的 decoder 仅校验回调 id_token。
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder)));
         return http.build();
