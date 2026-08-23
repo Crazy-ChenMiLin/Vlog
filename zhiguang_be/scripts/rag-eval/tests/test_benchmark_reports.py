@@ -84,6 +84,10 @@ class BenchmarkReportsTest(unittest.TestCase):
             self.assertEqual(1.0, report["stages"]["ORIGINAL"]["goldHitRate"])
             self.assertEqual(0.5, report["stages"]["ORIGINAL"]["meanReciprocalRank"])
             self.assertIn("Hit@K", report["metricDefinition"])
+            self.assertEqual("ALIGNED", report["goldIdAudit"]["status"])
+            self.assertEqual(1, report["goldIdAudit"]["caseCountWithAnyMatch"])
+            self.assertEqual(["gold-001"], report["goldIdAudit"]["casesWithAnyMatch"])
+            self.assertEqual(0, report["goldIdAudit"]["annotationMismatchCount"])
             self.assertEqual("COMPARISON_AVAILABLE", diff["status"])
             self.assertEqual(0.5, diff["stages"]["ORIGINAL"]["goldHitRateDelta"])
             self.assertEqual(0.25, diff["stages"]["ORIGINAL"]["meanReciprocalRankDelta"])
@@ -102,6 +106,27 @@ class BenchmarkReportsTest(unittest.TestCase):
             self.assertEqual(0, report["inputTranscriptCount"])
             self.assertEqual(0, report["completedCaseCount"])
             self.assertEqual({}, report["stages"])
+            self.assertEqual("NO_COMPLETED_CASES", report["goldIdAudit"]["status"])
+
+    def test_gold_id_audit_exposes_expected_and_online_candidate_id_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            transcripts = run_dir / "transcripts"
+            transcripts.mkdir(parents=True)
+            mismatched = transcript("gold-001", "COMPLETED", False, [])
+            mismatched["stages"][0]["candidates"] = [{"chunkId": "online-chunk-999"}]
+            (transcripts / "gold-001.json").write_text(json.dumps(mismatched), encoding="utf-8")
+
+            report = report_generator.build_report(run_dir)
+
+            self.assertEqual("NO_MATCH", report["goldIdAudit"]["status"])
+            self.assertEqual(["gold-001"], report["goldIdAudit"]["casesWithoutAnyMatch"])
+            self.assertEqual(["chunk-1"], report["goldIdAudit"]["unmatchedExpectedChunkIds"])
+            self.assertIn("online-chunk-999", report["goldIdAudit"]["observedCandidateChunkIdSamples"])
+            self.assertEqual(
+                ["online-chunk-999"],
+                report["cases"][0]["stages"]["ORIGINAL"]["candidateChunkIds"],
+            )
 
     def test_judge_accepts_strict_json_and_can_summarize_an_empty_partial_run(self) -> None:
         def opener(request, timeout):
@@ -143,6 +168,65 @@ class BenchmarkReportsTest(unittest.TestCase):
             self.assertTrue((run_dir / "3-1-judge-report.json").is_file())
             self.assertIn("Hit@K uses the K recorded above (5)", summary)
             self.assertIn("No baseline is configured", summary)
+
+    def test_judge_retries_non_json_and_retains_raw_response(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            transcripts = run_dir / "transcripts"
+            transcripts.mkdir(parents=True)
+            (transcripts / "gold-001.json").write_text(
+                json.dumps(transcript("gold-001", "COMPLETED", True, [1])), encoding="utf-8"
+            )
+            dataset = Path(temp) / "gold.json"
+            dataset.write_text(json.dumps([
+                {"id": "gold-001", "question": "q", "evidence": {"excerpt": "e"}},
+            ]), encoding="utf-8")
+            contents = iter([
+                "这次没有按照要求返回 JSON",
+                '{"verdict":"PASS","score":1,"reason":"证据一致"}',
+            ])
+
+            def opener(request, timeout):
+                return FakeResponse({"choices": [{"message": {"content": next(contents)}}]})
+
+            document = judge.run_judgements(
+                run_dir=run_dir,
+                dataset_path=dataset,
+                output_path=run_dir / "3-1-judge-report.json",
+                base_url="https://judge.example",
+                model="model",
+                api_key="token",
+                timeout_seconds=5,
+                retries=1,
+                retry_delay_seconds=0,
+                resume=False,
+                opener=opener,
+                sleeper=lambda _: None,
+            )
+
+            self.assertEqual("COMPLETE", document["evaluationStatus"])
+            self.assertEqual(1, document["completedCount"])
+            self.assertEqual(1, document["retryFailureCount"])
+            self.assertEqual(2, document["results"][0]["attempts"])
+            self.assertEqual(
+                "这次没有按照要求返回 JSON",
+                document["results"][0]["retryFailures"][0]["rawResponse"],
+            )
+
+    def test_partial_judge_report_is_non_fatal_but_total_judge_failure_is_fatal(self) -> None:
+        common = (Path("run"), Path("gold.json"), "https://judge.example/chat/completions", "model")
+        partial = judge.judgement_document(*common, [
+            {"caseId": "gold-001", "status": "COMPLETED", "verdict": "PASS"},
+            {"caseId": "gold-002", "status": "FAILED", "attemptFailures": []},
+        ])
+        failed = judge.judgement_document(*common, [
+            {"caseId": "gold-001", "status": "FAILED", "attemptFailures": []},
+        ])
+
+        self.assertEqual("PARTIAL", partial["evaluationStatus"])
+        self.assertEqual(0, judge.judge_exit_code(partial))
+        self.assertEqual("FAILED", failed["evaluationStatus"])
+        self.assertEqual(1, judge.judge_exit_code(failed))
 
 
 if __name__ == "__main__":

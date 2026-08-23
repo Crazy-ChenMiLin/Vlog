@@ -27,6 +27,7 @@ JUDGEMENT_SCHEMA_VERSION = "rag-benchmark-judgement-v1"
 DEFAULT_BASE_URL = "https://qianfan.baidubce.com/v2/tokenplan/personal"
 DEFAULT_MODEL = "deepseek-v4-flash"
 VALID_VERDICTS = {"PASS", "PARTIAL", "FAIL"}
+MAX_RAW_RESPONSE_CHARS = 4000
 
 
 @dataclass(frozen=True)
@@ -39,9 +40,18 @@ class GoldCase:
 
 
 class JudgeRequestError(RuntimeError):
-    def __init__(self, message: str, retryable: bool) -> None:
+    def __init__(self, message: str, retryable: bool, raw_response: str | None = None) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.raw_response = truncate_raw_response(raw_response)
+
+
+def truncate_raw_response(content: str | None) -> str | None:
+    if content is None:
+        return None
+    if len(content) <= MAX_RAW_RESPONSE_CHARS:
+        return content
+    return content[:MAX_RAW_RESPONSE_CHARS] + "\n...[truncated]"
 
 
 def parse_args() -> argparse.Namespace:
@@ -180,26 +190,38 @@ def extract_json_object(content: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", content, flags=re.DOTALL)
         if not match:
-            raise JudgeRequestError("Judge model did not return a JSON object", retryable=False)
+            raise JudgeRequestError(
+                "Judge model did not return a JSON object", retryable=True, raw_response=content
+            )
         try:
             value = json.loads(match.group(0))
         except json.JSONDecodeError as error:
-            raise JudgeRequestError("Judge model returned invalid JSON", retryable=False) from error
+            raise JudgeRequestError(
+                "Judge model returned invalid JSON", retryable=True, raw_response=content
+            ) from error
     if not isinstance(value, dict):
-        raise JudgeRequestError("Judge model JSON must be an object", retryable=False)
+        raise JudgeRequestError(
+            "Judge model JSON must be an object", retryable=True, raw_response=content
+        )
     return value
 
 
-def validate_judgement(value: dict[str, Any]) -> dict[str, Any]:
+def validate_judgement(value: dict[str, Any], raw_response: str | None = None) -> dict[str, Any]:
     verdict = value.get("verdict")
     score = value.get("score")
     reason = value.get("reason")
     if not isinstance(verdict, str) or verdict not in VALID_VERDICTS:
-        raise JudgeRequestError("Judge model returned an invalid verdict", retryable=False)
+        raise JudgeRequestError(
+            "Judge model returned an invalid verdict", retryable=True, raw_response=raw_response
+        )
     if not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 1:
-        raise JudgeRequestError("Judge model returned an invalid score", retryable=False)
+        raise JudgeRequestError(
+            "Judge model returned an invalid score", retryable=True, raw_response=raw_response
+        )
     if not isinstance(reason, str) or not reason.strip():
-        raise JudgeRequestError("Judge model returned an empty reason", retryable=False)
+        raise JudgeRequestError(
+            "Judge model returned an empty reason", retryable=True, raw_response=raw_response
+        )
     return {"verdict": verdict, "score": round(float(score), 4), "reason": reason.strip()[:500]}
 
 
@@ -241,6 +263,7 @@ def call_judge(
         raise JudgeRequestError(
             f"HTTP {error.code}: {detail or error.reason}",
             retryable=error.code == 429 or error.code >= 500,
+            raw_response=detail or None,
         ) from error
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as error:
         raise JudgeRequestError(f"{type(error).__name__}: {error}", retryable=True) from error
@@ -248,10 +271,19 @@ def call_judge(
     try:
         content = payload["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:
-        raise JudgeRequestError("Judge API response has no choices[0].message.content", retryable=False) from error
+        raise JudgeRequestError(
+            "Judge API response has no choices[0].message.content",
+            retryable=True,
+            raw_response=json.dumps(payload, ensure_ascii=False),
+        ) from error
     if not isinstance(content, str):
-        raise JudgeRequestError("Judge API returned non-text content", retryable=False)
-    return validate_judgement(extract_json_object(content.strip()))
+        raise JudgeRequestError(
+            "Judge API returned non-text content",
+            retryable=True,
+            raw_response=json.dumps(payload, ensure_ascii=False),
+        )
+    raw_response = content.strip()
+    return validate_judgement(extract_json_object(raw_response), raw_response=raw_response)
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -327,12 +359,13 @@ def run_judgements(
             continue
 
         started = time.monotonic()
+        attempt_failures: list[dict[str, Any]] = []
         for attempt in range(retries + 1):
             try:
                 judgement = call_judge(
                     endpoint, api_key, model, judge_prompt(gold_cases[case_id], final_answer), timeout_seconds, opener
                 )
-                results.append({
+                result = {
                     "caseId": case_id,
                     "traceId": transcript.get("traceId"),
                     "status": "COMPLETED",
@@ -340,9 +373,20 @@ def run_judgements(
                     "durationSeconds": round(time.monotonic() - started, 3),
                     "source": str(source),
                     **judgement,
-                })
+                }
+                if attempt_failures:
+                    result["retryFailures"] = attempt_failures
+                results.append(result)
                 break
             except JudgeRequestError as error:
+                attempt_failure: dict[str, Any] = {
+                    "attempt": attempt + 1,
+                    "error": str(error),
+                    "retryable": error.retryable,
+                }
+                if error.raw_response is not None:
+                    attempt_failure["rawResponse"] = error.raw_response
+                attempt_failures.append(attempt_failure)
                 if not error.retryable or attempt == retries:
                     results.append({
                         "caseId": case_id,
@@ -352,6 +396,7 @@ def run_judgements(
                         "durationSeconds": round(time.monotonic() - started, 3),
                         "source": str(source),
                         "error": str(error),
+                        "attemptFailures": attempt_failures,
                     })
                     break
                 sleeper(retry_delay_seconds * (attempt + 1))
@@ -372,6 +417,16 @@ def judgement_document(
         results: list[dict[str, Any]],
 ) -> dict[str, Any]:
     completed = [result for result in results if result["status"] == "COMPLETED"]
+    failed_count = sum(result["status"] == "FAILED" for result in results)
+    skipped_count = sum(result["status"] == "SKIPPED_EMPTY_ANSWER" for result in results)
+    if failed_count and not completed:
+        evaluation_status = "FAILED"
+    elif failed_count or skipped_count:
+        evaluation_status = "PARTIAL"
+    elif results:
+        evaluation_status = "COMPLETE"
+    else:
+        evaluation_status = "NO_CASES"
     verdict_counts = {verdict: sum(result.get("verdict") == verdict for result in completed) for verdict in sorted(VALID_VERDICTS)}
     return {
         "schemaVersion": JUDGEMENT_SCHEMA_VERSION,
@@ -380,16 +435,31 @@ def judgement_document(
         "dataset": str(dataset_path),
         "endpoint": endpoint,
         "model": model,
+        "evaluationStatus": evaluation_status,
         "completedCount": len(completed),
-        "failedCount": sum(result["status"] == "FAILED" for result in results),
-        "skippedEmptyAnswerCount": sum(result["status"] == "SKIPPED_EMPTY_ANSWER" for result in results),
+        "failedCount": failed_count,
+        "skippedEmptyAnswerCount": skipped_count,
+        "retryFailureCount": sum(len(result.get("retryFailures", [])) for result in completed)
+        + sum(len(result.get("attemptFailures", [])) for result in results if result["status"] == "FAILED"),
         "verdictCounts": verdict_counts,
         "results": sorted(results, key=lambda result: result["caseId"]),
     }
 
 
+def judge_exit_code(document: dict[str, Any]) -> int:
+    return 1 if document.get("evaluationStatus") == "FAILED" else 0
+
+
 def markdown_cell(value: Any) -> str:
     return str(value if value is not None else "-").replace("|", "\\|").replace("\n", " ")
+
+
+def append_collapsible_list(lines: list[str], title: str, values: list[Any]) -> None:
+    if not values:
+        return
+    lines.extend(["", "<details>", f"<summary>{title} ({len(values)})</summary>", ""])
+    lines.extend(f"- `{markdown_cell(value)}`" for value in values)
+    lines.extend(["", "</details>"])
 
 
 def benchmark_summary(
@@ -399,6 +469,7 @@ def benchmark_summary(
         judgement: dict[str, Any],
 ) -> str:
     verdicts = judgement["verdictCounts"]
+    gold_id_audit = funnel_report.get("goldIdAudit", {})
     lines = [
         "# RAG Benchmark Summary",
         "",
@@ -407,6 +478,7 @@ def benchmark_summary(
         "",
         "## ① Runtime",
         "",
+        f"- Collection status: `{runtime_metadata.get('collectionStatus', 'UNKNOWN')}`",
         f"- Gold cases: {runtime_metadata['caseCount']}",
         f"- Completed: {runtime_metadata['completedCount']}",
         f"- Failed: {runtime_metadata['failedCount']}",
@@ -425,6 +497,27 @@ def benchmark_summary(
             f"| {stage_name} | {stage['goldHitRate']} | {stage['meanReciprocalRank']} | "
             f"{stage['meanBestGoldRankWhenHit']} |"
         )
+    lines.extend([
+        "",
+        "### Gold ID alignment",
+        "",
+        f"- Status: `{gold_id_audit.get('status', 'NOT_AVAILABLE')}`",
+        f"- Cases with an expected-ID match: {gold_id_audit.get('caseCountWithAnyMatch', '-')} / "
+        f"{gold_id_audit.get('caseCountWithExpectedIds', '-')}",
+        f"- Unique expected chunk IDs observed: {gold_id_audit.get('matchedExpectedChunkIdCount', '-')} / "
+        f"{gold_id_audit.get('expectedChunkIdCount', '-')}",
+        f"- Backend annotation mismatches: {gold_id_audit.get('annotationMismatchCount', '-')}",
+    ])
+    unmatched_cases = gold_id_audit.get("casesWithoutAnyMatch", [])
+    unmatched_ids = gold_id_audit.get("unmatchedExpectedChunkIds", [])
+    candidate_samples = gold_id_audit.get("observedCandidateChunkIdSamples", [])
+    append_collapsible_list(lines, "Cases without any expected-ID match", unmatched_cases)
+    append_collapsible_list(lines, "Expected chunk IDs never observed", unmatched_ids)
+    append_collapsible_list(lines, "Observed candidate ID samples", candidate_samples)
+    lines.extend([
+        "",
+        "An ID mismatch can mean a real retrieval miss or Gold/index ID drift; use the per-case JSON diagnostics to distinguish them.",
+    ])
     lines.extend([
         "",
         "## ③ Baseline diff",
@@ -448,10 +541,13 @@ def benchmark_summary(
         "## ④ Final-answer judge",
         "",
         f"- Model: `{judgement['model']}`",
+        f"- Evaluation status: `{judgement.get('evaluationStatus', 'UNKNOWN')}`",
         f"- Completed: {judgement['completedCount']}",
         f"- Failed: {judgement['failedCount']}",
         f"- Empty-answer skipped: {judgement['skippedEmptyAnswerCount']}",
+        f"- Failed attempts retained for diagnosis: {judgement.get('retryFailureCount', 0)}",
         f"- PASS / PARTIAL / FAIL: {verdicts['PASS']} / {verdicts['PARTIAL']} / {verdicts['FAIL']}",
+        "- Raw model responses for failed/retried attempts are stored in `3-1-judge-report.json`.",
         "",
         "## Per-case verdicts",
         "",
@@ -498,12 +594,13 @@ def main() -> int:
     )
     write_text(summary_output_path, benchmark_summary(runtime_metadata, funnel_report, diff_report, document))
     print(json.dumps({
+        "evaluationStatus": document["evaluationStatus"],
         "completedCount": document["completedCount"],
         "failedCount": document["failedCount"],
         "jsonOutput": str(output_path),
         "summaryOutput": str(summary_output_path),
     }, ensure_ascii=False))
-    return 1 if document["failedCount"] else 0
+    return judge_exit_code(document)
 
 
 if __name__ == "__main__":

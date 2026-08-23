@@ -157,6 +157,10 @@ def write_transcripts_jsonl(output_dir: Path, results: list[dict[str, Any]]) -> 
     return len(lines)
 
 
+def collection_exit_code(manifest: dict[str, Any]) -> int:
+    return 1 if manifest.get("collectionStatus") == "FAILED" else 0
+
+
 def run_benchmark(
         base_url: str,
         run_id: str,
@@ -233,6 +237,12 @@ def run_benchmark(
         "skippedCount": sum(item["status"] == "SKIPPED" for item in results),
         "cases": results,
     }
+    if metadata["failedCount"] and not metadata["completedCount"]:
+        metadata["collectionStatus"] = "FAILED"
+    elif metadata["failedCount"]:
+        metadata["collectionStatus"] = "PARTIAL"
+    else:
+        metadata["collectionStatus"] = "COMPLETE"
     metadata["transcriptCount"] = write_transcripts_jsonl(output_dir, results)
     write_json(output_dir / "1-2-runtime-metadata.json", metadata)
     return metadata
@@ -255,12 +265,13 @@ def main() -> int:
     )
     print(json.dumps({
         "runId": manifest["runId"],
+        "collectionStatus": manifest["collectionStatus"],
         "caseCount": manifest["caseCount"],
         "completedCount": manifest["completedCount"],
         "failedCount": manifest["failedCount"],
         "output": str(output_dir),
     }, ensure_ascii=False))
-    return 1 if manifest["failedCount"] else 0
+    return collection_exit_code(manifest)
 
 
 if __name__ == "__main__":

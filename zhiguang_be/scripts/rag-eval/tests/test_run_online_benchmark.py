@@ -63,6 +63,8 @@ class RunOnlineBenchmarkTest(unittest.TestCase):
 
             self.assertEqual(2, metadata["completedCount"])
             self.assertEqual(0, metadata["failedCount"])
+            self.assertEqual("COMPLETE", metadata["collectionStatus"])
+            self.assertEqual(0, runner.collection_exit_code(metadata))
             self.assertEqual(2, metadata["transcriptCount"])
             self.assertEqual(["gold-001", "gold-002"], [call["body"]["caseId"] for call in calls])
             self.assertTrue(all(call["token"] == "not-printed-token" for call in calls))
@@ -117,9 +119,14 @@ class RunOnlineBenchmarkTest(unittest.TestCase):
 
             self.assertEqual(1, metadata["completedCount"])
             self.assertEqual(1, metadata["failedCount"])
+            self.assertEqual("PARTIAL", metadata["collectionStatus"])
+            self.assertEqual(0, runner.collection_exit_code(metadata))
             self.assertEqual(1, metadata["transcriptCount"])
             self.assertTrue((output / "transcripts" / "gold-001.json").is_file())
             self.assertFalse((output / "transcripts" / "gold-002.json").exists())
+
+    def test_total_collection_failure_is_fatal(self) -> None:
+        self.assertEqual(1, runner.collection_exit_code({"collectionStatus": "FAILED"}))
 
 
 if __name__ == "__main__":

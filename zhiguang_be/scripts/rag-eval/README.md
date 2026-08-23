@@ -73,12 +73,19 @@ python .\scripts\AUTO_Benchwork\benchmark.py `
 
 ```text
 target\rag-benchmark\baseline-001\
-  run-manifest.json
+  1-1-transcripts.jsonl
+  1-2-runtime-metadata.json
+  3-1-judge-report.json
+  summary.md
+  report\2-1-funnel-report.json
+  report\2-3-diff-report.json
   transcripts\gold-001.json
   ...
 ```
 
-网络波动后可使用 `--resume` 只补跑没有成功落盘的 case。脚本会在任一 case 最终失败时以非零退出码结束，供 GitHub Actions 判断本次评测失败。
+网络波动后可使用 `--resume` 只补跑没有成功落盘的 case。少量 case 失败会记录为 `PARTIAL`，继续生成 JSON、Markdown 和 Artifact；只有整个阶段完全不可用或报告无法生成时才以非零退出码结束。
+
+`report\2-1-funnel-report.json` 还会直接比较 Gold `expectedChunkIds` 与线上 Transcript 的候选 `chunkId`。`summary.md` 展示匹配状态，完整的逐题 ID 诊断保留在 JSON 中。裁判模型输出非 JSON 时会自动重试，失败尝试的原始返回保存在 `3-1-judge-report.json`，不会写入日志或泄露 API Key。
 
 ## 单独比较两份结果
 

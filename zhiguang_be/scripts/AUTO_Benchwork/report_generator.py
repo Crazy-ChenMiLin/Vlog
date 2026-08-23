@@ -66,6 +66,18 @@ def rounded_ratio(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 6) if denominator else None
 
 
+def unique_strings(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(values))
+
+
+def candidate_chunk_id(candidate: dict[str, Any]) -> str | None:
+    for field in ("chunkId", "id"):
+        value = candidate.get(field)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
 def transcript_case_row(transcript: dict[str, Any], source: Path) -> dict[str, Any]:
     evaluation = transcript.get("evaluation")
     if not isinstance(evaluation, dict):
@@ -76,6 +88,12 @@ def transcript_case_row(transcript: dict[str, Any], source: Path) -> dict[str, A
     stages = transcript.get("stages")
     if not isinstance(stages, list):
         raise RuntimeError(f"Transcript {source} has no stages array")
+    raw_expected_chunk_ids = evaluation.get("expectedChunkIds", [])
+    if not isinstance(raw_expected_chunk_ids, list) or any(
+        not isinstance(chunk_id, str) or not chunk_id.strip() for chunk_id in raw_expected_chunk_ids
+    ):
+        raise RuntimeError(f"Transcript {source} has invalid evaluation.expectedChunkIds")
+    expected_chunk_ids = unique_strings(raw_expected_chunk_ids)
 
     stage_rows: dict[str, dict[str, Any]] = {}
     for stage in stages:
@@ -88,6 +106,17 @@ def transcript_case_row(transcript: dict[str, Any], source: Path) -> dict[str, A
         candidates = stage.get("candidates")
         if not isinstance(candidates, list):
             raise RuntimeError(f"Transcript {source} stage {name} has no candidates array")
+        if any(not isinstance(candidate, dict) for candidate in candidates):
+            raise RuntimeError(f"Transcript {source} stage {name} contains a non-object candidate")
+        candidate_chunk_ids = unique_strings([
+            chunk_id
+            for candidate in candidates
+            if (chunk_id := candidate_chunk_id(candidate)) is not None
+        ])
+        candidate_chunk_id_set = set(candidate_chunk_ids)
+        matched_expected_chunk_ids = [
+            chunk_id for chunk_id in expected_chunk_ids if chunk_id in candidate_chunk_id_set
+        ]
         raw_ranks = stage.get("goldRanks")
         if raw_ranks is None:
             raw_ranks = []
@@ -106,11 +135,27 @@ def transcript_case_row(transcript: dict[str, Any], source: Path) -> dict[str, A
 
         stage_rows[name] = {
             "candidateCount": len(candidates),
+            "candidateChunkIdCount": len(candidate_chunk_ids),
+            "candidateChunkIds": candidate_chunk_ids,
+            "candidateChunkIdSamples": candidate_chunk_ids[:10],
             "goldHit": gold_hit is True,
             "goldRanks": raw_ranks,
             "bestGoldRank": min(raw_ranks) if raw_ranks else None,
+            "matchedExpectedChunkIds": matched_expected_chunk_ids,
+            "derivedGoldHit": bool(matched_expected_chunk_ids),
+            "annotationConsistent": gold_hit is None or (gold_hit is True) == bool(matched_expected_chunk_ids),
         }
 
+    observed_candidate_chunk_ids = unique_strings([
+        chunk_id
+        for stage in stage_rows.values()
+        for chunk_id in stage["candidateChunkIds"]
+    ])
+    matched_expected_chunk_ids = [
+        chunk_id
+        for chunk_id in expected_chunk_ids
+        if any(chunk_id in stage["matchedExpectedChunkIds"] for stage in stage_rows.values())
+    ]
     final_answer = transcript.get("finalAnswer")
     has_answer = isinstance(final_answer, str) and bool(final_answer.strip())
     return {
@@ -118,7 +163,16 @@ def transcript_case_row(transcript: dict[str, Any], source: Path) -> dict[str, A
         "traceId": transcript.get("traceId"),
         "status": status,
         "hasAnswer": has_answer,
-        "expectedChunkIds": evaluation.get("expectedChunkIds", []),
+        "expectedChunkIds": expected_chunk_ids,
+        "goldIdAudit": {
+            "matchedExpectedChunkIds": matched_expected_chunk_ids,
+            "unmatchedExpectedChunkIds": [
+                chunk_id for chunk_id in expected_chunk_ids if chunk_id not in set(matched_expected_chunk_ids)
+            ],
+            "anyMatch": bool(matched_expected_chunk_ids),
+            "observedCandidateChunkIdCount": len(observed_candidate_chunk_ids),
+            "observedCandidateChunkIdSamples": observed_candidate_chunk_ids[:10],
+        },
         "stages": stage_rows,
         "source": str(source),
     }
@@ -129,6 +183,63 @@ def ordered_stage_names(case_rows: list[dict[str, Any]]) -> list[str]:
     return [name for name in CANONICAL_STAGE_ORDER if name in present] + sorted(
         present.difference(CANONICAL_STAGE_ORDER)
     )
+
+
+def build_gold_id_audit(completed_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    rows_with_expected_ids = [row for row in completed_rows if row["expectedChunkIds"]]
+    cases_with_matches = [row["caseId"] for row in rows_with_expected_ids if row["goldIdAudit"]["anyMatch"]]
+    cases_without_matches = [row["caseId"] for row in rows_with_expected_ids if not row["goldIdAudit"]["anyMatch"]]
+    expected_chunk_ids = unique_strings([
+        chunk_id for row in rows_with_expected_ids for chunk_id in row["expectedChunkIds"]
+    ])
+    matched_expected_chunk_ids = unique_strings([
+        chunk_id
+        for row in rows_with_expected_ids
+        for chunk_id in row["goldIdAudit"]["matchedExpectedChunkIds"]
+    ])
+    observed_candidate_chunk_ids = unique_strings([
+        chunk_id
+        for row in completed_rows
+        for stage in row["stages"].values()
+        for chunk_id in stage["candidateChunkIds"]
+    ])
+    annotation_mismatch_cases = sorted({
+        row["caseId"]
+        for row in completed_rows
+        for stage in row["stages"].values()
+        if not stage["annotationConsistent"]
+    })
+    if not completed_rows:
+        status = "NO_COMPLETED_CASES"
+    elif not rows_with_expected_ids:
+        status = "NO_EXPECTED_IDS"
+    elif not cases_without_matches:
+        status = "ALIGNED"
+    elif not cases_with_matches:
+        status = "NO_MATCH"
+    else:
+        status = "PARTIAL_MATCH"
+    return {
+        "status": status,
+        "completedCaseCount": len(completed_rows),
+        "caseCountWithExpectedIds": len(rows_with_expected_ids),
+        "caseCountWithAnyMatch": len(cases_with_matches),
+        "caseCountWithoutAnyMatch": len(cases_without_matches),
+        "casesWithAnyMatch": cases_with_matches,
+        "casesWithoutAnyMatch": cases_without_matches,
+        "caseMatchRate": rounded_ratio(len(cases_with_matches), len(rows_with_expected_ids)),
+        "expectedChunkIdCount": len(expected_chunk_ids),
+        "matchedExpectedChunkIdCount": len(matched_expected_chunk_ids),
+        "unmatchedExpectedChunkIdCount": len(expected_chunk_ids) - len(matched_expected_chunk_ids),
+        "unmatchedExpectedChunkIds": [
+            chunk_id for chunk_id in expected_chunk_ids if chunk_id not in set(matched_expected_chunk_ids)
+        ],
+        "observedCandidateChunkIdCount": len(observed_candidate_chunk_ids),
+        "observedCandidateChunkIdSamples": observed_candidate_chunk_ids[:20],
+        "annotationMismatchCount": len(annotation_mismatch_cases),
+        "annotationMismatchCases": annotation_mismatch_cases,
+        "note": "Expected IDs are compared directly with deployed Transcript candidate chunkId values. A mismatch can be a retrieval miss or Gold/index ID drift.",
+    }
 
 
 def build_report(run_dir: Path) -> dict[str, Any]:
@@ -185,6 +296,7 @@ def build_report(run_dir: Path) -> dict[str, Any]:
             "note": "This is only an answer-presence check; judge.py owns answer-quality scoring.",
         },
         "metricDefinition": "goldHitRate is Hit@K over the candidates returned by each stage; K is recorded in runtime metadata.",
+        "goldIdAudit": build_gold_id_audit(completed_rows),
         "stages": stage_summary,
         "cases": sorted(case_rows, key=lambda row: row["caseId"]),
     }

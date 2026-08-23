@@ -212,16 +212,40 @@ jobs:
             cat "${BENCHMARK_RUN_DIR}/summary.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Annotate partial Benchmark results
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          python - "${BENCHMARK_RUN_DIR}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          run_dir = Path(sys.argv[1])
+          reports = (
+              (run_dir / "1-2-runtime-metadata.json", "collectionStatus", "Transcript collection"),
+              (run_dir / "3-1-judge-report.json", "evaluationStatus", "LLM judge"),
+          )
+          for path, status_field, label in reports:
+              if not path.is_file():
+                  continue
+              document = json.loads(path.read_text(encoding="utf-8"))
+              status = document.get(status_field, "UNKNOWN")
+              if status == "PARTIAL":
+                  print(f"::warning title={label} is partial::{path.name} contains the per-case diagnostics.")
+          PY
+
       - name: Upload Benchmark Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rag-benchmark-${{ github.run_id }}
           path: ${{ env.BENCHMARK_RUN_DIR }}
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
-      - name: Mark Benchmark failures after publishing reports
+      - name: Fail only on Benchmark execution failures
         if: always()
         shell: bash
         env:
@@ -230,6 +254,6 @@ jobs:
           JUDGE_OUTCOME: ${{ steps.judge.outcome }}
         run: |
           if [[ "$COLLECT_OUTCOME" != "success" || "$REPORT_OUTCOME" != "success" || "$JUDGE_OUTCOME" != "success" ]]; then
-            echo "Benchmark has partial or complete failures; reports and artifacts were retained for review." >&2
+            echo "Benchmark execution failed completely in at least one phase; available reports and artifacts were retained." >&2
             exit 1
           fi
