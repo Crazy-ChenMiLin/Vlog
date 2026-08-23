@@ -120,6 +120,7 @@ public class OssStorageService {
     private MinioClient buildClient() {
         return MinioClient.builder()
                 .endpoint(trimTrailingSlash(props.getEndpoint()))
+                .region(props.getRegion())
                 .credentials(props.getAccessKeyId(), props.getAccessKeySecret())
                 .build();
     }
@@ -128,6 +129,7 @@ public class OssStorageService {
         String endpoint = resolvePresignEndpoint();
         return MinioClient.builder()
                 .endpoint(endpoint)
+                .region(props.getRegion())
                 .credentials(props.getAccessKeyId(), props.getAccessKeySecret())
                 .build();
     }
