@@ -10,8 +10,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  inject-benchmark-token:
+    name: Inject Benchmark credential
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout deployment script
+        uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: 2
+          GIT_CONFIG_KEY_0: url.https://v4.gh-proxy.org/https://github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
+          GIT_CONFIG_KEY_1: http.version
+          GIT_CONFIG_VALUE_1: HTTP/1.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Inject and verify Benchmark credential
+        env:
+          SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
+          BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
+        run: bash scripts/deploy/internal-backend.sh inject-benchmark-token
+
   deploy:
     name: Deploy backend and frontend
+    needs: inject-benchmark-token
     runs-on: self-hosted
     timeout-minutes: 30
 
@@ -45,7 +70,6 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
           GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'http://47.108.66.230/callback' }}
           GITHUB_EXTERNAL_SEARCH_TOKEN: ${{ secrets.GITHUB_EXTERNAL_SEARCH_TOKEN }}
-          BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
           NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
           NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
@@ -115,6 +139,31 @@ jobs:
           done
           echo "Benchmark backend health check failed" >&2
           exit 1
+
+      - name: Verify Benchmark authentication
+        shell: bash
+        env:
+          BENCHMARK_BASE_URL: ${{ vars.BENCHMARK_BASE_URL || 'http://127.0.0.1:18080' }}
+          BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
+        run: |
+          if [[ -z "$BENCHMARK_TOKEN" ]]; then
+            echo "GitHub Secret BENCHMARK_TOKEN is missing" >&2
+            exit 1
+          fi
+
+          status="$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
+            -H "X-Benchmark-Token: $BENCHMARK_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{}' \
+            "${BENCHMARK_BASE_URL}/api/internal/rag-benchmark/single-case" || true)"
+
+          if [[ "$status" != "400" ]]; then
+            echo "Benchmark authentication preflight failed: expected HTTP 400 after authentication, got ${status:-no response}" >&2
+            echo "HTTP 401 means the credential was rejected; HTTP 503 means the backend credential is not configured." >&2
+            exit 1
+          fi
+
+          echo "Benchmark authentication preflight passed"
 
       - name: Collect 40 Java RAG Transcripts
         id: collect

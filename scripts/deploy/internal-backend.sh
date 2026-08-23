@@ -5,6 +5,7 @@ BASE="${ZHIGUANG_DEPLOY_BASE:-/home/chenmilin/zhiguang-deploy}"
 REPO="$BASE/Vlog"
 RUNTIME="$BASE/runtime"
 SOURCE="${GITHUB_WORKSPACE:-}"
+MODE="${1:-deploy}"
 MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://100.83.242.114:9000}"
 MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-http://47.108.66.230}"
 MINIO_BUCKET="${MINIO_BUCKET:-zhiguang}"
@@ -28,6 +29,25 @@ sudo_cmd() {
   fi
 }
 
+# Use this variant when the command must also receive data through stdin.
+# `printf password | sudo -S tee ...` replaces the caller's pipe with the
+# password pipe, which previously produced an empty Compose override file and
+# silently skipped new .env entries. Prefixing the password to the existing
+# stdin lets sudo consume the first line and forwards the remaining data to the
+# target command.
+sudo_stdin_cmd() {
+  if sudo -n true 2>/dev/null; then
+    sudo "$@"
+  elif [[ -n "${SUDO_PASSWORD:-}" ]]; then
+    {
+      printf '%s\n' "$SUDO_PASSWORD"
+      cat
+    } | sudo -S -p '' "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 update_env_value() {
   local file="$1"
   local key="$2"
@@ -44,7 +64,7 @@ update_env_value() {
     escaped_value="${escaped_value//|/\\|}"
     sudo_cmd sed -i "s|^${key}=.*|${key}=${escaped_value}|" "$file"
   else
-    printf '%s=%s\n' "$key" "$value" | sudo_cmd tee -a "$file" >/dev/null
+    printf '%s=%s\n' "$key" "$value" | sudo_stdin_cmd tee -a "$file" >/dev/null
   fi
 }
 
@@ -65,6 +85,22 @@ require_env_value() {
   fi
 }
 
+if [[ "$MODE" == "inject-benchmark-token" ]]; then
+  require_env_value "BENCHMARK_TOKEN" "${BENCHMARK_TOKEN:-}"
+  update_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN" "$BENCHMARK_TOKEN"
+  if [[ "$(read_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN")" != "$BENCHMARK_TOKEN" ]]; then
+    echo "BENCHMARK_TOKEN was not persisted to the runtime env file" >&2
+    exit 1
+  fi
+  echo "Benchmark credential was injected into the server runtime environment"
+  exit 0
+fi
+
+if [[ "$MODE" != "deploy" ]]; then
+  echo "Unknown deployment mode: $MODE" >&2
+  exit 1
+fi
+
 sudo_cmd mkdir -p "$REPO"
 sudo_cmd rsync -a --delete \
   --exclude '.git' \
@@ -82,10 +118,11 @@ require_env_value "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET:-}"
 update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
 update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
 
-# CI uses this separate service credential to call the internal Benchmark API
-# without storing a human JWT in GitHub Actions.
-require_env_value "BENCHMARK_TOKEN" "${BENCHMARK_TOKEN:-}"
-update_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN" "$BENCHMARK_TOKEN"
+# The preceding Action job persists this credential on the internal server.
+# Loading it here proves that the value survives the Job boundary and makes the
+# deployment consume the server-side source of truth.
+BENCHMARK_TOKEN="$(read_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN")"
+require_env_value "BENCHMARK_TOKEN in runtime env" "$BENCHMARK_TOKEN"
 
 # Nacos is part of the application's bootstrap path: the container needs these
 # values before it can load the hot-reloadable runtime configuration from Nacos.
@@ -125,7 +162,7 @@ update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_ID" "$MINIO_ACCESS_KEY_VALUE"
 update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_SECRET" "$MINIO_SECRET_KEY_VALUE"
 update_env_value "$RUNTIME/.env" "OSS_BUCKET" "$MINIO_BUCKET"
 
-cat <<EOF | sudo_cmd tee "$RUNTIME/docker-compose.zhiguang-env.yml" >/dev/null
+cat <<EOF | sudo_stdin_cmd tee "$RUNTIME/docker-compose.zhiguang-env.yml" >/dev/null
 services:
   zhiguang-be:
     env_file:
@@ -163,11 +200,29 @@ services:
       CAMPUS_SCOPES: \${CAMPUS_SCOPES:-openid profile}
 EOF
 
+if ! sudo_cmd test -s "$RUNTIME/docker-compose.zhiguang-env.yml"; then
+  echo "Generated Docker Compose environment override is empty" >&2
+  exit 1
+fi
+if ! sudo_cmd grep -q '^[[:space:]]*BENCHMARK_TOKEN:' "$RUNTIME/docker-compose.zhiguang-env.yml"; then
+  echo "Generated Docker Compose environment override does not forward BENCHMARK_TOKEN" >&2
+  exit 1
+fi
+
 sudo_cmd docker compose \
   -f "$RUNTIME/docker-compose.yml" \
   -f "$RUNTIME/docker-compose.zhiguang-env.yml" \
   --env-file "$RUNTIME/.env" \
   up -d --build
+
+CONTAINER_BENCHMARK_TOKEN="$(
+  sudo_cmd docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' zhiguang-be \
+    | awk -F= '$1 == "BENCHMARK_TOKEN" { sub(/^[^=]*=/, ""); print; exit }'
+)"
+if [[ "$CONTAINER_BENCHMARK_TOKEN" != "$BENCHMARK_TOKEN" ]]; then
+  echo "Running backend container did not receive the expected BENCHMARK_TOKEN" >&2
+  exit 1
+fi
 
 for _ in $(seq 1 40); do
   if curl -fsS http://127.0.0.1:18080/actuator/health >/dev/null; then
