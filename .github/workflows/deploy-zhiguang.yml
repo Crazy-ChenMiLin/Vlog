@@ -68,7 +68,7 @@ jobs:
           MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'http://47.108.66.230' }}
           GITHUB_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
-          GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'http://47.108.66.230/callback' }}
+          GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'https://47.108.66.230/callback' }}
           GITHUB_EXTERNAL_SEARCH_TOKEN: ${{ secrets.GITHUB_EXTERNAL_SEARCH_TOKEN }}
           NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}

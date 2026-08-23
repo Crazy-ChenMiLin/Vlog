@@ -54,7 +54,10 @@ public class CampusOAuthService {
 
     private static final String PKCE_KEY_PREFIX = "campus:pkce:";
     private static final long PKCE_TTL_MINUTES = 5;
-    private static final int PKCE_VERIFIER_LENGTH = 128;
+    // RFC 7636 allows a verifier of at most 128 characters. 96 random bytes
+    // produce exactly 128 unpadded Base64URL characters (128 bytes would
+    // produce 171 characters and is rejected by the campus OIDC server).
+    private static final int PKCE_VERIFIER_BYTE_LENGTH = 96;
     private static final String CODE_CHALLENGE_METHOD = "S256";
 
     private final UserService userService;
@@ -244,7 +247,7 @@ public class CampusOAuthService {
     }
 
     private String generateCodeVerifier() {
-        byte[] bytes = new byte[PKCE_VERIFIER_LENGTH];
+        byte[] bytes = new byte[PKCE_VERIFIER_BYTE_LENGTH];
         secureRandom.nextBytes(bytes);
         return base64UrlEncode(bytes);
     }
