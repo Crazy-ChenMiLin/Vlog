@@ -65,7 +65,8 @@ jobs:
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
           SMTP: ${{ secrets.SMTP }}
-          MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'http://47.108.66.230' }}
+          MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'https://47.108.66.230' }}
+          OSS_PRESIGN_ENDPOINT: ${{ vars.OSS_PRESIGN_ENDPOINT || 'https://47.108.66.230' }}
           GITHUB_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
           GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'https://47.108.66.230/callback' }}

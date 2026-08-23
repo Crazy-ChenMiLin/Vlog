@@ -13,5 +13,7 @@ public class OssProperties {
     private String accessKeySecret;
     private String bucket;
     private String publicDomain; // 可选：如自定义 CDN 域名
+    /** Browser-reachable S3 endpoint used only when signing direct uploads. */
+    private String presignEndpoint;
     private String folder = "avatars"; // 默认上传目录
 }

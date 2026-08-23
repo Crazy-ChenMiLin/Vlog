@@ -85,13 +85,16 @@ public class OssStorageService {
      */
     public String generatePresignedPutUrl(String objectKey, String contentType, int expiresInSeconds) {
         ensureConfigured();
-        MinioClient client = buildClient();
+        // Bucket administration stays on the private endpoint. The URL returned
+        // to a browser must instead use the HTTPS gateway it can actually reach.
+        MinioClient internalClient = buildClient();
+        MinioClient presignClient = buildPresignClient();
         try {
-            ensureBucketExists(client);
+            ensureBucketExists(internalClient);
             Map<String, String> extraHeaders = (contentType == null || contentType.isBlank())
                     ? Map.of()
                     : Map.of("Content-Type", contentType);
-            return client.getPresignedObjectUrl(
+            return presignClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.PUT)
                             .bucket(props.getBucket())
@@ -119,6 +122,21 @@ public class OssStorageService {
                 .endpoint(trimTrailingSlash(props.getEndpoint()))
                 .credentials(props.getAccessKeyId(), props.getAccessKeySecret())
                 .build();
+    }
+
+    private MinioClient buildPresignClient() {
+        String endpoint = resolvePresignEndpoint();
+        return MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(props.getAccessKeyId(), props.getAccessKeySecret())
+                .build();
+    }
+
+    String resolvePresignEndpoint() {
+        String endpoint = StringUtils.hasText(props.getPresignEndpoint())
+                ? props.getPresignEndpoint()
+                : props.getEndpoint();
+        return trimTrailingSlash(endpoint);
     }
 
     private void ensureBucketExists(MinioClient client) {
