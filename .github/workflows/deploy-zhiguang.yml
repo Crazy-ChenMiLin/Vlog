@@ -94,7 +94,7 @@ jobs:
           CLOUD_HOST: ${{ secrets.CLOUD_HOST }}
           CLOUD_USER: ${{ secrets.CLOUD_USER }}
           CLOUD_SSH_KEY: ${{ secrets.CLOUD_SSH_KEY }}
-          CLOUD_WEB_ROOT: /var/www/zhiguang-fe
+          CLOUD_WEB_ROOT: /opt/1panel/www/zhiguang-fe
         run: bash scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
 
   benchmark:

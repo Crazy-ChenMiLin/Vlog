@@ -4,7 +4,7 @@ set -euo pipefail
 DIST_DIR="${1:-zhiguang_fe/zhiguang_fe-main/dist}"
 CLOUD_HOST="${CLOUD_HOST:-47.108.66.230}"
 CLOUD_USER="${CLOUD_USER:-root}"
-CLOUD_WEB_ROOT="${CLOUD_WEB_ROOT:-/var/www/zhiguang-fe}"
+CLOUD_WEB_ROOT="${CLOUD_WEB_ROOT:-/opt/1panel/www/zhiguang-fe}"
 SSH_KEY_PATH="${CLOUD_SSH_KEY_PATH:-}"
 
 if [[ ! -d "$DIST_DIR" ]]; then
@@ -48,13 +48,22 @@ ssh "${SSH_OPTS[@]}" "$CLOUD_USER@$CLOUD_HOST" "echo 'Cloud SSH OK'"
 echo "Uploading frontend dist to $CLOUD_USER@$CLOUD_HOST:$REMOTE_TMP ..."
 ssh "${SSH_OPTS[@]}" "$CLOUD_USER@$CLOUD_HOST" "rm -rf '$REMOTE_TMP' && mkdir -p '$REMOTE_TMP'"
 rsync -az --delete -e "ssh ${SSH_OPTS[*]}" "$DIST_DIR"/ "$CLOUD_USER@$CLOUD_HOST:$REMOTE_TMP"/
-echo "Activating frontend release and reloading nginx ..."
+echo "Activating frontend release and reloading the active gateway ..."
 ssh "${SSH_OPTS[@]}" "$CLOUD_USER@$CLOUD_HOST" "
   set -e
   mkdir -p '$CLOUD_WEB_ROOT'
   rsync -a --delete '$REMOTE_TMP'/ '$CLOUD_WEB_ROOT'/
-  nginx -t
-  systemctl reload nginx
+  openresty_container=\$(docker ps --filter 'name=1Panel-openresty' --format '{{.Names}}' | head -n 1)
+  if [ -n \"\$openresty_container\" ]; then
+    docker exec \"\$openresty_container\" nginx -t
+    docker exec \"\$openresty_container\" nginx -s reload
+  elif systemctl is-active --quiet nginx; then
+    nginx -t
+    systemctl reload nginx
+  else
+    echo 'No active OpenResty container or system Nginx service found.' >&2
+    exit 1
+  fi
   curl -fsS http://127.0.0.1/ >/dev/null
   curl -fsS 'http://127.0.0.1/api/v1/knowposts/feed?page=1&size=1' >/dev/null
 "
