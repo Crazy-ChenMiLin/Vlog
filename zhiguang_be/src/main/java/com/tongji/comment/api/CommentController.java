@@ -1,6 +1,8 @@
 package com.tongji.comment.api;
 
 import com.tongji.auth.token.JwtService;
+import com.tongji.common.exception.BusinessException;
+import com.tongji.common.exception.ErrorCode;
 import com.tongji.comment.api.dto.CommentResponse;
 import com.tongji.comment.api.dto.CreateCommentRequest;
 import com.tongji.comment.service.CommentService;
@@ -27,7 +29,13 @@ public class CommentController {
     public ResponseEntity<Void> create(@Valid @RequestBody CreateCommentRequest request,
                                        @AuthenticationPrincipal Jwt jwt) {
         long userId = jwtService.extractUserId(jwt);
-        commentService.create(request.postId(), userId, request.content());
+        long postId;
+        try {
+            postId = Long.parseLong(request.postId());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "postId 非法");
+        }
+        commentService.create(postId, userId, request.content());
         return ResponseEntity.noContent().build();
     }
 

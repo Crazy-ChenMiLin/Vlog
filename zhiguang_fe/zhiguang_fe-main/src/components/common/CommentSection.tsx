@@ -56,7 +56,7 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
     setSubmitting(true);
     setError(null);
     try {
-      await commentService.create({ postId: Number(postId), content: text }, tokens.accessToken);
+      await commentService.create({ postId, content: text }, tokens.accessToken);
       setInput("");
       await loadPage(1, false);
     } catch (e) {

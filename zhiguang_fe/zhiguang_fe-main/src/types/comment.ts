@@ -9,6 +9,7 @@ export type CommentItem = {
 };
 
 export type CreateCommentRequest = {
-  postId: number;
+  // Snowflake IDs exceed JavaScript's safe integer range; keep them as strings.
+  postId: string;
   content: string;
 };
