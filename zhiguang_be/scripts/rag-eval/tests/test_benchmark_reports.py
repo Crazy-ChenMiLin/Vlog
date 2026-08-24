@@ -283,11 +283,17 @@ class BenchmarkReportsTest(unittest.TestCase):
         failed = judge.judgement_document(*common, [
             {"caseId": "gold-001", "status": "FAILED", "attemptFailures": []},
         ])
+        complete_with_planned_skip = judge.judgement_document(*common, [
+            {"caseId": "gold-001", "status": "COMPLETED", "verdict": "PASS"},
+            {"caseId": "gold-002", "status": "SKIPPED_NOT_EVALUABLE"},
+        ])
 
         self.assertEqual("PARTIAL", partial["evaluationStatus"])
         self.assertEqual(0, judge.judge_exit_code(partial))
         self.assertEqual("FAILED", failed["evaluationStatus"])
         self.assertEqual(1, judge.judge_exit_code(failed))
+        self.assertEqual("COMPLETE", complete_with_planned_skip["evaluationStatus"])
+        self.assertEqual(1, complete_with_planned_skip["skippedNotEvaluableCount"])
 
 
 if __name__ == "__main__":

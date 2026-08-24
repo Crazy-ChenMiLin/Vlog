@@ -556,7 +556,10 @@ def judgement_document(
     skipped_not_evaluable_count = sum(result["status"] == "SKIPPED_NOT_EVALUABLE" for result in results)
     if failed_count and not completed:
         evaluation_status = "FAILED"
-    elif failed_count or skipped_count or skipped_not_evaluable_count:
+    # Gold cases explicitly marked as not evaluable are planned exclusions,
+    # not execution gaps. They stay visible in the counts but must not turn an
+    # otherwise complete evaluation into PARTIAL.
+    elif failed_count or skipped_count:
         evaluation_status = "PARTIAL"
     elif results:
         evaluation_status = "COMPLETE"
