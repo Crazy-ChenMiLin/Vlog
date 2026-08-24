@@ -61,12 +61,13 @@ target/rag-benchmark/t2-retrieval-report.md
 
 ```text
 t2-topic-automotive-maintenance-v1.json  # 受审选题、规范问题和固定证据
+t2-automotive-answer-reference-v1.json   # 答案裁判参考要点与是否可评标记
 gold-dataset-t2-automotive-v1.json       # 专题 Gold 留档
 gold-dataset-t2-automotive-v1.md         # 人工审核文档
 ../gold-dataset-v1.json                  # 后端与 Action 当前实际读取的正式 Gold
 ```
 
-正式 Gold 的 40 题均为 `approved`，运行报告中的数据集版本为 `t2-automotive-maintenance-v1`。专题留档与正式 Gold 内容应保持一致。
+正式 Gold 的 40 题均为 `approved`，运行报告中的数据集版本为 `t2-automotive-maintenance-v1`。其中 40 题都参与检索评测；38 题有充分、可靠的答案参考点并参与大模型裁判，2 题标记为 `answer_evaluable=false`，只做检索评测，避免不完整或不安全的参考答案制造误判。专题留档与正式 Gold 内容应保持一致。
 
 ## 常用覆盖参数
 

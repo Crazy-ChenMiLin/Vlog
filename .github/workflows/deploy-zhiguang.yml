@@ -210,6 +210,8 @@ jobs:
         working-directory: zhiguang_be
         env:
           QIANFAN_JUDGE_API_KEY: ${{ secrets.QIANFAN_JUDGE_API_KEY }}
+          BENCHMARK_ES_URL: http://127.0.0.1:9200
+          BENCHMARK_ES_INDEX: zhiguang-ai-index
         run: |
           python scripts/AUTO_Benchwork/judge.py \
             --run-dir "$BENCHMARK_RUN_DIR"

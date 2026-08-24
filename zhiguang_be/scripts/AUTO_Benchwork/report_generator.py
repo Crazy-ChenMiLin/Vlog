@@ -12,12 +12,12 @@ import argparse
 import json
 import os
 import tempfile
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
-REPORT_SCHEMA_VERSION = "rag-benchmark-report-v1"
+REPORT_SCHEMA_VERSION = "rag-benchmark-report-v2"
 CANONICAL_STAGE_ORDER = ("ORIGINAL", "HYDE", "KEYWORD", "FUSED", "RERANKED")
 
 
@@ -251,21 +251,54 @@ def build_report(run_dir: Path) -> dict[str, Any]:
         raise RuntimeError("Duplicate evaluation.caseId values found in saved Transcripts")
 
     completed_rows = [row for row in case_rows if row["status"] == "COMPLETED"]
+    runtime_metadata_path = run_dir / "1-2-runtime-metadata.json"
+    runtime_metadata = read_json(runtime_metadata_path) if runtime_metadata_path.is_file() else {}
+    top_k = runtime_metadata.get("topK", 5)
+    if not isinstance(top_k, int) or top_k < 1:
+        raise RuntimeError(f"Runtime metadata has invalid topK: {top_k}")
     stage_summary: dict[str, dict[str, Any]] = {}
     for stage_name in ordered_stage_names(completed_rows):
-        available = [row["stages"][stage_name] for row in completed_rows if stage_name in row["stages"]]
-        hits = sum(stage["goldHit"] for stage in available)
-        reciprocal_rank_sum = sum(
-            1 / stage["bestGoldRank"] for stage in available if stage["bestGoldRank"] is not None
-        )
-        best_ranks = [stage["bestGoldRank"] for stage in available if stage["bestGoldRank"] is not None]
+        available_rows = [row for row in completed_rows if stage_name in row["stages"]]
+        executed_rows = [row for row in available_rows if row["stages"][stage_name]["candidateCount"] > 0]
+        top_k_best_ranks: list[int] = []
+        recall_values: list[float] = []
+        full_stage_best_ranks: list[int] = []
+        for row in executed_rows:
+            stage = row["stages"][stage_name]
+            top_k_ranks = [rank for rank in stage["goldRanks"] if rank <= top_k]
+            stage["topK"] = top_k
+            stage["topKGoldRanks"] = top_k_ranks
+            stage["topKGoldHit"] = bool(top_k_ranks)
+            stage["topKBestGoldRank"] = min(top_k_ranks) if top_k_ranks else None
+            if top_k_ranks:
+                top_k_best_ranks.append(min(top_k_ranks))
+            if stage["bestGoldRank"] is not None:
+                full_stage_best_ranks.append(stage["bestGoldRank"])
+            expected_count = len(row["expectedChunkIds"])
+            matched_in_top_k = sum(rank <= top_k for rank in stage["goldRanks"])
+            recall_values.append(matched_in_top_k / expected_count if expected_count else 0.0)
+
+        top_k_hits = len(top_k_best_ranks)
+        full_stage_hits = len(full_stage_best_ranks)
+        reciprocal_rank_sum = sum(1 / rank for rank in top_k_best_ranks)
+        full_stage_reciprocal_rank_sum = sum(1 / rank for rank in full_stage_best_ranks)
         stage_summary[stage_name] = {
-            "availableCaseCount": len(available),
-            "missingCaseCount": len(completed_rows) - len(available),
-            "goldHitCount": hits,
-            "goldHitRate": rounded_ratio(hits, len(available)),
-            "meanReciprocalRank": round(reciprocal_rank_sum / len(available), 6) if available else None,
-            "meanBestGoldRankWhenHit": round(sum(best_ranks) / len(best_ranks), 6) if best_ranks else None,
+            "topK": top_k,
+            "availableCaseCount": len(available_rows),
+            "executedCaseCount": len(executed_rows),
+            "skippedEmptyCandidateCount": len(available_rows) - len(executed_rows),
+            "missingCaseCount": len(completed_rows) - len(available_rows),
+            "executionRate": rounded_ratio(len(executed_rows), len(completed_rows)),
+            "goldHitCount": top_k_hits,
+            "goldHitRate": rounded_ratio(top_k_hits, len(executed_rows)),
+            "macroRecallAtK": round(sum(recall_values) / len(recall_values), 6) if recall_values else None,
+            "meanReciprocalRank": round(reciprocal_rank_sum / len(executed_rows), 6) if executed_rows else None,
+            "meanBestGoldRankWhenHit": round(sum(top_k_best_ranks) / len(top_k_best_ranks), 6)
+            if top_k_best_ranks else None,
+            "fullStageGoldHitCount": full_stage_hits,
+            "fullStageGoldHitRate": rounded_ratio(full_stage_hits, len(executed_rows)),
+            "fullStageMeanReciprocalRank": round(full_stage_reciprocal_rank_sum / len(executed_rows), 6)
+            if executed_rows else None,
         }
 
     non_empty_answers = sum(row["hasAnswer"] for row in completed_rows)
@@ -277,14 +310,12 @@ def build_report(run_dir: Path) -> dict[str, Any]:
     if len(run_ids) > 1:
         raise RuntimeError(f"Saved Transcripts belong to multiple runs: {sorted(run_ids)}")
 
-    runtime_metadata_path = run_dir / "1-2-runtime-metadata.json"
-    runtime_metadata = read_json(runtime_metadata_path) if runtime_metadata_path.is_file() else {}
     if not run_ids and isinstance(runtime_metadata.get("runId"), str):
         run_ids.add(runtime_metadata["runId"])
 
     return {
         "schemaVersion": REPORT_SCHEMA_VERSION,
-        "generatedAt": datetime.now(UTC).isoformat(),
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
         "runId": next(iter(run_ids), None),
         "runDirectory": str(run_dir),
         "inputTranscriptCount": len(case_rows),
@@ -295,7 +326,11 @@ def build_report(run_dir: Path) -> dict[str, Any]:
             "nonEmptyRate": rounded_ratio(non_empty_answers, len(completed_rows)),
             "note": "This is only an answer-presence check; judge.py owns answer-quality scoring.",
         },
-        "metricDefinition": "goldHitRate is Hit@K over the candidates returned by each stage; K is recorded in runtime metadata.",
+        "metricDefinition": (
+            f"Hit@K (goldHitRate), Recall@K (macroRecallAtK), and MRR@K (meanReciprocalRank) "
+            f"use the first {top_k} candidates only. "
+            "Empty candidate stages are SKIPPED and excluded from the stage-quality denominator; executionRate reports their frequency."
+        ),
         "goldIdAudit": build_gold_id_audit(completed_rows),
         "stages": stage_summary,
         "cases": sorted(case_rows, key=lambda row: row["caseId"]),
@@ -325,7 +360,7 @@ def metric_delta(current: Any, baseline: Any) -> float | None:
 def build_diff_report(report: dict[str, Any], baseline_path: Path | None) -> dict[str, Any]:
     if baseline_path is None:
         return {
-            "schemaVersion": "rag-benchmark-diff-v1",
+            "schemaVersion": "rag-benchmark-diff-v2",
             "status": "NO_BASELINE",
             "currentRunId": report["runId"],
             "message": "No baseline was supplied; this first run establishes an inspectable report only.",
@@ -333,6 +368,11 @@ def build_diff_report(report: dict[str, Any], baseline_path: Path | None) -> dic
         }
 
     baseline = read_json(baseline_path)
+    if baseline.get("schemaVersion") != REPORT_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Baseline {baseline_path} uses {baseline.get('schemaVersion')}; expected {REPORT_SCHEMA_VERSION}. "
+            "Create a new reviewed baseline after the Top-K metric correction."
+        )
     baseline_stages = baseline.get("stages")
     if not isinstance(baseline_stages, dict):
         raise RuntimeError(f"Baseline {baseline_path} has no stages object")
@@ -351,7 +391,7 @@ def build_diff_report(report: dict[str, Any], baseline_path: Path | None) -> dic
             ),
         }
     return {
-        "schemaVersion": "rag-benchmark-diff-v1",
+        "schemaVersion": "rag-benchmark-diff-v2",
         "status": "COMPARISON_AVAILABLE",
         "currentRunId": report["runId"],
         "baselineRunId": baseline.get("runId"),

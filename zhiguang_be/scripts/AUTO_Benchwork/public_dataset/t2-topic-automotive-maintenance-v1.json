@@ -3,6 +3,7 @@
   "dataset": "mteb/T2Retrieval",
   "topic": "汽车维护与故障诊断",
   "status": "approved",
+  "answer_reference_file": "t2-automotive-answer-reference-v1.json",
   "cases": [
     {"query_id": "1497", "question": "汽车机油乳化有哪些常见原因？", "review_evidence_chunk_id": "159187"},
     {"query_id": "2961", "question": "汽车行驶时出现顿挫，常见原因有哪些？", "review_evidence_chunk_id": "290544"},

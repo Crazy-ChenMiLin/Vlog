@@ -242,6 +242,15 @@ def select_manifest_cases(
 ) -> list[dict[str, Any]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     topic = clean_text(manifest.get("topic"))
+    answer_references: dict[str, Any] = {}
+    reference_file = manifest.get("answer_reference_file")
+    if isinstance(reference_file, str) and reference_file.strip():
+        reference_path = manifest_path.parent / reference_file
+        reference_document = json.loads(reference_path.read_text(encoding="utf-8"))
+        raw_references = reference_document.get("cases")
+        if not isinstance(raw_references, dict):
+            raise RuntimeError("Answer reference file requires a cases object")
+        answer_references = raw_references
     manifest_cases = manifest.get("cases")
     query_ids = manifest.get("query_ids")
     default_status = clean_text(manifest.get("status") or "candidate")
@@ -279,6 +288,7 @@ def select_manifest_cases(
                 "selection_score": None,
                 "review_evidence_chunk_id": evidence_id or None,
                 "status": clean_text(entry.get("status") or default_status),
+                "answer_reference": answer_references.get(query_id, {}),
             }
         )
     return selected
@@ -310,6 +320,13 @@ def build_gold(selected: list[dict[str, Any]], evidence: dict[str, dict[str, str
     for number, item in enumerate(selected, start=1):
         evidence_id = best_evidence_id(item, evidence)
         first_evidence = evidence.get(evidence_id, {})
+        answer_reference = item.get("answer_reference") or {}
+        reference_points = answer_reference.get("reference_points", [])
+        if not isinstance(reference_points, list) or any(not isinstance(point, str) for point in reference_points):
+            raise RuntimeError(f"Invalid reference_points for query {item['query_id']}")
+        reference_answer = clean_text(answer_reference.get("reference_answer"))
+        if not reference_answer and reference_points:
+            reference_answer = "；".join(clean_text(point) for point in reference_points) + "。"
         gold.append(
             {
                 "id": f"gold-{number:03d}",
@@ -321,6 +338,9 @@ def build_gold(selected: list[dict[str, Any]], evidence: dict[str, dict[str, str
                     "section_title": item["topic"],
                     "excerpt": first_evidence.get("excerpt", ""),
                 },
+                "answer_evaluable": bool(answer_reference.get("answer_evaluable", True)),
+                "reference_answer": reference_answer or first_evidence.get("excerpt", ""),
+                "reference_points": [clean_text(point) for point in reference_points],
                 "source": {
                     "dataset": "mteb/T2Retrieval",
                     "query_id": item["query_id"],
@@ -365,6 +385,9 @@ def markdown(gold: list[dict[str, Any]]) -> str:
                 f"- 审核证据 chunk：`{source['review_evidence_chunk_id']}`",
                 f"- 证据标题：{case['evidence']['title']}",
                 f"- 证据摘录：{case['evidence']['excerpt']}",
+                f"- 答案裁判：{'启用' if case['answer_evaluable'] else '跳过（证据不足或存在安全争议）'}",
+                f"- 标准答案：{case['reference_answer']}",
+                f"- 标准要点：{'；'.join(case['reference_points'])}",
                 "",
             ]
         )

@@ -56,6 +56,64 @@ class FakeResponse:
 
 
 class BenchmarkReportsTest(unittest.TestCase):
+    def test_judge_loads_reranked_contexts_from_elasticsearch_in_rank_order(self) -> None:
+        value = transcript("gold-001", "COMPLETED", True, [1])
+        value["stages"][-1]["candidates"] = [{"chunkId": "b"}, {"chunkId": "a"}]
+
+        def opener(request, timeout):
+            body = json.loads(request.data.decode("utf-8"))
+            self.assertEqual(["b", "a"], body["ids"])
+            return FakeResponse({"docs": [
+                {"_id": "a", "found": True, "_source": {"content": "A", "metadata": {"title": "TA"}}},
+                {"_id": "b", "found": True, "_source": {"content": "B", "metadata": {"title": "TB"}}},
+            ]})
+
+        contexts = judge.load_retrieved_contexts(value, "http://es", "index", opener)
+
+        self.assertEqual(["b", "a"], [context["chunkId"] for context in contexts])
+        self.assertEqual(["B", "A"], [context["content"] for context in contexts])
+
+    def test_judge_requests_json_mode_and_reports_truncation(self) -> None:
+        def opener(request, timeout):
+            body = json.loads(request.data.decode("utf-8"))
+            self.assertEqual({"type": "json_object"}, body["response_format"])
+            self.assertEqual(800, body["max_tokens"])
+            return FakeResponse({
+                "choices": [{"finish_reason": "length", "message": {"content": '{"verdict":"PASS"'}}],
+                "usage": {"completion_tokens": 800},
+            })
+
+        with self.assertRaises(judge.JudgeRequestError) as caught:
+            judge.call_judge("https://judge.example/chat/completions", "token", "model", "prompt", 5, opener)
+
+        self.assertIn("truncated", str(caught.exception))
+        self.assertIn("finishReason", caught.exception.raw_response)
+
+    def test_stage_metrics_use_common_top_k_and_exclude_empty_hyde_stages(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            run_dir = Path(temp) / "run"
+            transcripts = run_dir / "transcripts"
+            transcripts.mkdir(parents=True)
+            value = transcript("gold-001", "COMPLETED", True, [6])
+            value["stages"].insert(1, {
+                "stage": "HYDE", "candidates": [], "goldHit": False, "goldRanks": [],
+            })
+            value["stages"][0]["candidates"] = [
+                {"id": f"other-{index}"} for index in range(5)
+            ] + [{"id": "chunk-1"}]
+            (transcripts / "gold-001.json").write_text(json.dumps(value), encoding="utf-8")
+            (run_dir / "1-2-runtime-metadata.json").write_text(
+                json.dumps({"runId": "ci-run-001", "topK": 5}), encoding="utf-8"
+            )
+
+            report = report_generator.build_report(run_dir)
+
+            self.assertEqual(0.0, report["stages"]["ORIGINAL"]["goldHitRate"])
+            self.assertEqual(1.0, report["stages"]["ORIGINAL"]["fullStageGoldHitRate"])
+            self.assertEqual(0, report["stages"]["HYDE"]["executedCaseCount"])
+            self.assertEqual(1, report["stages"]["HYDE"]["skippedEmptyCandidateCount"])
+            self.assertIsNone(report["stages"]["HYDE"]["goldHitRate"])
+
     def test_partial_collection_builds_hit_at_k_and_baseline_delta(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             run_dir = Path(temp) / "run"
@@ -69,6 +127,7 @@ class BenchmarkReportsTest(unittest.TestCase):
             )
             baseline = Path(temp) / "baseline.json"
             baseline.write_text(json.dumps({
+                "schemaVersion": report_generator.REPORT_SCHEMA_VERSION,
                 "runId": "reviewed-baseline",
                 "stages": {
                     "ORIGINAL": {"goldHitRate": 0.5, "meanReciprocalRank": 0.25},
@@ -130,12 +189,14 @@ class BenchmarkReportsTest(unittest.TestCase):
 
     def test_judge_accepts_strict_json_and_can_summarize_an_empty_partial_run(self) -> None:
         def opener(request, timeout):
-            return FakeResponse({"choices": [{"message": {"content": '{"verdict":"PASS","score":1,"reason":"证据一致"}'}}]})
+            return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": '{"verdict":"PASS","score":1,"correctness":1,"completeness":1,"groundedness":1,"reason":"证据一致"}'}}]})
 
         judgement = judge.call_judge(
             "https://judge.example/chat/completions", "token", "model", "prompt", 5, opener
         )
-        self.assertEqual({"verdict": "PASS", "score": 1.0, "reason": "证据一致"}, judgement)
+        self.assertEqual("PASS", judgement["verdict"])
+        self.assertEqual(1.0, judgement["correctness"])
+        self.assertEqual("stop", judgement["providerMeta"]["finishReason"])
 
         with tempfile.TemporaryDirectory() as temp:
             run_dir = Path(temp) / "run"
@@ -166,7 +227,7 @@ class BenchmarkReportsTest(unittest.TestCase):
 
             self.assertEqual(0, document["completedCount"])
             self.assertTrue((run_dir / "3-1-judge-report.json").is_file())
-            self.assertIn("Hit@K uses the K recorded above (5)", summary)
+            self.assertIn("first 5 candidates", summary)
             self.assertIn("No baseline is configured", summary)
 
     def test_judge_retries_non_json_and_retains_raw_response(self) -> None:
@@ -183,11 +244,11 @@ class BenchmarkReportsTest(unittest.TestCase):
             ]), encoding="utf-8")
             contents = iter([
                 "这次没有按照要求返回 JSON",
-                '{"verdict":"PASS","score":1,"reason":"证据一致"}',
+                '{"verdict":"PASS","score":1,"correctness":1,"completeness":1,"groundedness":1,"reason":"证据一致"}',
             ])
 
             def opener(request, timeout):
-                return FakeResponse({"choices": [{"message": {"content": next(contents)}}]})
+                return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": next(contents)}}]})
 
             document = judge.run_judgements(
                 run_dir=run_dir,
