@@ -328,7 +328,11 @@ def call_judge(
             {"role": "user", "content": prompt},
         ],
         "temperature": 0,
-        "max_tokens": 800,
+        # DeepSeek-V4-Flash may spend most of the completion budget on
+        # reasoning tokens before emitting the small JSON judgement. 800
+        # repeatedly truncated valid evaluations in production, so leave
+        # enough headroom for both reasoning and the structured response.
+        "max_tokens": 2048,
         "response_format": {"type": "json_object"},
     }).encode("utf-8")
     request = urllib.request.Request(

@@ -77,7 +77,7 @@ class BenchmarkReportsTest(unittest.TestCase):
         def opener(request, timeout):
             body = json.loads(request.data.decode("utf-8"))
             self.assertEqual({"type": "json_object"}, body["response_format"])
-            self.assertEqual(800, body["max_tokens"])
+            self.assertEqual(2048, body["max_tokens"])
             return FakeResponse({
                 "choices": [{"finish_reason": "length", "message": {"content": '{"verdict":"PASS"'}}],
                 "usage": {"completion_tokens": 800},
