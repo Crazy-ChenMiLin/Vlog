@@ -27,7 +27,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class BenchmarkController {
 
-    private static final String DATASET_VERSION = "gold-dataset-v1";
+    private static final String DATASET_VERSION = "t2-automotive-maintenance-v1";
     private static final int DEFAULT_TOP_K = 5;
 
     private final BenchmarkSingleCaseService benchmarkSingleCaseService;

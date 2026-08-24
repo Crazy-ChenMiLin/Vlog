@@ -109,17 +109,26 @@ jobs:
 
     steps:
       - name: Checkout evaluated revision
+        id: checkout
         uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: 2
+          GIT_CONFIG_KEY_0: url.https://v4.gh-proxy.org/https://github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
+          GIT_CONFIG_KEY_1: http.version
+          GIT_CONFIG_VALUE_1: HTTP/1.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Python
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Prepare Benchmark run
+        id: prepare
         shell: bash
         run: |
           run_id="benchmark-${GITHUB_RUN_ID}-${GITHUB_SHA:0:7}"
@@ -182,7 +191,7 @@ jobs:
 
       - name: Build retrieval funnel and diff reports
         id: report
-        if: always()
+        if: always() && steps.prepare.outcome == 'success'
         shell: bash
         working-directory: zhiguang_be
         run: |
@@ -195,7 +204,7 @@ jobs:
 
       - name: Judge final answers and create review summary
         id: judge
-        if: always()
+        if: always() && steps.report.outcome == 'success'
         continue-on-error: true
         shell: bash
         working-directory: zhiguang_be
@@ -206,7 +215,7 @@ jobs:
             --run-dir "$BENCHMARK_RUN_DIR"
 
       - name: Show Benchmark summary
-        if: always()
+        if: always() && steps.prepare.outcome == 'success'
         shell: bash
         run: |
           if [[ -f "${BENCHMARK_RUN_DIR}/summary.md" ]]; then
@@ -214,7 +223,7 @@ jobs:
           fi
 
       - name: Annotate partial Benchmark results
-        if: always()
+        if: always() && steps.prepare.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |
@@ -238,7 +247,7 @@ jobs:
           PY
 
       - name: Upload Benchmark Artifact
-        if: always()
+        if: always() && steps.prepare.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: rag-benchmark-${{ github.run_id }}
@@ -247,7 +256,7 @@ jobs:
           retention-days: 30
 
       - name: Fail only on Benchmark execution failures
-        if: always()
+        if: always() && steps.prepare.outcome == 'success' && steps.report.outcome == 'success'
         shell: bash
         env:
           COLLECT_OUTCOME: ${{ steps.collect.outcome }}
