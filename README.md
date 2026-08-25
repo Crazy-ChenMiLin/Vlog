@@ -51,9 +51,12 @@
 ```text
 .
 ├── zhiguang_be
-│   ├── db                 # MySQL 建表脚本
-│   ├── docs               # 后端接口文档
-│   ├── scripts            # 辅助脚本
+│   ├── docs               # 后端接口文档与 SQL
+│   ├── scripts
+│   │   ├── deploy         # 内网后端、公网前端与 Nacos 部署脚本
+│   │   ├── AUTO_Benchwork # RAG Benchmark 流水线、数据集与测试
+│   │   ├── rag-eval       # RAG/Graph A/B 评测工具
+│   │   └── graph          # 图数据工具
 │   ├── src/main/java      # 后端业务代码
 │   ├── src/main/resources # MyBatis mapper、密钥、配置等资源
 │   └── pom.xml
@@ -137,7 +140,7 @@ $env:VITE_API_BASE_URL="http://localhost:8080"
 后端建表脚本位于：
 
 ```text
-zhiguang_be/db/schema.sql
+zhiguang_be/docs/sql/schema.sql
 ```
 
 首次启动前，在 MySQL 中创建目标数据库后执行该脚本。
@@ -151,7 +154,7 @@ CREATE DATABASE zhiguang_auth DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unic
 然后导入：
 
 ```powershell
-mysql -u root -p zhiguang_auth < zhiguang_be/db/schema.sql
+mysql -u root -p zhiguang_auth < zhiguang_be/docs/sql/schema.sql
 ```
 
 ## 启动后端
@@ -239,6 +242,26 @@ zhiguang_be/docs
 4. 调用大模型生成答案。
 5. 前端以流式方式展示回答。
 
+RAG 检索链路采用多阶段处理：
+
+```text
+用户问题
+-> 问题改写 / standaloneQuestion
+-> 原始向量召回 + HyDE 召回
+-> RRF 融合候选集
+-> NVIDIA rerank 重排
+-> questionIntent + sectionType 轻量后处理
+-> TopK 上下文交给大模型生成流式答案
+```
+
+索引中的 chunk 除正文外还保存 `title`、`sectionTitle`、`sectionType`、
+`postId`、`chunkId`、`position` 和 `indexVersion`。重排阶段使用标题、章节和
+章节类型增强输入，并根据解释、解决方案、面试和测试等问题意图做轻量分数校正。
+
+正式 Benchmark 位于 `zhiguang_be/scripts/AUTO_Benchwork/`，包含五个互不重复的
+T2Retrieval 专题、真实 qrels Gold、检索漏斗报告和答案裁判。传统 BM25/Graph A/B
+工具位于 `zhiguang_be/scripts/rag-eval/`，可通过根目录的手动 Workflow 触发。
+
 ### 关注关系同步
 
 1. 关注或取关请求在主事务中写入关系表和 Outbox 表。
@@ -249,7 +272,7 @@ zhiguang_be/docs
 ## 开发建议
 
 - 修改接口前先查看 `zhiguang_be/docs` 中的契约说明。
-- 修改数据表后同步更新 `zhiguang_be/db/schema.sql`。
+- 修改数据表后同步更新 `zhiguang_be/docs/sql/schema.sql`。
 - 修改前端接口调用时，同步检查 `src/services` 和 `src/types`。
 - 修改 RAG 或搜索逻辑时，确认 Elasticsearch 索引名、Embedding 维度和模型配置一致。
 - 涉及缓存、Kafka、Canal 的改动，建议同时验证同步链路和失败重试场景。
@@ -274,6 +297,30 @@ zhiguang_be/docs
 - 检查对象存储 bucket 是否存在。
 - 检查 `oss.public-domain` 是否能被浏览器访问。
 - 检查 bucket 访问策略或预签名 URL 是否过期。
+
+## Docker 与自动部署
+
+后端提供 `zhiguang_be/Dockerfile`、`docker-compose.yml` 和 `.env.example`：
+
+```bash
+cd zhiguang_be
+cp .env.example .env
+docker compose up -d --build
+docker compose logs -f zhiguang-be
+```
+
+真实 `.env`、数据库密码、模型 API Key 和私钥不得提交到 Git。生产环境采用
+“内网资源服务器运行后端和中间件、公网轻量服务器提供前端与反向代理”的拓扑，
+两台服务器通过 Tailscale 通信。
+
+根目录 `.github/workflows/` 是唯一 Workflow 目录：
+
+- `deploy-zhiguang.yml`：推送 `main` 后部署前后端；提交信息包含 `[run-bench]` 时追加 Benchmark。
+- `rag-eval.yml`：手动运行 BM25 A/B 评测。
+- `graph-rag-eval.yml`：手动运行 Graph RAG A/B 评测。
+
+部署脚本统一位于 `zhiguang_be/scripts/deploy/`。普通开发流程为：本地修改、提交、
+推送 GitHub，然后以 Action 是否成功作为部署结果。
 
 ## 项目状态
 

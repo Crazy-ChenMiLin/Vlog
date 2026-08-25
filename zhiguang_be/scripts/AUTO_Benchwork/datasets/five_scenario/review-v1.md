@@ -1,0 +1,24 @@
+# 五场景 Benchmark 审核清单
+
+| 场景 | 题数 | 答案裁判 | 仅检索 | Gold chunk 关系 |
+| --- | ---: | ---: | ---: | --- |
+| 汽车维护与故障诊断 | 40 | 38 | 2 | T2 qrels |
+| 中国历史与传统文化 | 40 | 35 | 5 | T2 qrels |
+| 计算机软件与网络运维 | 40 | 35 | 5 | T2 qrels |
+| 日常生活与家居实务 | 40 | 36 | 4 | T2 qrels |
+| 教育学习与职业发展 | 40 | 34 | 6 | T2 qrels |
+
+## 审核结论
+
+- 共 200 题、200 个唯一 queryId，五个场景之间无重复题。
+- expectedChunkIds 全部由对应 query 的真实 T2Retrieval qrels 构建，不使用模型生成的 ID。
+- 178 题参与最终答案质量裁判；22 题因证据不足、政策时效、歧义或安全风险只参与检索评测。
+- 每个场景固定 40 题，因此场景等权宏平均与按题汇总在检索题数上等价；答案裁判题数不同，所以答案质量必须先算场景均值，再对五场景等权平均。
+- 总分是 Hit@5、Recall@5、MRR@5、correctness、completeness、groundedness 六项归一化指标的算术平均。六项原始宏平均和逐场景成绩必须与总分一起展示。
+
+## 运行边界
+
+- 后端只接受五个白名单 datasetVersion，调用方不能传问题或 expectedChunkIds，避免篡改评测基准。
+- 五个数据集由 Maven 打包进后端 classpath；业务 RAG 检索链路没有改动。
+- `run_five_scenario_benchmark.py` 顺序运行五个专题，避免同时压测后端和外部模型。
+- 自动化没有提交、推送或触发 GitHub Action，需人工审核后再进入 CI。

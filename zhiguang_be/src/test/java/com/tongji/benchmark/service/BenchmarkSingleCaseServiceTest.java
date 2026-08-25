@@ -35,9 +35,11 @@ class BenchmarkSingleCaseServiceTest {
                 "gold-003", "HyDE 如何提升召回？", List.of("gold#1"), List.of("RAG")
         );
         BenchmarkEvaluationContextDTO context = new BenchmarkEvaluationContextDTO(
-                "run-001", "gold-003", "gold-dataset-v1"
+                "run-001", "gold-003", "t2-automotive-maintenance-v1"
         );
-        when(benchmarkCaseService.getRequiredCase("gold-003")).thenReturn(benchmarkCase);
+        when(benchmarkCaseService.getRequiredCase(
+                "t2-automotive-maintenance-v1", "gold-003"
+        )).thenReturn(benchmarkCase);
         when(ragQueryService.generateGlobalTranscript("HyDE 如何提升召回？", 5, "run-001"))
                 .thenReturn(Mono.just(runtimeTranscript()));
         BenchmarkSingleCaseService service = new BenchmarkSingleCaseService(benchmarkCaseService, ragQueryService);

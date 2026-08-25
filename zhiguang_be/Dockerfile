@@ -5,8 +5,8 @@ COPY pom.xml .
 RUN mvn -q -DskipTests dependency:go-offline
 
 COPY src ./src
-# Gold 数据集由 pom.xml 映射到 classpath:benchmark，构建镜像时必须一并复制。
-COPY scripts/AUTO_Benchwork/gold-dataset-v1.json ./scripts/AUTO_Benchwork/gold-dataset-v1.json
+# 五套 Gold 数据集由 pom.xml 映射到 classpath:benchmark，构建镜像时必须一并复制。
+COPY scripts/AUTO_Benchwork/datasets/five_scenario ./scripts/AUTO_Benchwork/datasets/five_scenario
 RUN mvn -q -DskipTests package
 
 FROM eclipse-temurin:21-jre

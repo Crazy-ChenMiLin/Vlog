@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -18,38 +19,45 @@ import java.util.stream.Collectors;
  */
 @Service
 public class BenchmarkCaseService {
-    private static final String DATASET_RESOURCE = "benchmark/gold-dataset-v1.json";
+    private static final Map<String, String> DATASET_RESOURCES = Map.of(
+            "t2-automotive-maintenance-v1", "benchmark/automotive-maintenance/gold-v1.json",
+            "t2-history-culture-v1", "benchmark/history-culture/gold-v1.json",
+            "t2-computer-operations-v1", "benchmark/computer-operations/gold-v1.json",
+            "t2-daily-home-v1", "benchmark/daily-home/gold-v1.json",
+            "t2-education-development-v1", "benchmark/education-development/gold-v1.json"
+    );
 
     private final ObjectMapper objectMapper;
-    private volatile Map<String, BenchmarkCaseDTO> casesById;
+    private final Map<String, Map<String, BenchmarkCaseDTO>> casesByDataset = new ConcurrentHashMap<>();
 
     public BenchmarkCaseService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     public BenchmarkCaseDTO getRequiredCase(String caseId) {
-        BenchmarkCaseDTO benchmarkCase = cases().get(caseId);
+        return getRequiredCase("t2-automotive-maintenance-v1", caseId);
+    }
+
+    public BenchmarkCaseDTO getRequiredCase(String datasetVersion, String caseId) {
+        BenchmarkCaseDTO benchmarkCase = cases(datasetVersion).get(caseId);
         if (benchmarkCase == null) {
-            throw new IllegalArgumentException("Unknown benchmark caseId: " + caseId);
+            throw new IllegalArgumentException(
+                    "Unknown benchmark caseId " + caseId + " in dataset " + datasetVersion
+            );
         }
         return benchmarkCase;
     }
 
-    private Map<String, BenchmarkCaseDTO> cases() {
-        Map<String, BenchmarkCaseDTO> cached = casesById;
-        if (cached != null) {
-            return cached;
+    private Map<String, BenchmarkCaseDTO> cases(String datasetVersion) {
+        String resourcePath = DATASET_RESOURCES.get(datasetVersion);
+        if (resourcePath == null) {
+            throw new IllegalArgumentException("Unknown benchmark dataset: " + datasetVersion);
         }
-        synchronized (this) {
-            if (casesById == null) {
-                casesById = loadCases();
-            }
-            return casesById;
-        }
+        return casesByDataset.computeIfAbsent(datasetVersion, ignored -> loadCases(resourcePath));
     }
 
-    private Map<String, BenchmarkCaseDTO> loadCases() {
-        ClassPathResource resource = new ClassPathResource(DATASET_RESOURCE);
+    private Map<String, BenchmarkCaseDTO> loadCases(String resourcePath) {
+        ClassPathResource resource = new ClassPathResource(resourcePath);
         try (InputStream inputStream = resource.getInputStream()) {
             List<BenchmarkCaseDTO> cases = objectMapper.readValue(
                     inputStream,
@@ -60,7 +68,7 @@ public class BenchmarkCaseService {
                     Function.identity()
             ));
         } catch (IOException exception) {
-            throw new IllegalStateException("Cannot load benchmark dataset: " + DATASET_RESOURCE, exception);
+            throw new IllegalStateException("Cannot load benchmark dataset: " + resourcePath, exception);
         }
     }
 }

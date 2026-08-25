@@ -1,13 +1,11 @@
 """定向生成「关系型」RAG 文档并入库，使 RAG 测试文档总量达到约 300 篇。
 
-与 repair_seed_rag_docs.py 的区别：
-- 后者只 repair 已有的 100 篇「单点解释」通用文档。
-- 本脚本新创建 ~200 篇「关系型」文档，全部围绕 Redis 缓存异常的
+本脚本新创建约 200 篇「关系型」文档，全部围绕 Redis 缓存异常的
   概念对比 / 原因关系 / 治理关系 / 桥接概念 / 三者归类，
   每篇都含明确关系句（如「缓存击穿和缓存雪崩的区别在于……」），
   目标是提高 RAG 语料的「关系证据密度」，而非单纯堆数量。
 
-入库流程（沿用 repair_seed_rag_docs 的 API 约定）：
+入库流程：
   POST /api/v1/knowposts/drafts            -> 新建草稿，返回 id
   POST /api/v1/storage/presign            -> 预签名上传 URL
   PUT  <putUrl>                           -> 上传 markdown 正文

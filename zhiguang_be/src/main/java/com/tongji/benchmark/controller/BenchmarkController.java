@@ -27,7 +27,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class BenchmarkController {
 
-    private static final String DATASET_VERSION = "t2-automotive-maintenance-v1";
+    private static final String DEFAULT_DATASET_VERSION = "t2-automotive-maintenance-v1";
     private static final int DEFAULT_TOP_K = 5;
 
     private final BenchmarkSingleCaseService benchmarkSingleCaseService;
@@ -38,10 +38,13 @@ public class BenchmarkController {
     @PostMapping("/single-case")
     public Mono<RagTranscriptDTO> executeSingleCase(
             @Valid @RequestBody BenchmarkSingleCaseRequest request) {
+        String datasetVersion = request.datasetVersion() == null
+                ? DEFAULT_DATASET_VERSION
+                : request.datasetVersion();
         BenchmarkEvaluationContextDTO context = new BenchmarkEvaluationContextDTO(
                 request.runId(),
                 request.caseId(),
-                DATASET_VERSION
+                datasetVersion
         );
         int effectiveTopK = request.topK() == null ? DEFAULT_TOP_K : request.topK();
 

@@ -22,6 +22,12 @@ public record BenchmarkSingleCaseRequest(
         @Pattern(regexp = "^gold-\\d{3}$", message = "caseId 必须是 gold-001 形式")
         String caseId,
 
+        @Pattern(
+                regexp = "^t2-[a-z0-9-]+-v\\d+$",
+                message = "datasetVersion 格式不合法"
+        )
+        String datasetVersion,
+
         @Min(value = 1, message = "topK 最小为 1")
         @Max(value = 20, message = "topK 最大为 20")
         Integer topK

@@ -81,10 +81,9 @@ RagPromptService.getSystemPrompt(key)
 - **key 名不能改**：后端 `RagPromptService.KEY_*` 与 Nacos promptKey 一一对应，改 key 会找不到。
 - 改 prompt 会影响 RAG 输出质量，建议配合 `scripts/rag-eval/` 的 `questions-40.json` 做回归评测。
 
-## 八、首次灌数据脚本
+## 八、首次灌数据
 
 `scripts/seed_nacos_prompts.py`：登录 → 创建 → force-publish → online，8 个一次灌完。
-`scripts/verify_nacos_prompts.py`：校验 8 个 prompt 已 online 且客户端可读。
 
 ```bash
 ssh root@100.83.242.114 'python3 -' < scripts/seed_nacos_prompts.py

@@ -32,7 +32,7 @@ jobs:
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
           BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
-        run: bash scripts/deploy/internal-backend.sh inject-benchmark-token
+        run: bash zhiguang_be/scripts/deploy/internal-backend.sh inject-benchmark-token
 
   deploy:
     name: Deploy backend and frontend
@@ -59,7 +59,7 @@ jobs:
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
           NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
           NACOS_CONFIG_GROUP: ZHIGUANG_GROUP
-        run: bash scripts/deploy/sync-nacos-config.sh zhiguang_be/nacos-config/nacos-import/ZHIGUANG_GROUP/zhiguang-runtime.yaml
+        run: bash zhiguang_be/scripts/deploy/sync-nacos-config.sh zhiguang_be/nacos-config/nacos-import/ZHIGUANG_GROUP/zhiguang-runtime.yaml
 
       - name: Deploy backend on internal server
         env:
@@ -75,7 +75,7 @@ jobs:
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
           NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
           NACOS_CONFIG_GROUP: ZHIGUANG_GROUP
-        run: bash scripts/deploy/internal-backend.sh
+        run: bash zhiguang_be/scripts/deploy/internal-backend.sh
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -96,7 +96,7 @@ jobs:
           CLOUD_USER: ${{ secrets.CLOUD_USER }}
           CLOUD_SSH_KEY: ${{ secrets.CLOUD_SSH_KEY }}
           CLOUD_WEB_ROOT: /opt/1panel/www/zhiguang-fe
-        run: bash scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
+        run: bash zhiguang_be/scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
 
   benchmark:
     name: Run RAG Benchmark
@@ -184,7 +184,7 @@ jobs:
           BENCHMARK_BASE_URL: ${{ vars.BENCHMARK_BASE_URL || 'http://127.0.0.1:18080' }}
           BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
         run: |
-          python scripts/AUTO_Benchwork/benchmark.py \
+          python scripts/AUTO_Benchwork/pipeline/benchmark.py \
             --base-url "$BENCHMARK_BASE_URL" \
             --run-id "$BENCHMARK_RUN_ID" \
             --output-dir "$BENCHMARK_RUN_DIR"
@@ -200,7 +200,7 @@ jobs:
           if [[ -f "$baseline_path" ]]; then
             report_args+=(--baseline "$baseline_path")
           fi
-          python scripts/AUTO_Benchwork/report_generator.py "${report_args[@]}"
+          python scripts/AUTO_Benchwork/pipeline/report_generator.py "${report_args[@]}"
 
       - name: Judge final answers and create review summary
         id: judge
@@ -213,7 +213,7 @@ jobs:
           BENCHMARK_ES_URL: http://127.0.0.1:9200
           BENCHMARK_ES_INDEX: zhiguang-ai-index
         run: |
-          python scripts/AUTO_Benchwork/judge.py \
+          python scripts/AUTO_Benchwork/pipeline/judge.py \
             --run-dir "$BENCHMARK_RUN_DIR"
 
       - name: Show Benchmark summary

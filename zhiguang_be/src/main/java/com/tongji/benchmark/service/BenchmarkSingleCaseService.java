@@ -33,7 +33,10 @@ public class BenchmarkSingleCaseService {
     public Mono<RagTranscriptDTO> execute(BenchmarkEvaluationContextDTO context, int topK) {
         // 第一步：根据 caseId 从 Gold 数据集找到这道题
         // 拿到：题目内容（question）、标准答案 chunk（expectedChunkIds）、场景标签
-        BenchmarkCaseDTO benchmarkCase = benchmarkCaseService.getRequiredCase(context.caseId());
+        BenchmarkCaseDTO benchmarkCase = benchmarkCaseService.getRequiredCase(
+                context.datasetVersion(),
+                context.caseId()
+        );
 
         // 第二步：调用正常 RAG 链路，执行一次真实问答
         // 注意：这里调用的 generateGlobalTranscript 就是普通用户提问走的同一个方法

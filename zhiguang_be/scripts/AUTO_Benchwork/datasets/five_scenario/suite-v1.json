@@ -1,0 +1,11 @@
+{
+  "schema_version":"rag-benchmark-five-scenario-suite-v1",
+  "scoring":{"top_k":5,"scenario_weight":0.2,"metric_weights":{"hit_at_5":0.1666667,"recall_at_5":0.1666667,"mrr_at_5":0.1666667,"correctness":0.1666667,"completeness":0.1666667,"groundedness":0.1666667}},
+  "scenarios":[
+    {"order":1,"slug":"automotive-maintenance","dataset_version":"t2-automotive-maintenance-v1","topic":"汽车维护与故障诊断","dataset":"automotive-maintenance/gold-v1.json"},
+    {"order":2,"slug":"history-culture","dataset_version":"t2-history-culture-v1","topic":"中国历史与传统文化","dataset":"history-culture/gold-v1.json"},
+    {"order":3,"slug":"computer-operations","dataset_version":"t2-computer-operations-v1","topic":"计算机软件与网络运维","dataset":"computer-operations/gold-v1.json"},
+    {"order":4,"slug":"daily-home","dataset_version":"t2-daily-home-v1","topic":"日常生活与家居实务","dataset":"daily-home/gold-v1.json"},
+    {"order":5,"slug":"education-development","dataset_version":"t2-education-development-v1","topic":"教育学习与职业发展","dataset":"education-development/gold-v1.json"}
+  ]
+}

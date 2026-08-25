@@ -272,11 +272,15 @@
             <resource>
                 <directory>src/main/resources</directory>
             </resource>
-            <!-- Gold 数据集只有 scripts/AUTO_Benchwork 中的一份源文件；打包时映射到 classpath:benchmark。 -->
+            <!-- Five reviewed Gold scenario files are packaged under classpath:benchmark/<scenario>. -->
             <resource>
-                <directory>${project.basedir}/scripts/AUTO_Benchwork</directory>
+                <directory>${project.basedir}/scripts/AUTO_Benchwork/datasets/five_scenario</directory>
                 <includes>
-                    <include>gold-dataset-v1.json</include>
+                    <include>automotive-maintenance/gold-v1.json</include>
+                    <include>history-culture/gold-v1.json</include>
+                    <include>computer-operations/gold-v1.json</include>
+                    <include>daily-home/gold-v1.json</include>
+                    <include>education-development/gold-v1.json</include>
                 </includes>
                 <targetPath>benchmark</targetPath>
             </resource>

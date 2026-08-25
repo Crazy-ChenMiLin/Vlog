@@ -52,7 +52,7 @@ class BenchmarkControllerTest {
         BenchmarkController controller = new BenchmarkController(benchmarkSingleCaseService);
 
         RagTranscriptDTO result = controller.executeSingleCase(
-                new BenchmarkSingleCaseRequest("local-run-001", "gold-003", null)
+                new BenchmarkSingleCaseRequest("local-run-001", "gold-003", null, null)
         ).block();
 
         assertThat(result.evaluation().caseId()).isEqualTo("gold-003");
@@ -70,10 +70,12 @@ class BenchmarkControllerTest {
                 .thenReturn(Mono.just(transcript()));
         BenchmarkController controller = new BenchmarkController(benchmarkSingleCaseService);
 
-        controller.executeSingleCase(new BenchmarkSingleCaseRequest("local-run-002", "gold-004", 8)).block();
+        controller.executeSingleCase(new BenchmarkSingleCaseRequest(
+                "local-run-002", "gold-004", "t2-history-culture-v1", 8
+        )).block();
 
         verify(benchmarkSingleCaseService).execute(
-                new BenchmarkEvaluationContextDTO("local-run-002", "gold-004", "t2-automotive-maintenance-v1"),
+                new BenchmarkEvaluationContextDTO("local-run-002", "gold-004", "t2-history-culture-v1"),
                 8
         );
     }
@@ -111,7 +113,7 @@ class BenchmarkControllerTest {
                 "回答",
                 RagTranscriptStatusEnum.COMPLETED,
                 new RagTranscriptEvaluationDTO(
-                        "local-run-001", "gold-003", "t2-automotive-maintenance-v1", "scripts/AUTO_Benchwork/gold-dataset-v1.json", List.of("chunk#1")
+                        "local-run-001", "gold-003", "t2-automotive-maintenance-v1", "datasets/five_scenario/automotive-maintenance/gold-v1.json", List.of("chunk#1")
                 )
         );
     }

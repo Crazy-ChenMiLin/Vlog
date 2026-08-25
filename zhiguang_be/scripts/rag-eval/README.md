@@ -87,27 +87,6 @@ target\rag-benchmark\baseline-001\
 
 `report\2-1-funnel-report.json` 还会直接比较 Gold `expectedChunkIds` 与线上 Transcript 的候选 `chunkId`。`summary.md` 展示匹配状态，完整的逐题 ID 诊断保留在 JSON 中。裁判模型输出非 JSON 时会自动重试，失败尝试的原始返回保存在 `3-1-judge-report.json`，不会写入日志或泄露 API Key。
 
-## 重新标注 Gold 的 `expected_chunk_ids`
-
-当 `summary.md` 的 Gold ID alignment 显示大量 `NO_MATCH` 或 `PARTIAL_MATCH` 时，在**能访问内网 Elasticsearch 的机器**上运行下面的脚本。它只读查询 `zhiguang-ai-index`，生成提案 JSON 和审核 Markdown，绝不覆盖 `gold-dataset-v1.json`：
-
-```bash
-cd /home/chenmilin/zhiguang-deploy/Vlog/zhiguang_be
-python3 scripts/AUTO_Benchwork/relabel_gold_expected_chunk_ids.py \
-  --es-url http://127.0.0.1:9200 \
-  --index zhiguang-ai-index \
-  --output target/rag-benchmark/gold-relabel-proposal.json \
-  --report-output target/rag-benchmark/gold-relabel-proposal.md
-```
-
-结果分为三类：
-
-- `AUTO_MATCHED`：当前向量库有一个 chunk 包含完全一致的 Gold 证据摘录，可以作为新的候选 ID。
-- `REVIEW_REQUIRED`：只找到词法相关的候选，必须人工核对 `contentPreview` 后再决定，不能直接当答案。
-- `UNRESOLVED`：当前索引没有可用候选，需要先补充/恢复原始知识文档。
-
-审核完成后，再人工更新一份新的 Gold 数据集版本；不要就地覆盖已经审核过的 `gold-dataset-v1.json`。
-
 ## 单独比较两份结果
 
 ```powershell
