@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import judge  # noqa: E402
 import report_generator  # noqa: E402
 import aggregate_five_scenario_reports as five_scenario  # noqa: E402
+import run_five_scenario_benchmark as five_runner  # noqa: E402
 
 
 def transcript(case_id: str, status: str, original_hit: bool, original_ranks: list[int]) -> dict[str, object]:
@@ -330,8 +332,76 @@ class BenchmarkReportsTest(unittest.TestCase):
             report = five_scenario.aggregate({"scenarios": scenarios}, root)
 
             self.assertEqual(5, report["scenarioCount"])
+            self.assertEqual("COMPLETE", report["reportStatus"])
             self.assertAlmostEqual(0.7, report["macroMetrics"]["hitAt5"])
             self.assertAlmostEqual(0.7, report["overallScore"])
+
+    def test_five_scenario_report_does_not_reweight_missing_scenarios(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            scenarios = [{"slug": f"scenario-{index}", "topic": f"topic-{index}"} for index in range(5)]
+            first = root / "scenario-0"
+            (first / "report").mkdir(parents=True)
+            (first / "report" / "2-1-funnel-report.json").write_text(json.dumps({
+                "stages": {"RERANKED": {
+                    "goldHitRate": 0.8,
+                    "macroRecallAtK": 0.7,
+                    "meanReciprocalRank": 0.6,
+                }}
+            }), encoding="utf-8")
+            (first / "3-1-judge-report.json").write_text(json.dumps({
+                "evaluationStatus": "COMPLETE",
+                "completedCount": 40,
+                "dimensionAverages": {"correctness": 0.9, "completeness": 0.8, "groundedness": 0.7},
+            }), encoding="utf-8")
+            (first / "1-2-runtime-metadata.json").write_text(
+                json.dumps({"collectionStatus": "COMPLETE"}), encoding="utf-8"
+            )
+
+            report = five_scenario.aggregate({"scenarios": scenarios}, root)
+
+            self.assertEqual("PARTIAL", report["reportStatus"])
+            self.assertIsNone(report["overallScore"])
+            self.assertIsNone(report["macroMetrics"]["hitAt5"])
+            self.assertEqual(1, report["availableMacroMetrics"]["hitAt5"]["scenarioCount"])
+
+    def test_five_scenario_runner_continues_after_one_phase_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            suite_path = root / "suite.json"
+            suite_path.write_text(json.dumps({"scenarios": [
+                {
+                    "order": index + 1,
+                    "slug": f"scenario-{index + 1}",
+                    "topic": f"topic-{index + 1}",
+                    "dataset_version": f"dataset-{index + 1}",
+                    "dataset": f"scenario-{index + 1}/gold-v1.json",
+                }
+                for index in range(5)
+            ]}), encoding="utf-8")
+            calls: list[list[str]] = []
+
+            def fake_runner(arguments, check=False):
+                calls.append(arguments)
+                return subprocess.CompletedProcess(arguments, 1 if len(calls) == 1 else 0)
+
+            args = type("Args", (), {
+                "base_url": "http://benchmark.example",
+                "run_id": "five-test",
+                "output_dir": root / "output",
+                "suite": suite_path,
+                "top_k": 5,
+                "skip_judge": False,
+            })()
+            document = five_runner.execute_suite(args, fake_runner)
+
+            self.assertEqual(16, len(calls))
+            self.assertEqual(5, len(document["scenarios"]))
+            self.assertEqual("PARTIAL", document["overallStatus"])
+            self.assertEqual("PARTIAL", document["scenarios"][0]["executionStatus"])
+            self.assertTrue(all(
+                item["executionStatus"] == "COMPLETE" for item in document["scenarios"][1:]
+            ))
 
 
 if __name__ == "__main__":

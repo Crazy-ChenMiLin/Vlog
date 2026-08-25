@@ -315,7 +315,7 @@ docker compose logs -f zhiguang-be
 
 根目录 `.github/workflows/` 是唯一 Workflow 目录：
 
-- `deploy-zhiguang.yml`：推送 `main` 后部署前后端；提交信息包含 `[run-bench]` 时追加 Benchmark。
+- `deploy-zhiguang.yml`：推送 `main` 后部署前后端；提交信息包含 `[run-bench]` 时追加五场景 200 题 Benchmark。
 - `rag-eval.yml`：手动运行 BM25 A/B 评测。
 - `graph-rag-eval.yml`：手动运行 Graph RAG A/B 评测。
 

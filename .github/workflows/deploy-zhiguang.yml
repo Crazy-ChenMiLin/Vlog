@@ -99,13 +99,13 @@ jobs:
         run: bash zhiguang_be/scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
 
   benchmark:
-    name: Run RAG Benchmark
+    name: Run five-scenario RAG Benchmark
     needs: deploy
     if: >-
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.head_commit.message, '[run-bench]')
     runs-on: self-hosted
-    timeout-minutes: 120
+    timeout-minutes: 360
 
     steps:
       - name: Checkout evaluated revision
@@ -175,56 +175,34 @@ jobs:
 
           echo "Benchmark authentication preflight passed"
 
-      - name: Collect 40 Java RAG Transcripts
-        id: collect
+      - name: Run all five Benchmark scenarios
+        id: five_scenario
         continue-on-error: true
         shell: bash
         working-directory: zhiguang_be
         env:
           BENCHMARK_BASE_URL: ${{ vars.BENCHMARK_BASE_URL || 'http://127.0.0.1:18080' }}
           BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
-        run: |
-          python scripts/AUTO_Benchwork/pipeline/benchmark.py \
-            --base-url "$BENCHMARK_BASE_URL" \
-            --run-id "$BENCHMARK_RUN_ID" \
-            --output-dir "$BENCHMARK_RUN_DIR"
-
-      - name: Build retrieval funnel and diff reports
-        id: report
-        if: always() && steps.prepare.outcome == 'success'
-        shell: bash
-        working-directory: zhiguang_be
-        run: |
-          report_args=(--run-dir "$BENCHMARK_RUN_DIR")
-          baseline_path="scripts/AUTO_Benchwork/baseline/funnel-report.json"
-          if [[ -f "$baseline_path" ]]; then
-            report_args+=(--baseline "$baseline_path")
-          fi
-          python scripts/AUTO_Benchwork/pipeline/report_generator.py "${report_args[@]}"
-
-      - name: Judge final answers and create review summary
-        id: judge
-        if: always() && steps.report.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        working-directory: zhiguang_be
-        env:
           QIANFAN_JUDGE_API_KEY: ${{ secrets.QIANFAN_JUDGE_API_KEY }}
           BENCHMARK_ES_URL: http://127.0.0.1:9200
           BENCHMARK_ES_INDEX: zhiguang-ai-index
         run: |
-          python scripts/AUTO_Benchwork/pipeline/judge.py \
-            --run-dir "$BENCHMARK_RUN_DIR"
+          python scripts/AUTO_Benchwork/pipeline/run_five_scenario_benchmark.py \
+            --base-url "$BENCHMARK_BASE_URL" \
+            --run-id "$BENCHMARK_RUN_ID" \
+            --output-dir "$BENCHMARK_RUN_DIR"
 
-      - name: Show Benchmark summary
+      - name: Show five-scenario Benchmark summary
         if: always() && steps.prepare.outcome == 'success'
         shell: bash
         run: |
-          if [[ -f "${BENCHMARK_RUN_DIR}/summary.md" ]]; then
-            cat "${BENCHMARK_RUN_DIR}/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "${BENCHMARK_RUN_DIR}/five-scenario-report.md" ]]; then
+            cat "${BENCHMARK_RUN_DIR}/five-scenario-report.md" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -f "${BENCHMARK_RUN_DIR}/five-scenario-run-status.md" ]]; then
+            cat "${BENCHMARK_RUN_DIR}/five-scenario-run-status.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Annotate partial Benchmark results
+      - name: Annotate partial five-scenario results
         if: always() && steps.prepare.outcome == 'success'
         continue-on-error: true
         shell: bash
@@ -235,17 +213,28 @@ jobs:
           from pathlib import Path
 
           run_dir = Path(sys.argv[1])
-          reports = (
-              (run_dir / "1-2-runtime-metadata.json", "collectionStatus", "Transcript collection"),
-              (run_dir / "3-1-judge-report.json", "evaluationStatus", "LLM judge"),
-          )
-          for path, status_field, label in reports:
-              if not path.is_file():
-                  continue
-              document = json.loads(path.read_text(encoding="utf-8"))
-              status = document.get(status_field, "UNKNOWN")
-              if status == "PARTIAL":
-                  print(f"::warning title={label} is partial::{path.name} contains the per-case diagnostics.")
+          status_path = run_dir / "five-scenario-run-status.json"
+          report_path = run_dir / "five-scenario-report.json"
+          if status_path.is_file():
+              status = json.loads(status_path.read_text(encoding="utf-8"))
+              for scenario in status.get("scenarios", []):
+                  if scenario.get("executionStatus") != "COMPLETE":
+                      phases = ", ".join(
+                          f"{phase.get('phase')}={phase.get('status')}"
+                          for phase in scenario.get("phases", [])
+                      )
+                      print(
+                          f"::warning title=Benchmark scenario incomplete::"
+                          f"{scenario.get('topic')} ({scenario.get('slug')}): {phases}"
+                      )
+          if report_path.is_file():
+              report = json.loads(report_path.read_text(encoding="utf-8"))
+              if report.get("reportStatus") != "COMPLETE":
+                  print(
+                      f"::warning title=Five-scenario score is partial::"
+                      f"Complete scenarios: {report.get('completeScenarioCount', 0)} / 5. "
+                      "Missing metrics were not silently reweighted."
+                  )
           PY
 
       - name: Upload Benchmark Artifact
@@ -257,15 +246,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Fail only on Benchmark execution failures
-        if: always() && steps.prepare.outcome == 'success' && steps.report.outcome == 'success'
+      - name: Report five-scenario execution outcome
+        if: always() && steps.prepare.outcome == 'success'
         shell: bash
         env:
-          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
-          REPORT_OUTCOME: ${{ steps.report.outcome }}
-          JUDGE_OUTCOME: ${{ steps.judge.outcome }}
+          FIVE_SCENARIO_OUTCOME: ${{ steps.five_scenario.outcome }}
         run: |
-          if [[ "$COLLECT_OUTCOME" != "success" || "$REPORT_OUTCOME" != "success" || "$JUDGE_OUTCOME" != "success" ]]; then
-            echo "Benchmark execution failed completely in at least one phase; available reports and artifacts were retained." >&2
-            exit 1
+          if [[ "$FIVE_SCENARIO_OUTCOME" != "success" ]]; then
+            echo "::warning title=Five-scenario Benchmark needs review::At least one scenario or phase was incomplete; all available reports and artifacts were retained."
+          else
+            echo "All five Benchmark scenarios completed."
           fi

@@ -15,15 +15,17 @@ AUTO_Benchwork/
 
 ## 正式入口
 
-单场景流水线由 GitHub Action 调用：
+提交信息包含 `[run-bench]` 时，GitHub Action 调用五场景总入口：
 
 ```bash
-python scripts/AUTO_Benchwork/pipeline/benchmark.py ...
-python scripts/AUTO_Benchwork/pipeline/report_generator.py ...
-python scripts/AUTO_Benchwork/pipeline/judge.py ...
+python scripts/AUTO_Benchwork/pipeline/run_five_scenario_benchmark.py ...
 ```
 
-本地运行五场景：
+总入口按清单串行运行五个专题；每个专题内部依次调用 `benchmark.py`、
+`report_generator.py` 和 `judge.py`。单个专题失败不会阻止后续专题，运行状态、
+五场景汇总和全部逐题产物都会保留在 Artifact 中。
+
+本地运行相同的五场景入口：
 
 ```bash
 python scripts/AUTO_Benchwork/pipeline/run_five_scenario_benchmark.py \
@@ -47,4 +49,3 @@ python scripts/AUTO_Benchwork/pipeline/run_five_scenario_benchmark.py \
 ```bash
 python -m unittest discover -s scripts/AUTO_Benchwork/tests -p "test_*.py"
 ```
-

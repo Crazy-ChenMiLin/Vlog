@@ -21,4 +21,5 @@
 - 后端只接受五个白名单 datasetVersion，调用方不能传问题或 expectedChunkIds，避免篡改评测基准。
 - 五个数据集由 Maven 打包进后端 classpath；业务 RAG 检索链路没有改动。
 - `run_five_scenario_benchmark.py` 顺序运行五个专题，避免同时压测后端和外部模型。
-- 自动化没有提交、推送或触发 GitHub Action，需人工审核后再进入 CI。
+- 五套数据已经完成人工审核；提交信息包含 `[run-bench]` 时由 CI 串行执行全部五个专题。
+- 单个专题失败不会阻止后续专题，缺失指标不会被剩余专题静默重加权。
