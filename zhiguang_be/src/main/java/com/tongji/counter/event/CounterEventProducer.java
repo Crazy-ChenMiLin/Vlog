@@ -2,6 +2,7 @@ package com.tongji.counter.event;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -11,14 +12,10 @@ import org.springframework.stereotype.Service;
  * <p>职责：将业务产生的计数增量事件异步发送到 Kafka 主题，供聚合消费者处理。</p>
  */
 @Service
+@RequiredArgsConstructor
 public class CounterEventProducer {
     private final KafkaTemplate<String, String> kafka;
     private final ObjectMapper objectMapper;
-
-    public CounterEventProducer(KafkaTemplate<String, String> kafka, ObjectMapper objectMapper) {
-        this.kafka = kafka;
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 发布计数事件到 Kafka。

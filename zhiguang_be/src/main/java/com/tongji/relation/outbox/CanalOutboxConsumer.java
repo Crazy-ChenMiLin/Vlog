@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.relation.event.RelationEvent;
 import com.tongji.relation.processor.RelationEventProcessor;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -18,21 +19,12 @@ import com.tongji.common.util.OutboxMessageUtil;
  * 职责：消费 Canal 桥接写入的 outbox 主题消息，提取 payload 并反序列化为 RelationEvent，交由处理器落库与更新缓存/计数；使用手动位点确保处理成功语义。
  */
 @Service
+@RequiredArgsConstructor
 public class CanalOutboxConsumer {
     private static final Logger log = LoggerFactory.getLogger(CanalOutboxConsumer.class);
 
     private final ObjectMapper objectMapper;
     private final RelationEventProcessor processor;
-
-    /**
-     * Outbox 消费者构造函数。
-     * @param objectMapper JSON 序列化器
-     * @param processor 关系事件处理器
-     */
-    public CanalOutboxConsumer(ObjectMapper objectMapper, RelationEventProcessor processor) {
-        this.objectMapper = objectMapper;
-        this.processor = processor;
-    }
 
     /**
      * 消费 Canal outbox 消息并转为关系事件处理。

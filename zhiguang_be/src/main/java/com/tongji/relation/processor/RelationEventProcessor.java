@@ -2,6 +2,7 @@ package com.tongji.relation.processor;
 
 import com.tongji.relation.event.RelationEvent;
 import com.tongji.relation.mapper.RelationMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import com.tongji.counter.service.UserCounterService;
 import org.springframework.stereotype.Service;
@@ -12,16 +13,11 @@ import java.time.Duration;
  * 职责：对 FollowCreated/FollowCanceled 事件进行去重、防抖与幂等处理，落库更新粉丝表，维护关注/粉丝 ZSet 缓存与 TTL，并原子更新用户维度计数（SDS）。
  */
 @Service
+@RequiredArgsConstructor
 public class RelationEventProcessor {
     private final RelationMapper mapper;
     private final StringRedisTemplate redis;
     private final UserCounterService userCounterService;
-
-    public RelationEventProcessor(RelationMapper mapper, StringRedisTemplate redis, UserCounterService userCounterService) {
-        this.mapper = mapper;
-        this.redis = redis;
-        this.userCounterService = userCounterService;
-    }
 
     /**
      * 处理关系事件：入库、更新缓存、刷新计数，并进行幂等去重。

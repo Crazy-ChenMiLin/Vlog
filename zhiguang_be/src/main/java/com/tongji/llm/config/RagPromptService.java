@@ -3,6 +3,7 @@ package com.tongji.llm.config;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class RagPromptService {
 
     public static final String KEY_PLANNER = "rag-planner-system";
@@ -41,10 +43,6 @@ public class RagPromptService {
 
     private volatile String accessToken;
     private volatile long tokenExpireAt;
-
-    public RagPromptService(RagPromptProperties props) {
-        this.props = props;
-    }
 
     /**
      * 取某个节点的 system prompt，唯一来源 Nacos。拉取失败直接抛异常，暴露问题。

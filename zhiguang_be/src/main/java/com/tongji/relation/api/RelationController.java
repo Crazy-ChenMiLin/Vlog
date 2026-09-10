@@ -3,6 +3,7 @@ package com.tongji.relation.api;
 import com.tongji.relation.service.RelationService;
 import com.tongji.auth.token.JwtService;
 import com.tongji.profile.api.dto.ProfileResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,20 +23,13 @@ import java.nio.charset.StandardCharsets;
  */
 @RestController
 @RequestMapping("/api/v1/relation")
+@RequiredArgsConstructor
 public class RelationController {
     private final RelationService relationService;
     private final JwtService jwtService;
     private final StringRedisTemplate redis;
     private final com.tongji.counter.service.UserCounterService userCounterService;
     private final com.tongji.relation.mapper.RelationMapper relationMapper;
-
-    public RelationController(RelationService relationService, JwtService jwtService, StringRedisTemplate redis, com.tongji.counter.service.UserCounterService userCounterService, com.tongji.relation.mapper.RelationMapper relationMapper) {
-        this.relationService = relationService;
-        this.jwtService = jwtService;
-        this.redis = redis;
-        this.userCounterService = userCounterService;
-        this.relationMapper = relationMapper;
-    }
 
     /**
      * 发起关注。

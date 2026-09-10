@@ -3,6 +3,7 @@ package com.tongji.benchmark.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
  * 读取版本化 Gold 数据集，并按 caseId 提供题目、期望证据 chunk 与评测上下文。
  */
 @Service
+@RequiredArgsConstructor
 public class BenchmarkCaseService {
     private static final Map<String, String> DATASET_RESOURCES = Map.of(
             "t2-automotive-maintenance-v1", "benchmark/automotive-maintenance/gold-v1.json",
@@ -29,10 +31,6 @@ public class BenchmarkCaseService {
 
     private final ObjectMapper objectMapper;
     private final Map<String, Map<String, BenchmarkCaseDTO>> casesByDataset = new ConcurrentHashMap<>();
-
-    public BenchmarkCaseService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public BenchmarkCaseDTO getRequiredCase(String caseId) {
         return getRequiredCase("t2-automotive-maintenance-v1", caseId);

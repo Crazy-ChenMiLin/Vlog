@@ -1,5 +1,6 @@
 package com.tongji.auth.token;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -13,13 +14,10 @@ import java.util.Objects;
  * 支持校验令牌有效性、撤销单个令牌或撤销某用户全部令牌。
  */
 @Component
+@RequiredArgsConstructor
 public class RedisRefreshTokenStore implements RefreshTokenStore {
 
     private final StringRedisTemplate redisTemplate;
-
-    public RedisRefreshTokenStore(StringRedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
 
     /**
      * 将刷新令牌写入白名单，设置过期时间。

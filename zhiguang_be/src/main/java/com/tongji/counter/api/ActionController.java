@@ -4,6 +4,7 @@ import com.tongji.counter.api.dto.ActionRequest;
 import com.tongji.counter.service.CounterService;
 import com.tongji.auth.token.JwtService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,15 +19,11 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/action")
+@RequiredArgsConstructor
 public class ActionController {
 
     private final CounterService counterService;
     private final JwtService jwtService;
-
-    public ActionController(CounterService counterService, JwtService jwtService) {
-        this.counterService = counterService;
-        this.jwtService = jwtService;
-    }
 
     /**
      * 点赞操作。

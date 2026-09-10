@@ -1,5 +1,6 @@
 package com.tongji.auth.verification;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.HashOperations;
@@ -17,6 +18,7 @@ import java.util.Objects;
  * 校验时支持尝试计数与错误状态返回，成功后删除键以防重用。
  */
 @Component
+@RequiredArgsConstructor
 public class RedisVerificationCodeStore implements VerificationCodeStore {
 
     private static final String FIELD_CODE = "code";
@@ -24,10 +26,6 @@ public class RedisVerificationCodeStore implements VerificationCodeStore {
     private static final String FIELD_ATTEMPTS = "attempts";
 
     private final StringRedisTemplate redisTemplate;
-
-    public RedisVerificationCodeStore(StringRedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
 
     /**
      * 保存验证码到 Redis Hash，并设置 TTL。

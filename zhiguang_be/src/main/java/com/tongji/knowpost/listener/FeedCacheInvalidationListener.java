@@ -6,6 +6,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.tongji.knowpost.api.dto.FeedItemResponse;
 import com.tongji.knowpost.api.dto.FeedPageResponse;
 import com.tongji.knowpost.model.KnowPost;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,25 +32,15 @@ import java.util.*;
  * - 反向索引按小时维护，监听器会同时覆盖当前与上一个小时段的页面键。
  */
 @Component
+@RequiredArgsConstructor
 public class FeedCacheInvalidationListener {
 
+    @Qualifier("feedPublicCache")
     private final Cache<String, FeedPageResponse> feedPublicCache;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final com.tongji.counter.service.UserCounterService userCounterService;
     private final com.tongji.knowpost.mapper.KnowPostMapper knowPostMapper;
-
-    public FeedCacheInvalidationListener(@Qualifier("feedPublicCache") Cache<String, FeedPageResponse> feedPublicCache,
-                                         StringRedisTemplate redis,
-                                         ObjectMapper objectMapper,
-                                         com.tongji.counter.service.UserCounterService userCounterService,
-                                         com.tongji.knowpost.mapper.KnowPostMapper knowPostMapper) {
-        this.feedPublicCache = feedPublicCache;
-        this.redis = redis;
-        this.objectMapper = objectMapper;
-        this.userCounterService = userCounterService;
-        this.knowPostMapper = knowPostMapper;
-    }
 
     /**
      * 监听计数事件并进行缓存更新。

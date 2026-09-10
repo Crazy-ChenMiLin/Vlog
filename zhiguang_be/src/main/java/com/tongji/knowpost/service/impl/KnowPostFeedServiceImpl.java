@@ -10,8 +10,8 @@ import com.tongji.knowpost.model.KnowPostFeedRow;
 import com.tongji.counter.service.CounterService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.tongji.cache.hotkey.HotKeyDetector;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -26,48 +26,22 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
+@RequiredArgsConstructor
 public class KnowPostFeedServiceImpl implements KnowPostFeedService {
 
     private final KnowPostMapper mapper;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final CounterService counterService;
+    @Qualifier("feedPublicCache")
     private final Cache<String, FeedPageResponse> feedPublicCache;
+    @Qualifier("feedMineCache")
     private final Cache<String, FeedPageResponse> feedMineCache;
     private final HotKeyDetector hotKey;
     private static final Logger log = LoggerFactory.getLogger(KnowPostFeedServiceImpl.class);
     private static final int LAYOUT_VER = 1;
     private static final long PUBLIC_FEED_SHUFFLE_INTERVAL_MILLIS = 30_000L;
     private final ConcurrentHashMap<String, Object> singleFlight = new ConcurrentHashMap<>();
-
-    /**
-     * 构造函数：注入 Mapper、Redis、对象映射器、计数服务与本地缓存。
-     * @param mapper 数据访问层
-     * @param redis Redis 客户端
-     * @param objectMapper JSON 序列化/反序列化器
-     * @param counterService 点赞/收藏计数服务
-     * @param feedPublicCache 首页公共 Feed 本地缓存
-     * @param feedMineCache 我的发布 Feed 本地缓存
-     * @param hotKey 热点 Key 检测器，用于动态延长 TTL
-     */
-    @Autowired
-    public KnowPostFeedServiceImpl(
-            KnowPostMapper mapper,
-            StringRedisTemplate redis,
-            ObjectMapper objectMapper,
-            CounterService counterService,
-            @Qualifier("feedPublicCache") Cache<String, FeedPageResponse> feedPublicCache,
-            @Qualifier("feedMineCache") Cache<String, FeedPageResponse> feedMineCache,
-            HotKeyDetector hotKey
-    ) {
-        this.mapper = mapper;
-        this.redis = redis;
-        this.objectMapper = objectMapper;
-        this.counterService = counterService;
-        this.feedPublicCache = feedPublicCache;
-        this.feedMineCache = feedMineCache;
-        this.hotKey = hotKey;
-    }
 
     /**
      * 生成公共 Feed 页面的缓存 Key（包含分页与布局版本）。

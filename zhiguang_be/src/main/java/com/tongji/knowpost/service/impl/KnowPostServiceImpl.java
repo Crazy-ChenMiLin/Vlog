@@ -19,13 +19,15 @@ import com.tongji.storage.config.OssProperties;
 import com.tongji.llm.searchService.RagIndexService;
 import com.tongji.relation.outbox.OutboxMapper;
 import com.tongji.cache.hotkey.HotKeyDetector;
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.net.URI;
 import java.time.Duration;
@@ -38,10 +40,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
+@RequiredArgsConstructor
 public class KnowPostServiceImpl implements KnowPostService {
 
     private final KnowPostMapper mapper;
-    @Resource
     private final SnowflakeIdGenerator idGen;
     private final ObjectMapper objectMapper;
     private final OssProperties ossProperties;
@@ -60,34 +62,6 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final RagIndexService ragIndexService;
     private final OutboxMapper outboxMapper;
 
-    // 手动编写构造器，Spring的@Qualifier直接标注在参数上（核心）
-    public KnowPostServiceImpl(
-            KnowPostMapper mapper,
-            SnowflakeIdGenerator idGen,
-            ObjectMapper objectMapper,
-            OssProperties ossProperties,
-            CounterService counterService,
-            UserCounterService userCounterService,
-            StringRedisTemplate redis,
-            @Qualifier("feedPublicCache") Cache<String, FeedPageResponse> feedPublicCache,
-            @Qualifier("knowPostDetailCache") Cache<String, KnowPostDetailResponse> knowPostDetailCache,
-            HotKeyDetector hotKey,
-            RagIndexService ragIndexService,
-            OutboxMapper outboxMapper
-    ) {
-        this.mapper = mapper;
-        this.idGen = idGen;
-        this.objectMapper = objectMapper;
-        this.ossProperties = ossProperties;
-        this.counterService = counterService;
-        this.userCounterService = userCounterService;
-        this.redis = redis;
-        this.feedPublicCache = feedPublicCache;
-        this.knowPostDetailCache = knowPostDetailCache; // 带@Qualifier的参数赋值
-        this.hotKey = hotKey;
-        this.ragIndexService = ragIndexService;
-        this.outboxMapper = outboxMapper;
-    }
     /**
      * 创建草稿并返回新 ID。
      */
@@ -114,9 +88,9 @@ public class KnowPostServiceImpl implements KnowPostService {
      */
     @Transactional
     public void confirmContent(long creatorId, long id, String objectKey, String etag, Long size, String sha256) {
-        // 缓存双删
+        // 1.缓存双删
         invalidateCache(id);
-
+        // 2.outin box更新es
         KnowPost post = KnowPost.builder()
                 .id(id)
                 .creatorId(creatorId)
@@ -133,7 +107,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
 
-        invalidateCache(id);
+        // 第二删移到事务提交成功之后执行（L1）
+        invalidateCacheAfterCommit(id);
 
         // 触发一次预索引（草稿阶段可能因可见性/状态被跳过）
         try {
@@ -183,7 +158,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             log.warn("Outbox event after metadata update failed, post {}: {}", id, e.getMessage());
         }
 
-        invalidateCache(id);
+        // 第二删移到事务提交成功之后执行（L1）
+        invalidateCacheAfterCommit(id);
     }
 
     /**
@@ -197,6 +173,9 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
+
+        // 发布后清掉旧草稿缓存（L1：事务提交后执行）
+        invalidateCacheAfterCommit(id);
 
         // ── 2. 技术板块：初始化计数器（点赞/收藏归零 + 作者发帖数+1，失败只记日志）──
         try {
@@ -241,7 +220,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
 
-        invalidateCache(id);
+        // 第二删移到事务提交成功之后执行（L1）
+        invalidateCacheAfterCommit(id);
     }
 
     /**
@@ -271,7 +251,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             ragIndexService.deletePost(id);
         }
 
-        invalidateCache(id);
+        // 第二删移到事务提交成功之后执行（L1）
+        invalidateCacheAfterCommit(id);
     }
 
     /**
@@ -297,7 +278,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             log.warn("Outbox event after delete failed, post {}: {}", id, e.getMessage());
         }
 
-        invalidateCache(id);
+        // 第二删移到事务提交成功之后执行（L1）
+        invalidateCacheAfterCommit(id);
     }
 
     private boolean isValidVisible(String visible) {
@@ -616,6 +598,30 @@ public class KnowPostServiceImpl implements KnowPostService {
         Long itemTtl = redis.getExpire(itemKey);
         if (itemTtl < target) {
             redis.expire(itemKey, java.time.Duration.ofSeconds(target));
+        }
+    }
+
+    /**
+     * L1 缓存失效：把"删缓存"挂到当前事务提交成功之后执行。
+     * <p>
+     * 修复点：原来方法体内的第二删发生在 Spring 提交事务之前，
+     * 提交瞬间落入的并发读会把旧值回填到缓存，脏到 TTL 过期。
+     * 注册 afterCommit 回调后，删除动作严格晚于 DB 提交。
+     * </p>
+     *
+     * @param id 内容 ID
+     */
+    private void invalidateCacheAfterCommit(long id) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    invalidateCache(id);
+                }
+            });
+        } else {
+            // 无事务上下文（非 @Transactional 路径）时直接删，兜底
+            invalidateCache(id);
         }
     }
 

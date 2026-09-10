@@ -3,6 +3,7 @@ package com.tongji.counter.api;
 import com.tongji.counter.api.dto.CountsResponse;
 import com.tongji.counter.schema.CounterSchema;
 import com.tongji.counter.service.CounterService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,13 +14,10 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("/api/v1/counter")
+@RequiredArgsConstructor
 public class CounterController {
 
     private final CounterService counterService;
-
-    public CounterController(CounterService counterService) {
-        this.counterService = counterService;
-    }
 
     /**
      * 获取实体的计数汇总。
