@@ -45,8 +45,6 @@ public class AuthController {
     /**
      * 发送短信/邮箱验证码。
      * <p>
-     * 根据场景（注册、登录、重置密码）向指定标识（手机号或邮箱）发送一次性验证码。
-     *
      * @param request 请求体，包含：
      *                - identifierType：标识类型，PHONE 或 EMAIL；
      *                - identifier：手机号或邮箱地址；
