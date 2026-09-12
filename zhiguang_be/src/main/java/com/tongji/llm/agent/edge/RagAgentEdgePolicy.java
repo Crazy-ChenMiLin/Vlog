@@ -9,10 +9,9 @@ import com.tongji.llm.agent.state.RetrievalMode;
 import org.springframework.stereotype.Component;
 
 /**
- * Conditional edges for the RAG agent graph.
+ * RAG Agent 图的条件边策略。
  *
- * <p>The nodes do the work, while this policy decides whether the next optional edge
- * should be taken based on the current plan/state.</p>
+ * <p>节点负责执行具体任务，本策略根据计划和运行状态判断是否进入可选分支。</p>
  */
 @Component
 public class RagAgentEdgePolicy {
@@ -21,9 +20,7 @@ public class RagAgentEdgePolicy {
         if (plan.questionType() == QuestionType.CHAT) {
             return true;
         }
-        // direct_answer is only a small-talk/no-retrieval shortcut. Technical and
-        // relation questions must still pass through graph/retrieval even if the
-        // planner accidentally marks needDirectAnswer=true.
+        // 直接回答只用于闲聊或明确无需检索的请求；即使 Planner 误置标志，技术和关系类问题仍须进入检索链路。
         return plan.needDirectAnswer()
                 && plan.retrievalMode() == RetrievalMode.NONE
                 && !plan.needKeywordSearch()

@@ -15,9 +15,7 @@ public class DirectAnswerNode {
     private final RagLlmProperties ragLlmProperties;
     private final RagPromptService ragPromptService;
 
-    /**
-     * Handles small-talk or questions that do not need knowledge-base retrieval.
-     */
+    /** 处理闲聊或其他无需检索知识库的问题。 */
     public String execute(RagAgentState state) {
         String answer = chatClient
                 .prompt()

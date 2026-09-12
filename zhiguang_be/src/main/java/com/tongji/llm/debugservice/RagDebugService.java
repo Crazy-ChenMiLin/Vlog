@@ -23,17 +23,15 @@ public class RagDebugService {
     private final RagRetrievalService retrievalService;
     private final RerankService rerankService;
 
-    // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
+    /** 调试单篇知文的完整检索与重排链路。 */
     public RagRetrievalDebugDTO debugPostRetrieval(long postId, String question, int topK) {
         RagRetrievalResultDTO result = retrievalService.retrieveForPost(postId, question, topK);
-    //然后rerank文章
         return toDebugResult("post", postId, question, result);
     }
 
-    // 先做原问题向量召回与 HyDE 向量召回，再用 RRF 融合。
+    /** 调试全库范围的完整检索与重排链路。 */
     public RagRetrievalDebugDTO debugGlobalRetrieval(String question, int topK) {
         RagRetrievalResultDTO result = retrievalService.retrieveGlobal(question, topK);
-    //然后rerank文章
         return toDebugResult("global", null, question, result);
     }
 

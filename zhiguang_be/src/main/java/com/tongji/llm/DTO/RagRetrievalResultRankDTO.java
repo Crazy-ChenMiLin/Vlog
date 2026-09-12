@@ -5,7 +5,7 @@ import org.springframework.ai.document.Document;
 import java.util.List;
 
 /**
- * Result after retrieval candidates are reranked and selected for final answer context.
+ * 检索候选经过重排并筛选最终回答上下文后的结果。
  */
 public record RagRetrievalResultRankDTO(
         RagRetrievalResultDTO retrieval,

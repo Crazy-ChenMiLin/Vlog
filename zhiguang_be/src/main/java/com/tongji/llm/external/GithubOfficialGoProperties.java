@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "rag.external.github-official-go")
 public class GithubOfficialGoProperties {
     private boolean enabled = true;
-    /** Supplied only through GITHUB_EXTERNAL_SEARCH_TOKEN; never place it in YAML. */
+    /** 仅通过 GITHUB_EXTERNAL_SEARCH_TOKEN 注入，禁止写入 YAML 配置。 */
     private String token;
     private String baseUrl = "https://api.github.com";
     private String repository = "golang/go";

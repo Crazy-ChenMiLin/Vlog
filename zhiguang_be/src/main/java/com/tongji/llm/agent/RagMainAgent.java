@@ -29,11 +29,10 @@ import java.util.stream.Collectors;
 import static net.logstash.logback.argument.StructuredArguments.kv;
 
 /**
- * RAG Main Agent: the main coordinator for one question-answer request.
+ * 单次 RAG 问答请求的主编排器。
  *
- * <p>This class deliberately keeps the workflow close to the graph/node model we discussed:
- * the agent owns the route, every node only handles its own step, and {@link RagAgentState}
- * carries the shared state between nodes.</p>
+ * <p>该类负责选择并串联执行路径；各节点只处理一个步骤，节点之间通过
+ * {@link RagAgentState} 共享本次请求的状态。</p>
  */
 @Slf4j
 @Service
@@ -72,7 +71,9 @@ public class RagMainAgent {
         this.externalKnowledgeProviders = externalKnowledgeProviders == null ? List.of() : List.copyOf(externalKnowledgeProviders);
     }
 
-    /** Keeps existing unit tests and callers source-compatible while no provider is configured. */
+    /**
+     * 兼容未配置外部知识提供器的调用方和既有测试。
+     */
     public RagMainAgent(
             PlanNode planNode,
             EvidenceCheckNode evidenceCheckNode,
@@ -95,8 +96,9 @@ public class RagMainAgent {
     }
 
     /**
-     * Runs the agent and invokes {@code stepListener} immediately after each node records its step.
-     * This keeps the synchronous state model while allowing an SSE caller to surface real-time progress.
+     * 执行 Agent，并在每个节点记录步骤后立即调用 {@code stepListener}。
+     *
+     * <p>执行链仍保持同步状态模型，SSE 调用方可通过监听器实时推送进度。</p>
      */
     public RagAgentState run(
             String scope,
@@ -178,8 +180,9 @@ public class RagMainAgent {
     }
 
     /**
-     * Link-only MVP fallback. The provider receives the question, but no external
-     * document text is ever inserted into the LLM context or the local vector store.
+     * 站内证据不足时补充外部官方资料链接。
+     *
+     * <p>仅将问题交给外部提供器并返回链接，不读取外部正文，也不将其写入模型上下文或本地向量库。</p>
      */
     private void discoverExternalLinksWhenNeeded(
             RagAgentState state,

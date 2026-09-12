@@ -5,8 +5,8 @@ import org.springframework.util.StringUtils;
 /**
  * EvidenceCheck 的检查报告。
  *
- * <p>我们讨论过它至少要回答四件事：证据是否足够、分数是多少、原因是什么、
- * 下一步建议做什么。MainAgent 只根据 suggestedAction 做有限补救，不让模型无限重试。</p>
+ * <p>包含证据充分性、置信分数、判断原因和下一步建议。主 Agent 仅依据
+ * {@code suggestedAction} 执行有限补救，避免模型无限重试。</p>
  */
 public record EvidenceResult(
         boolean sufficient,

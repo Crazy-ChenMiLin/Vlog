@@ -3,8 +3,7 @@ package com.tongji.llm.external;
 import org.springframework.util.StringUtils;
 
 /**
- * A link-only external knowledge result. The external document is deliberately
- * not persisted or passed to the answer model in this MVP.
+ * 仅包含链接和摘要的外部知识结果；外部正文不会持久化，也不会传给回答模型。
  */
 public record ExternalKnowledgeResource(
         String provider,

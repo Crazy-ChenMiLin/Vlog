@@ -10,26 +10,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 实体（概念）识别服务：用「概念-别名」词典做关键词匹配，从问题中抽取知识概念。
+ * 使用「概念—别名」词典从用户问题中匹配知识图谱实体。
  *
- * <p>这是图谱增强链路的第一步。采用轻量的词典匹配而非 NER 模型：
- * 把核心概念及其同义表述（中英文、口语化说法）列成白名单，命中即认为问题涉及该概念。
- * 优点是零外部依赖、可控、便于针对业务术语调优；代价是召回上限受词典覆盖度约束。
- *
- * <p>匹配为「子串包含」语义（如「击穿」可命中「缓存击穿」），因此对别名列表的取值
- * 需要人工把控，避免过短别名造成误召回（例如「命中」可能误命中非缓存场景）。
- * 词典实体匹配层。
- *
- * <p>这层是图谱增强的稳定兜底：用可控的概念/别名字典从问题里匹配实体。
- * 它不理解“关系意图”，只负责找出问题中明确出现的概念；关系意图由
+ * <p>词典匹配是图谱增强链路的稳定兜底：无外部依赖且便于针对业务术语调优，
+ * 但召回能力受词典覆盖范围限制。关系意图和复杂语义由
  * {@link QueryUnderstandingService} 补充。</p>
+ *
+ * <p>当前采用大小写不敏感的子串匹配，因此别名不宜过短，以免产生误召回。</p>
  */
 @Service
 public class QueryEntityMatchService {
     /**
      * 概念别名词典：key 为规范化概念名（需与 Neo4j 中 Concept.name 对齐），
      * value 为该概念在用户问题中可能出现的各种表述。
-     * 使用 LinkedHashMap 保证遍历顺序稳定（先定义的概念优先匹配）。
+     * 使用 LinkedHashMap 保证输出顺序与词典定义顺序一致。
      */
     private static final Map<String, List<String>> CONCEPT_ALIASES = new LinkedHashMap<>();
 
@@ -53,26 +47,18 @@ public class QueryEntityMatchService {
     }
 
     /**
-     * 从问题文本中匹配知识概念。
-     *
-     * @param question 用户原始问题
-     * @return 命中的概念列表（含其全部别名）；空文本或无机概念命中时返回空列表
-     */
-    /**
      * 按别名做大小写不敏感的子串匹配。
      *
-     * <p>这里故意保持简单：命中任意别名就认为命中该概念，复杂语义交给 LLM 理解层处理。</p>
+     * @param question 用户原始问题
+     * @return 命中的概念及其完整别名；问题为空或没有命中时返回空列表
      */
     public List<GraphEntity> match(String question) {
-        // 空问题直接返回，避免无意义遍历
         if (!StringUtils.hasText(question)) {
             return List.of();
         }
-        // 统一小写并去首尾空白，做大小写不敏感的子串匹配
         String normalized = question.trim().toLowerCase();
         List<GraphEntity> result = new ArrayList<>();
         for (Map.Entry<String, List<String>> entry : CONCEPT_ALIASES.entrySet()) {
-            // 任一别名作为子串出现在问题中，即判定该概念命中
             boolean matched = entry.getValue().stream()
                     .filter(StringUtils::hasText)
                     .anyMatch(alias -> normalized.contains(alias.toLowerCase()));

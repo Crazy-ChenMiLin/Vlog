@@ -3,11 +3,10 @@ package com.tongji.llm.external;
 import java.util.List;
 
 /**
- * Provider boundary for external, read-only knowledge discovery.
+ * 外部只读知识发现的统一接口。
  *
- * <p>This is intentionally shaped like a future MCP tool: the RAG workflow
- * asks for evidence links and does not know the provider's HTTP API, allow-list,
- * or result format. A later MCP transport can expose this contract unchanged.</p>
+ * <p>RAG 流程只依赖证据链接，不感知提供器的 HTTP API、来源白名单或响应格式；
+ * 该边界也便于后续通过 MCP 暴露同一能力。</p>
  */
 public interface ExternalKnowledgeProvider {
 

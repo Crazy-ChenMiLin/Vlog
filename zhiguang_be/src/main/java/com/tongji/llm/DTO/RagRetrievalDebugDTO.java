@@ -6,7 +6,7 @@ import com.tongji.llm.graphService.model.GraphRelation;
 import java.util.List;
 
 /**
- * Read-only view of the three retrieval stages used by single-post or global RAG.
+ * 单篇知文或全库 RAG 各检索阶段的只读调试视图。
  */
 public record RagRetrievalDebugDTO(
         String scope,
@@ -28,7 +28,8 @@ public record RagRetrievalDebugDTO(
             String chunkId,
             String title,
             Integer position,
-            Double vectorScore,// 历史字段名：向量结果是相似度分数，BM25 结果是 ES _score；不是 RRF 分数。
+            // 兼容历史字段名：向量结果为相似度，BM25 结果为 ES _score，均不是 RRF 分数。
+            Double vectorScore,
             String sectionTitle,
             String sectionType,
             String questionIntent,

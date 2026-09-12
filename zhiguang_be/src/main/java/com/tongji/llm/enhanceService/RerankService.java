@@ -39,8 +39,7 @@ public class RerankService {
             return fallback(fusedDocs, topK, graphContext);
         }
 
-        //rerank模型只是发送了内容的text
-        //没有title
+        // 将标题、章节等元数据拼入正文，弥补重排接口仅接收文本字段的限制。
         try {
             RerankRequest request = new RerankRequest(
                     rerank.getModel(),

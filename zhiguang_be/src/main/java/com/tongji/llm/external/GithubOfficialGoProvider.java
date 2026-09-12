@@ -18,9 +18,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Link-only GitHub provider for official Go sources. It uses authenticated Code
- * Search when a server-side token is configured and falls back to a small,
- * explicit catalogue when GitHub is unavailable.
+ * 从 GitHub 发现 Go 官方资料链接。
+ *
+ * <p>配置服务端令牌时优先调用 Code Search；未配置令牌或 GitHub 不可用时，
+ * 回退到内置的官方资料白名单。</p>
  */
 @Slf4j
 @Service
@@ -89,8 +90,7 @@ public class GithubOfficialGoProvider implements ExternalKnowledgeProvider {
                     ))
                     .toList();
         } catch (Exception e) {
-            // Token values must never appear in logs. A failed provider must not
-            // prevent the original RAG request from finishing.
+            // 不记录令牌或响应详情；外部来源不可用不应中断主 RAG 请求。
             log.info("Official Go GitHub Code Search unavailable: {}", e.getClass().getSimpleName());
             return List.of();
         }

@@ -3,10 +3,9 @@ package com.tongji.llm.agent.state;
 import org.springframework.util.StringUtils;
 
 /**
- * 单次请求实际走过的一步 Trace。
+ * 单次 Agent 请求中的一条执行步骤记录。
  *
- * <p>Trace 不是整张流程图，而是本次执行路径，所以 RagAgentState 里用 List 顺序保存。
- * 这份轻量记录后续可以直接打到 ELK，用于观察哪一步慢、哪一步失败、是否触发 topK 扩展。</p>
+ * <p>{@link RagAgentState} 按执行顺序保存这些记录，用于定位耗时、失败节点及 topK 扩展情况。</p>
  */
 public record RagAgentStepTrace(
         String stepName,

@@ -111,7 +111,7 @@ public class RagQueryService {
                             topK
                     ));
                 })
-                // With the initial Flux returned immediately, this protects each silent gap in the workflow.
+                // 初始 Flux 会立即返回；该超时用于限制后续工作流中每段无事件间隔。
                 .timeout(Duration.ofSeconds(60))
                 .onErrorResume(TimeoutException.class, e ->
                         Flux.just(errorEvent("408", "请求超时，请重试")))
