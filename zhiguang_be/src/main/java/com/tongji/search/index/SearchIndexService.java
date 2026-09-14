@@ -6,7 +6,7 @@ import co.elastic.clients.elasticsearch.core.IndexResponse;
 import co.elastic.clients.elasticsearch._types.Refresh;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.counter.service.CounterService;
+import com.tongji.counter.service.CounterReadService;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPostDetailRow;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +43,7 @@ public class SearchIndexService {
 
     private final ElasticsearchClient es;
     private final KnowPostMapper knowPostMapper;
-    private final CounterService counterService;
+    private final CounterReadService counterReadService;
     private final ObjectMapper objectMapper;
     private final RestTemplate http = new RestTemplate();
     private final AtomicBoolean backfillRunning = new AtomicBoolean(false);
@@ -126,7 +126,7 @@ public class SearchIndexService {
                 doc.put("body", truncate(body, 4000));
             }
 
-            Map<String, Long> counts = counterService.getCounts("knowpost", String.valueOf(id), List.of("like","fav"));
+            Map<String, Long> counts = counterReadService.getCounts("knowpost", String.valueOf(id), List.of("like","fav"));
             doc.put("like_count", counts.getOrDefault("like", 0L));
             doc.put("favorite_count", counts.getOrDefault("fav", 0L));
             doc.put("view_count", 0L);

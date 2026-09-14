@@ -7,7 +7,7 @@ import com.tongji.knowpost.api.dto.FeedItemResponse;
 import com.tongji.knowpost.api.dto.FeedPageResponse;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPostFeedRow;
-import com.tongji.counter.service.CounterService;
+import com.tongji.counter.service.CounterReadService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.tongji.cache.hotkey.HotKeyDetector;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
     private final KnowPostMapper mapper;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
-    private final CounterService counterService;
+    private final CounterReadService counterReadService;
     @Qualifier("feedPublicCache")
     private final Cache<String, FeedPageResponse> feedPublicCache;
     @Qualifier("feedMineCache")
@@ -224,8 +224,8 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
         List<FeedItemResponse> out = new ArrayList<>(base.size());
 
         for (FeedItemResponse it : base) {
-            boolean liked = uid != null && counterService.isLiked("knowpost", it.id(), uid);
-            boolean faved = uid != null && counterService.isFaved("knowpost", it.id(), uid);
+            boolean liked = uid != null && counterReadService.isLiked("knowpost", it.id(), uid);
+            boolean faved = uid != null && counterReadService.isFaved("knowpost", it.id(), uid);
             out.add(new FeedItemResponse(
                     it.id(),
                     it.title(),
@@ -336,7 +336,7 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
                 continue;
             }
 
-            Map<String, Long> counts = counterService.getCounts("knowpost", String.valueOf(base.id()), List.of("like", "fav"));
+            Map<String, Long> counts = counterReadService.getCounts("knowpost", String.valueOf(base.id()), List.of("like", "fav"));
             Long likeCount = counts.getOrDefault("like", 0L);
             Long favoriteCount = counts.getOrDefault("fav", 0L);
 
@@ -518,12 +518,12 @@ public class KnowPostFeedServiceImpl implements KnowPostFeedService {
             List<String> imgs = parseStringArray(r.getImgUrls());
             String cover = imgs.isEmpty() ? null : imgs.getFirst();
 
-            Map<String, Long> counts = counterService.getCounts("knowpost", String.valueOf(r.getId()), List.of("like", "fav"));
+            Map<String, Long> counts = counterReadService.getCounts("knowpost", String.valueOf(r.getId()), List.of("like", "fav"));
             Long likeCount = counts.getOrDefault("like", 0L);
             Long favoriteCount = counts.getOrDefault("fav", 0L);
 
-            Boolean liked = userIdNullable != null && counterService.isLiked("knowpost", String.valueOf(r.getId()), userIdNullable);
-            Boolean faved = userIdNullable != null && counterService.isFaved("knowpost", String.valueOf(r.getId()), userIdNullable);
+            Boolean liked = userIdNullable != null && counterReadService.isLiked("knowpost", String.valueOf(r.getId()), userIdNullable);
+            Boolean faved = userIdNullable != null && counterReadService.isFaved("knowpost", String.valueOf(r.getId()), userIdNullable);
             Boolean isTop = includeIsTop ? r.getIsTop() : null;
 
             items.add(new FeedItemResponse(

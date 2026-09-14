@@ -8,7 +8,7 @@ import java.util.Map;
  * 计数响应体：返回实体类型、ID 及各指标的计数值。
  */
 @Data
-public class CountsResponse {
+public class CounterReadResponse {
     private String entityType;
     private String entityId;
     private Map<String, Long> counts;
@@ -19,7 +19,7 @@ public class CountsResponse {
      * @param entityId 实体ID
      * @param counts 指标到计数值的映射
      */
-    public CountsResponse(String entityType, String entityId, Map<String, Long> counts) {
+    public CounterReadResponse(String entityType, String entityId, Map<String, Long> counts) {
         this.entityType = entityType;
         this.entityId = entityId;
         this.counts = counts;

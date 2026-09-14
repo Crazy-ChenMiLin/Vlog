@@ -3,15 +3,11 @@ package com.tongji.counter.service.impl;
 import com.tongji.counter.schema.CounterKeys;
 import com.tongji.counter.schema.CounterSchema;
 import com.tongji.counter.schema.BitmapShard;
-import com.tongji.counter.service.CounterService;
-import com.tongji.counter.event.CounterEvent;
-import com.tongji.counter.event.CounterEventProducer;
+import com.tongji.counter.service.CounterReadService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
-import org.springframework.context.ApplicationEventPublisher;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.RLock;
 import org.redisson.api.RRateLimiter;
@@ -25,21 +21,17 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 内容实体计数服务实现（位图事实 + 事件聚合 + SDS 汇总）。
+ * 内容实体计数读服务实现（位图事实 + SDS 汇总）。
  *
  * <p>职责：</p>
- * - 位图原子切换并产出计数事件（幂等）；
  * - 读取汇总计数（SDS），异常时基于位图分片重建；
  * - 批量读取优化与“是否点赞/收藏”判定。
  */
 @Slf4j
 @Service
-public class CounterServiceImpl implements CounterService {
+public class CounterReadServiceImpl implements CounterReadService {
 
     private final StringRedisTemplate redis;
-    private final DefaultRedisScript<Long> toggleScript;
-    private final CounterEventProducer eventProducer;
-    private final ApplicationEventPublisher eventPublisher;
     private final RedissonClient redisson;
     @Value("${counter.rebuild.lock.ttl-ms:5000}")
     private long lockTtlMs;
@@ -52,86 +44,9 @@ public class CounterServiceImpl implements CounterService {
     @Value("${counter.rebuild.backoff.max-ms:30000}")
     private long backoffMaxMs;
 
-    public CounterServiceImpl(StringRedisTemplate redis, CounterEventProducer eventProducer, ApplicationEventPublisher eventPublisher, RedissonClient redisson) {
+    public CounterReadServiceImpl(StringRedisTemplate redis, RedissonClient redisson) {
         this.redis = redis;
-        this.eventProducer = eventProducer;
-        this.eventPublisher = eventPublisher;
         this.redisson = redisson;
-        this.toggleScript = new DefaultRedisScript<>();
-        this.toggleScript.setResultType(Long.class);
-        // 位图状态原子切换，仅在状态变化时返回 1
-        this.toggleScript.setScriptText(TOGGLE_LUA);
-    }
-
-    /**
-     * 点赞：位图原子置位，仅当状态从未点赞→已点赞时返回 true。
-     * 同步路径完成事实层更新后产出增量事件，异步聚合到计数快照。
-     * @param entityType 实体类型
-     * @param entityId 实体 ID
-     * @param userId 用户 ID
-     * @return 是否发生状态变化（幂等）
-     */
-    @Override
-    public boolean like(String entityType, String entityId, long userId) {
-        return toggle(entityType, entityId, userId, "like", CounterSchema.IDX_LIKE, true);
-    }
-
-    /**
-     * 取消点赞：位图原子清零，仅当状态从已点赞→未点赞时返回 true。
-     * 产出增量事件（delta=-1），异步聚合到计数快照。
-     */
-    @Override
-    public boolean unlike(String entityType, String entityId, long userId) {
-        return toggle(entityType, entityId, userId, "like", CounterSchema.IDX_LIKE, false);
-    }
-
-    /**
-     * 收藏：位图原子置位，并产出增量事件（delta=+1）。
-     */
-    @Override
-    public boolean fav(String entityType, String entityId, long userId) {
-        return toggle(entityType, entityId, userId, "fav", CounterSchema.IDX_FAV, true);
-    }
-
-    /**
-     * 取消收藏：位图原子清零，并产出增量事件（delta=-1）。
-     */
-    @Override
-    public boolean unfav(String entityType, String entityId, long userId) {
-        return toggle(entityType, entityId, userId, "fav", CounterSchema.IDX_FAV, false);
-    }
-
-    /**
-     * 位图状态切换：仅在状态变化时返回成功，并产出增量事件。
-     * @param etype 实体类型
-     * @param eid 实体 ID
-     * @param uid 用户 ID
-     * @param metric 指标名称（like/fav）
-     * @param idx 指标索引（用于 SDS 固定结构定位）
-     * @param add 是否置位（true=添加，false=移除）
-     */
-    private boolean toggle(String etype, String eid, long uid, String metric, int idx, boolean add) {
-        // 固定分片定位：按用户ID映射到 chunk 与分片内 bit 偏移，避免单键膨胀与热点
-        long chunk = BitmapShard.chunkOf(uid);
-        // 分片内位偏移
-        long bit = BitmapShard.bitOf(uid);
-        String bmKey = CounterKeys.bitmapKey(metric, etype, eid, chunk);
-        List<String> keys = List.of(bmKey);
-        List<String> args = List.of(String.valueOf(bit), add ? "add" : "remove");
-        // 1. Redis 位图原子操作（SETBIT）
-        Long changed = redis.execute(toggleScript, keys, args.toArray());
-        boolean ok = changed == 1L;
-        // 只有状态真正变化时才发事件
-        if (ok) {
-            int delta = add ? 1 : -1;
-        // 2. 发到 Kafka（给 CounterAggregationConsumer 异步聚合计数）
-            // 产出计数事件（异步聚合），分区按实体维度保证同实体事件顺序
-            eventProducer.publish(CounterEvent.of(etype, eid, metric, idx, uid, delta));
-        // 3. 发 Spring 进程内事件（给 FeedCacheInvalidationListener 同步更新缓存）
-            // 本地事件：触发缓存失效/旁路更新等快速路径
-            eventPublisher.publishEvent(CounterEvent.of(etype, eid, metric, idx, uid, delta));
-        }
-        return ok;
     }
 
     /**
@@ -282,34 +197,6 @@ public class CounterServiceImpl implements CounterService {
             out.put(eid, m);
         }
         return out;
-    }
-
-    @Override
-    public void initZeroCountsIfAbsent(String entityType, String entityId, List<String> metrics) {
-        if (entityType == null || entityType.isBlank() || entityId == null || entityId.isBlank()) {
-            return;
-        }
-        if (metrics == null || metrics.isEmpty()) {
-            return;
-        }
-
-        byte[] zeroSds = new byte[CounterSchema.SCHEMA_LEN * CounterSchema.FIELD_SIZE];
-        boolean hasSupportedMetric = false;
-        for (String metric : metrics) {
-            Integer idx = CounterSchema.NAME_TO_IDX.get(metric);
-            if (idx == null) {
-                continue;
-            }
-            writeInt32BE(zeroSds, idx * CounterSchema.FIELD_SIZE, 0L);
-            hasSupportedMetric = true;
-        }
-        if (!hasSupportedMetric) {
-            return;
-        }
-
-        String sdsKey = CounterKeys.sdsKey(entityType, entityId);
-        redis.execute((RedisCallback<Boolean>) connection ->
-                connection.stringCommands().setNX(sdsKey.getBytes(StandardCharsets.UTF_8), zeroSds));
     }
 
     /**
@@ -472,21 +359,4 @@ public class CounterServiceImpl implements CounterService {
         return sum;
     }
 
-    // Redis 内嵌 Lua（Redis 5/6 的 Lua 5.1），位图原子切换（分片内偏移）
-    private static final String TOGGLE_LUA = """
-            local bmKey = KEYS[1]
-            local offset = tonumber(ARGV[1])
-            local op = ARGV[2] -- 'add' or 'remove'
-            local prev = redis.call('GETBIT', bmKey, offset)
-            if op == 'add' then
-              if prev == 1 then return 0 end
-              redis.call('SETBIT', bmKey, offset, 1)
-              return 1
-            elseif op == 'remove' then
-              if prev == 0 then return 0 end
-              redis.call('SETBIT', bmKey, offset, 0)
-              return 1
-            end
-            return -1
-            """;
 }

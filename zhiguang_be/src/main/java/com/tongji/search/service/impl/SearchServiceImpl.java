@@ -11,7 +11,7 @@ import co.elastic.clients.elasticsearch.core.search.Suggestion;
 import co.elastic.clients.util.NamedValue;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.tongji.knowpost.api.dto.FeedItemResponse;
-import com.tongji.counter.service.CounterService;
+import com.tongji.counter.service.CounterReadService;
 import com.tongji.search.api.dto.SearchResponse;
 import com.tongji.search.api.dto.SuggestResponse;
 import com.tongji.search.service.SearchService;
@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 public class SearchServiceImpl implements SearchService {
 
     private final ElasticsearchClient es;
-    private final CounterService counterService;
+    private final CounterReadService counterReadService;
     /**
      * ES 索引名：zhiguang 内容统一索引。
      */
@@ -131,8 +131,8 @@ public class SearchServiceImpl implements SearchService {
             String tagJson = asString(source.get("author_tag_json"));
             Long likeCount = asLong(source.get("like_count"));
             Long favoriteCount = asLong(source.get("favorite_count"));
-            Boolean liked = currentUserIdNullable != null && counterService.isLiked("knowpost", id, currentUserIdNullable);
-            Boolean faved = currentUserIdNullable != null && counterService.isFaved("knowpost", id, currentUserIdNullable);
+            Boolean liked = currentUserIdNullable != null && counterReadService.isLiked("knowpost", id, currentUserIdNullable);
+            Boolean faved = currentUserIdNullable != null && counterReadService.isFaved("knowpost", id, currentUserIdNullable);
             items.add(new FeedItemResponse(
                     id,
                     title,

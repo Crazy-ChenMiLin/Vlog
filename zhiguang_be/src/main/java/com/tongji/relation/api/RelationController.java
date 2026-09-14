@@ -2,6 +2,7 @@ package com.tongji.relation.api;
 
 import com.tongji.relation.service.RelationService;
 import com.tongji.auth.token.JwtService;
+import com.tongji.counter.application.UserCounterRebuildService;
 import com.tongji.profile.api.dto.ProfileResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisCallback;
@@ -28,7 +29,7 @@ public class RelationController {
     private final RelationService relationService;
     private final JwtService jwtService;
     private final StringRedisTemplate redis;
-    private final com.tongji.counter.service.UserCounterService userCounterService;
+    private final UserCounterRebuildService userCounterRebuildService;
     private final com.tongji.relation.mapper.RelationMapper relationMapper;
 
     /**
@@ -119,7 +120,7 @@ public class RelationController {
         // 缺失或结构异常（少于 5 段 × 每段 4 字节）时尝试重建
         if (raw == null || raw.length < 20) {
             try {
-                userCounterService.rebuildAllCounters(userId);
+                userCounterRebuildService.rebuildAllCounters(userId);
             } catch (Exception ignored) {}
 
             // 重建后二次读取
@@ -174,7 +175,7 @@ public class RelationController {
             // 段数异常或值不一致则触发全量重建
             if ((seg != 5) || sdsFollowings != (long) dbFollowings || sdsFollowers != (long) dbFollowers) {
                 try {
-                    userCounterService.rebuildAllCounters(userId);
+                    userCounterRebuildService.rebuildAllCounters(userId);
                 } catch (Exception ignored) {}
 
                 // 重建后读取并直接返回最新值

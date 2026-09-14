@@ -5,7 +5,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.tongji.cache.hotkey.HotKeyDetector;
 import com.tongji.cache.config.CacheProperties;
-import com.tongji.counter.service.CounterService;
+import com.tongji.counter.service.CounterReadService;
+import com.tongji.counter.service.CounterWriteService;
 import com.tongji.counter.service.UserCounterService;
 import com.tongji.knowpost.api.dto.FeedPageResponse;
 import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
@@ -42,7 +43,9 @@ class KnowPostServiceImplTest {
     @Mock
     private KnowPostMapper mapper;
     @Mock
-    private CounterService counterService;
+    private CounterReadService counterReadService;
+    @Mock
+    private CounterWriteService counterWriteService;
     @Mock
     private UserCounterService userCounterService;
     @Mock
@@ -76,7 +79,8 @@ class KnowPostServiceImplTest {
                 new SnowflakeIdGenerator(),
                 new ObjectMapper(),
                 ossProperties,
-                counterService,
+                counterReadService,
+                counterWriteService,
                 userCounterService,
                 redis,
                 feedPublicCache,

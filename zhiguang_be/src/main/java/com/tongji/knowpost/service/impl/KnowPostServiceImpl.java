@@ -14,7 +14,8 @@ import com.tongji.knowpost.model.KnowPostDetailRow;
 import com.tongji.knowpost.api.dto.FeedPageResponse;
 import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
 import com.github.benmanes.caffeine.cache.Cache;
-import com.tongji.counter.service.CounterService;
+import com.tongji.counter.service.CounterReadService;
+import com.tongji.counter.service.CounterWriteService;
 import com.tongji.storage.config.OssProperties;
 import com.tongji.llm.searchService.RagIndexService;
 import com.tongji.relation.outbox.OutboxMapper;
@@ -47,7 +48,8 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final SnowflakeIdGenerator idGen;
     private final ObjectMapper objectMapper;
     private final OssProperties ossProperties;
-    private final CounterService counterService;
+    private final CounterReadService counterReadService;
+    private final CounterWriteService counterWriteService;
     //点赞数量+1
     private final UserCounterService userCounterService;
     private final StringRedisTemplate redis;
@@ -179,7 +181,7 @@ public class KnowPostServiceImpl implements KnowPostService {
 
         // ── 2. 技术板块：初始化计数器（点赞/收藏归零 + 作者发帖数+1，失败只记日志）──
         try {
-            counterService.initZeroCountsIfAbsent("knowpost", String.valueOf(id), List.of("like", "fav"));
+            counterWriteService.initZeroCountsIfAbsent("knowpost", String.valueOf(id), List.of("like", "fav"));
         } catch (Exception e) {
             log.warn("Init counters after publish failed, post {}: {}", id, e.getMessage());
         }
@@ -431,7 +433,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             List<String> tags = parseStringArray(row.getTags());
             
             // 此处查询的计数仅作为缓存的基础值，后续 enrich 会刷新
-            Map<String, Long> counts = counterService.getCounts("knowpost", String.valueOf(row.getId()), List.of("like", "fav"));
+            Map<String, Long> counts = counterReadService.getCounts("knowpost", String.valueOf(row.getId()), List.of("like", "fav"));
             Long likeCount = counts.getOrDefault("like", 0L);
             Long favoriteCount = counts.getOrDefault("fav", 0L);
 
@@ -525,7 +527,7 @@ public class KnowPostServiceImpl implements KnowPostService {
      *
      * @param base 基础响应对象（来自缓存或 DB）
      * @param uid 当前用户 ID
-     * @param refreshCounts 是否需要从 CounterService 刷新计数（缓存命中时需要，DB 回源时不需要）
+     * @param refreshCounts 是否需要从 CounterReadService 刷新计数（缓存命中时需要，DB 回源时不需要）
      * @return 叠加了最新状态的响应对象
      */
     private KnowPostDetailResponse enrichDetailResponse(KnowPostDetailResponse base, Long uid, boolean refreshCounts) {
@@ -533,9 +535,9 @@ public class KnowPostServiceImpl implements KnowPostService {
         Long favoriteCount = base.favoriteCount();
 
         // 1. 刷新计数（仅在走缓存时执行）
-        // 因为缓存中的计数可能是旧的，权威计数在 CounterService (Redis SDS)
+        // 因为缓存中的计数可能是旧的，权威计数在 CounterReadService (Redis SDS)
         if (refreshCounts) {
-            Map<String, Long> counts = counterService.getCounts("knowpost", base.id(), List.of("like", "fav"));
+            Map<String, Long> counts = counterReadService.getCounts("knowpost", base.id(), List.of("like", "fav"));
             if (counts != null) {
                 likeCount = counts.getOrDefault("like", likeCount == null ? 0L : likeCount);
                 favoriteCount = counts.getOrDefault("fav", favoriteCount == null ? 0L : favoriteCount);
@@ -544,8 +546,8 @@ public class KnowPostServiceImpl implements KnowPostService {
 
         // 2. 获取用户维度的状态（是否已点赞/收藏）
         // 这部分数据是个性化的，不能存入公共缓存
-        Boolean liked = uid != null && counterService.isLiked("knowpost", base.id(), uid);
-        Boolean faved = uid != null && counterService.isFaved("knowpost", base.id(), uid);
+        Boolean liked = uid != null && counterReadService.isLiked("knowpost", base.id(), uid);
+        Boolean faved = uid != null && counterReadService.isFaved("knowpost", base.id(), uid);
 
         // 3. 构造新的 Record 对象返回
         return new KnowPostDetailResponse(

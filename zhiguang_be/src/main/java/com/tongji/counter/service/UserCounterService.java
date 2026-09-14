@@ -3,7 +3,7 @@ package com.tongji.counter.service;
 /**
  * 用户维度计数服务接口。
  *
- * <p>支持维护关注数、粉丝数、发文数、获赞数、获收藏数，并提供全量重建。</p>
+ * <p>维护关注数、粉丝数、发文数、获赞数和获收藏数。</p>
  */
 
 //delta是delta 就是“变化量/增量”。
@@ -22,7 +22,4 @@ public interface UserCounterService {
     void incrementLikesReceived(long userId, int delta);
     /** 增量更新获收藏数（作者维度） */
     void incrementFavsReceived(long userId, int delta);
-    /** 基于事实重建全部计数 */
-    void rebuildAllCounters(long userId);
 }
-

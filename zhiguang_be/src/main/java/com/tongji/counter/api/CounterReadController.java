@@ -1,8 +1,8 @@
 package com.tongji.counter.api;
 
-import com.tongji.counter.api.dto.CountsResponse;
+import com.tongji.counter.api.dto.CounterReadResponse;
 import com.tongji.counter.schema.CounterSchema;
-import com.tongji.counter.service.CounterService;
+import com.tongji.counter.service.CounterReadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,9 +15,10 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1/counter")
 @RequiredArgsConstructor
-public class CounterController {
+public class CounterReadController {
 
-    private final CounterService counterService;
+    // 注入只读服务，Controller 不依赖写能力
+    private final CounterReadService counterReadService;
 
     /**
      * 获取实体的计数汇总。
@@ -26,9 +27,9 @@ public class CounterController {
      * @param metricsStr 指标列表（逗号分隔），为空则返回全部支持指标
      */
     @GetMapping("/{etype}/{eid}")
-    public ResponseEntity<CountsResponse> getCounts(@PathVariable("etype") String entityType,
-                                                    @PathVariable("eid") String entityId,
-                                                    @RequestParam(value = "metrics", required = false) String metricsStr) {
+    public ResponseEntity<CounterReadResponse> getCounts(@PathVariable("etype") String entityType,
+                                                         @PathVariable("eid") String entityId,
+                                                         @RequestParam(value = "metrics", required = false) String metricsStr) {
         List<String> metrics;
         if (metricsStr == null || metricsStr.isBlank()) {
             metrics = new ArrayList<>(CounterSchema.SUPPORTED_METRICS); // 未指定指标时返回全部支持的计数
@@ -39,8 +40,8 @@ public class CounterController {
                     .toList();
         }
 
-        Map<String, Long> counts = counterService.getCounts(entityType, entityId, metrics);
+        Map<String, Long> counts = counterReadService.getCounts(entityType, entityId, metrics);
 
-        return ResponseEntity.ok(new CountsResponse(entityType, entityId, counts));
+        return ResponseEntity.ok(new CounterReadResponse(entityType, entityId, counts));
     }
 }
