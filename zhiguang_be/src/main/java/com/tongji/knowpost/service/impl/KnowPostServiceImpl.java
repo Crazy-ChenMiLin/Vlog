@@ -151,13 +151,16 @@ public class KnowPostServiceImpl implements KnowPostService {
             ragIndexService.deletePost(id);
         }
 
-        // 元数据变更后写入 Outbox 事件，驱动搜索索引更新
+        // 元数据变更后写入 Outbox 事件，驱动搜索索引更新。
+        // Canal 只订阅 outbox 表，事件缺失会导致 ES 里标题/描述/封面永远停留在旧值，
+        // 因此这里失败必须让整个事务回滚，保证“元数据已改 ⇔ 事件一定在”。
         try {
             long outId = idGen.nextId();
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "upsert", "id", id));
             outboxMapper.insert(outId, "knowpost", id, "KnowPostMetadataUpdated", payload);
         } catch (Exception e) {
-            log.warn("Outbox event after metadata update failed, post {}: ", id, e);
+            log.error("Outbox event after metadata update failed, postId={}", id, e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "更新失败，请重试", e);
         }
 
         // 第二删移到事务提交成功之后执行（L1）
@@ -199,7 +202,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "upsert", "id", id));
             outboxMapper.insert(outId, "knowpost", id, "KnowPostPublished", payload);
         } catch (Exception e) {
-            log.error("Outbox event after publish failed, postId={}, msg={}", id, e.getMessage(), e);
+            log.error("Outbox event after publish failed, postId={}", id, e);
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "发布失败，请重试", e);
         }
 
@@ -274,13 +277,16 @@ public class KnowPostServiceImpl implements KnowPostService {
 
         ragIndexService.deletePost(id);
 
-        // 写入 Outbox 事件，驱动搜索索引软删
+        // 写入 Outbox 事件，驱动搜索索引软删。
+        // 事件缺失会导致 ES 文档 status 仍是 published，已删除的文章照样能被搜到，
+        // 因此这里失败必须让整个删除事务回滚，保证“已删除 ⇔ 事件一定在”。
         try {
             long outId = idGen.nextId();
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "delete", "id", id));
             outboxMapper.insert(outId, "knowpost", id, "KnowPostDeleted", payload);
         } catch (Exception e) {
-            log.warn("Outbox event after delete failed, post {}: ", id, e);
+            log.error("Outbox event after delete failed, postId={}", id, e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "删除失败，请重试", e);
         }
 
         // 第二删移到事务提交成功之后执行（L1）

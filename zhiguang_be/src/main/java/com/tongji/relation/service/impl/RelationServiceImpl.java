@@ -5,6 +5,9 @@ import com.tongji.relation.service.RelationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.relation.event.RelationEvent;
 import com.tongji.relation.outbox.OutboxMapper;
+import com.tongji.common.exception.BusinessException;
+import com.tongji.common.exception.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,7 @@ import org.springframework.data.redis.core.RedisCallback;
  * - 并发与一致性：回填后设置短 TTL，降低陈旧风险；Outbox 事件消费者提供幂等与去重保障。
  */
 @Service
+@Slf4j
 public class RelationServiceImpl implements RelationService {
     private final RelationMapper mapper;
     private final OutboxMapper outboxMapper;
@@ -92,11 +96,17 @@ public class RelationServiceImpl implements RelationService {
         int inserted = mapper.insertFollowing(id, fromUserId, toUserId, 1);
 
         if (inserted > 0) {
+            // Outbox 是下游（粉丝表、计数、缓存）的唯一事件源，Canal 只订阅 outbox 表。
+            // 事件写不进去 → 关注关系已入库但粉丝表永远缺这条、计数不涨，且无重放无补偿。
+            // 因此这里失败必须让整个关注事务回滚，保证“关注成功 ⇔ 事件一定在”。
             try {
                 Long outId = ThreadLocalRandom.current().nextLong(Long.MAX_VALUE);
                 String payload = objectMapper.writeValueAsString(new RelationEvent("FollowCreated", fromUserId, toUserId, id));
                 outboxMapper.insert(outId, "following", id, "FollowCreated", payload);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.error("Outbox event after follow failed, fromUserId={}, toUserId={}", fromUserId, toUserId, e);
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "关注失败，请重试", e);
+            }
 
             return true;
         }
@@ -114,11 +124,15 @@ public class RelationServiceImpl implements RelationService {
     public boolean unfollow(long fromUserId, long toUserId) {
         int updated = mapper.cancelFollowing(fromUserId, toUserId);
         if (updated > 0) {
+            // 同 follow()：事件缺失会导致粉丝表残留、计数不回退，必须回滚整个事务。
             try {
                 Long outId = ThreadLocalRandom.current().nextLong(Long.MAX_VALUE);
                 String payload = objectMapper.writeValueAsString(new RelationEvent("FollowCanceled", fromUserId, toUserId, null));
                 outboxMapper.insert(outId, "following", null, "FollowCanceled", payload);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.error("Outbox event after unfollow failed, fromUserId={}, toUserId={}", fromUserId, toUserId, e);
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "取消关注失败，请重试", e);
+            }
             return true;
         }
         return false;
