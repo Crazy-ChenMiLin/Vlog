@@ -36,4 +36,18 @@ public class BusinessException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    /**
+     * 使用自定义文案并保留原始异常构造（错误码不变）。
+     *
+     * <p>转换异常时必须保留 cause：否则事务虽然回滚，但根因丢失，日志里查不到真实失败点。</p>
+     *
+     * @param errorCode 错误码（必填）
+     * @param message 自定义提示文案
+     * @param cause 原始异常
+     */
+    public BusinessException(ErrorCode errorCode, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+    }
+
 }

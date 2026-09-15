@@ -116,7 +116,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         try {
             ragIndexService.ensureIndexed(id);
         } catch (Exception e) {
-            log.warn("Pre-index after content confirm failed, post {}: {}", id, e.getMessage());
+            log.warn("Pre-index after content confirm failed, post {}: ", id, e);
         }
     }
 
@@ -157,7 +157,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "upsert", "id", id));
             outboxMapper.insert(outId, "knowpost", id, "KnowPostMetadataUpdated", payload);
         } catch (Exception e) {
-            log.warn("Outbox event after metadata update failed, post {}: {}", id, e.getMessage());
+            log.warn("Outbox event after metadata update failed, post {}: ", id, e);
         }
 
         // 第二删移到事务提交成功之后执行（L1）
@@ -183,7 +183,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         try {
             counterWriteService.initZeroCountsIfAbsent("knowpost", String.valueOf(id), List.of("like", "fav"));
         } catch (Exception e) {
-            log.warn("Init counters after publish failed, post {}: {}", id, e.getMessage());
+            log.warn("Init counters after publish failed, post {}: ", id, e);
         }
         try {
             userCounterService.incrementPosts(creatorId, 1);
@@ -191,13 +191,16 @@ public class KnowPostServiceImpl implements KnowPostService {
 
         // ── 3. 展示板块：写 Outbox 事件，驱动 ES 搜索索引异步同步 ──
         //    链路: outbox 表 → Canal 监听 → Kafka → 消费者用 ID 查库 → 写 ES
-        //    失败只记日志，搜索索引靠 Canal 重放兜底
+        //    注意：Canal 只订阅 outbox 表（见 OutboxMessageUtil#extract），
+        //    事件没写进去 → binlog 里没有这行 → 不存在“Canal 重放兜底”，ES 会永久缺数据。
+        //    因此这里失败必须让整个发布事务回滚，保证“已发布 ⇔ 事件存在”。
         try {
             long outId = idGen.nextId();
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "upsert", "id", id));
             outboxMapper.insert(outId, "knowpost", id, "KnowPostPublished", payload);
         } catch (Exception e) {
-            log.warn("Outbox event after publish failed, post {}: {}", id, e.getMessage());
+            log.error("Outbox event after publish failed, postId={}, msg={}", id, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "发布失败，请重试", e);
         }
 
         // ── 4. RAG 预索引：发布后预热向量索引，减少首次问答冷启动 ──
@@ -205,7 +208,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         try {
             ragIndexService.ensureIndexed(id);
         } catch (Exception e) {
-            log.warn("Pre-index after publish failed, post {}: {}", id, e.getMessage());
+            log.warn("Pre-index after publish failed, post {}: ", id, e);
         }
     }
 
@@ -247,7 +250,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             try {
                 ragIndexService.ensureIndexed(id);
             } catch (Exception e) {
-                log.warn("Pre-index after visibility update failed, post {}: {}", id, e.getMessage());
+                log.warn("Pre-index after visibility update failed, post {}: ", id, e);
             }
         } else {
             ragIndexService.deletePost(id);
@@ -277,7 +280,7 @@ public class KnowPostServiceImpl implements KnowPostService {
             String payload = objectMapper.writeValueAsString(Map.of("entity", "knowpost", "op", "delete", "id", id));
             outboxMapper.insert(outId, "knowpost", id, "KnowPostDeleted", payload);
         } catch (Exception e) {
-            log.warn("Outbox event after delete failed, post {}: {}", id, e.getMessage());
+            log.warn("Outbox event after delete failed, post {}: ", id, e);
         }
 
         // 第二删移到事务提交成功之后执行（L1）
