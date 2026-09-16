@@ -162,8 +162,8 @@ public class GitHubOAuthService {
             throw e;
         } catch (Exception e) {
             log.error("GitHub token exchange error", e);
-            //code违法时
-            throw new BusinessException(ErrorCode.GITHUB_OAUTH_FAILED);
+            // code 无效或网络异常时，保留原始异常作为 cause，避免上层只剩一句文案
+            throw new BusinessException(ErrorCode.GITHUB_OAUTH_FAILED, "GitHub 授权失败，请重试", e);
         }
     }
 
@@ -193,7 +193,7 @@ public class GitHubOAuthService {
             throw e;
         } catch (Exception e) {
             log.error("GitHub user API error", e);
-            throw new BusinessException(ErrorCode.GITHUB_OAUTH_FAILED);
+            throw new BusinessException(ErrorCode.GITHUB_OAUTH_FAILED, "GitHub 用户信息获取失败，请重试", e);
         }
     }
 

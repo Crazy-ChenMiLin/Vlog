@@ -208,7 +208,7 @@ public class CampusOAuthService {
             throw e;
         } catch (Exception e) {
             log.error("Campus token exchange error", e);
-            throw new BusinessException(ErrorCode.CAMPUS_OAUTH_FAILED);
+            throw new BusinessException(ErrorCode.CAMPUS_OAUTH_FAILED, "校园账号授权失败，请重试", e);
         }
     }
 
@@ -220,7 +220,7 @@ public class CampusOAuthService {
             return campusIdTokenDecoder.decode(idToken);
         } catch (Exception e) {
             log.error("Campus id_token decode error", e);
-            throw new BusinessException(ErrorCode.CAMPUS_OAUTH_FAILED);
+            throw new BusinessException(ErrorCode.CAMPUS_OAUTH_FAILED, "校园账号登录信息解析失败，请重试", e);
         }
     }
 
