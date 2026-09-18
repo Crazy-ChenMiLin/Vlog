@@ -1,6 +1,6 @@
 # 知光知识社区
 
-知光是一个面向知识内容发布、学习交流和智能问答的社区项目。项目采用前后端分离架构，后端负责认证、内容、关系链、计数、搜索、对象存储和 RAG 问答能力，前端提供知识流、内容详情、发布编辑、个人主页、搜索和 AI 对话等页面。
+知光是一个面向知识内容发布、学习交流和智能问答的社区项目。项目采用前后端分离架构，后端负责认证、内容、关系链、评论、计数、搜索、对象存储和 RAG 问答能力，前端提供知识流、内容详情、发布编辑、个人主页、搜索和 AI 对话等页面。
 
 当前仓库是前后端合仓：
 
@@ -9,14 +9,16 @@
 
 ## 功能概览
 
-- 用户认证：基于 Spring Security 的 JWT 认证，支持访问令牌和刷新令牌。
+- 用户认证：基于 Spring Security 的 JWT 认证，支持访问令牌和刷新令牌；支持密码登录、GitHub OAuth 与校园 CQUT-Auth OIDC 三种登录方式。
 - 知识发布：支持草稿创建、内容上传确认、元数据编辑、发布、置顶、可见性控制和删除。
+- 评论互动：支持对知识内容发表评论、回复、点赞以及分页加载。
 - 对象存储：通过后端生成预签名信息，前端直传内容、图片等资源到对象存储。
 - 首页 Feed：面向知识内容列表展示，结合本地缓存、Redis 缓存和热点探测优化读取。
 - 点赞收藏：支持点赞、取消点赞、收藏、取消收藏和计数查询。
 - 用户关系：支持关注、取关、粉丝数、关注数以及关系状态维护。
 - 搜索系统：基于 Elasticsearch 实现内容检索、标签过滤和搜索建议。
-- AI 能力：支持知识文章摘要生成、单篇知识内容 RAG 问答、流式输出和向量索引重建。
+- AI 能力：支持知识文章摘要生成、单篇 / 全局 RAG 问答、流式输出（SSE）、向量索引重建、关系图增强与证据校验。
+- 评测体系：内置 RAG Benchmark 服务与附属脚本，可对多场景问答质量做可复现的评测分析。
 - 事件驱动：使用 Kafka、Canal 和 Outbox 模式处理计数聚合、关系变更、搜索索引等异步任务。
 
 ## 技术栈
@@ -34,6 +36,7 @@
 - Canal
 - Elasticsearch
 - Caffeine
+- Nacos Config（配置中心）
 - MinIO / S3 兼容对象存储
 - Maven
 
@@ -44,6 +47,7 @@
 - Vite 5
 - React Router
 - React Markdown
+- remark-gfm（Markdown 表格等 GFM 语法扩展）
 - CSS Modules
 
 ## 目录结构
@@ -54,31 +58,35 @@
 │   ├── docs               # 后端接口文档与 SQL
 │   ├── scripts
 │   │   ├── deploy         # 内网后端、公网前端与 Nacos 部署脚本
-│   │   ├── AUTO_Benchwork # RAG Benchmark 流水线、数据集与测试
+│   │   ├── AUTO_Benchwork # RAG Benchmark 数据集、流水线与测试
 │   │   ├── rag-eval       # RAG/Graph A/B 评测工具
-│   │   └── graph          # 图数据工具
+│   │   ├── graph          # 图数据工具
+│   │   └── seed_*.py      # 造数脚本（内容、关系、热度、点赞计数等）
 │   ├── src/main/java      # 后端业务代码
 │   ├── src/main/resources # MyBatis mapper、密钥、配置等资源
 │   └── pom.xml
 ├── zhiguang_fe
 │   └── zhiguang_fe-main
-│       ├── docs
+│       ├── docs           # 前端接口契约
 │       ├── public
-│       ├── src            # 前端页面、组件、服务和类型定义
+│       ├── src            # 前端页面、组件、服务、类型和功能模块
 │       └── package.json
 └── README.md
 ```
 
 ## 后端模块
 
-- `auth`：登录、注册、验证码、JWT 签发、刷新令牌和登录日志。
+- `auth`：登录、注册、验证码、JWT 签发、刷新令牌、GitHub OAuth 与校园 OIDC 回调、登录日志与审计。
 - `profile`：用户资料、头像、个人主页信息。
 - `knowpost`：知识内容草稿、发布、详情、列表、摘要生成和 RAG 入口。
+- `comment`：评论、回复、点赞与分页加载。
 - `storage`：对象存储预签名上传、公开访问地址生成。
 - `counter`：点赞、收藏、计数和位图状态维护。
 - `relation`：关注、取关、粉丝和关注列表，配合 Outbox 事件异步同步。
 - `search`：Elasticsearch 索引、搜索、建议和搜索事件处理。
-- `llm`：大模型调用、RAG 检索、对话记忆、查询改写和调试能力。
+- `llm`：大模型调用、RAG 检索与重排、查询改写、对话记忆、Agent 编排、关系图查询和调试能力。
+- `limit`：AI 问答的令牌桶限流。
+- `benchmark`：RAG 评测（评估器、装配器、数据模型与内部评测接口）。
 - `cache`：本地缓存、Redis 二级缓存和热点 Key 探测。
 
 ## 环境要求
@@ -92,6 +100,7 @@
 - Canal
 - Elasticsearch
 - MinIO 或其他 S3 兼容对象存储
+- Neo4j（可选，用于 RAG 关系图增强）
 - 可兼容 OpenAI 协议的聊天模型服务
 - 可兼容 OpenAI Embedding 协议的向量模型服务
 
@@ -114,8 +123,20 @@ zhiguang_be/src/main/resources/application.yml
 - AI Embedding：`spring.ai.openai.embedding.base-url`、`api-key`、模型名、向量维度
 - 对象存储：`oss.endpoint`、`oss.access-key-id`、`oss.access-key-secret`、`oss.bucket`、`oss.public-domain`
 - JWT 密钥：`auth.jwt.private-key`、`auth.jwt.public-key`
+- GitHub OAuth：`github.client-id`、`github.client-secret`（回跳地址 `github.redirect-uri`，即 `{前端域名}/callback`）
+- 校园登录（可选）：`campus.client-id`、`campus.client-secret`、`campus.redirect-uri`、`campus.token-endpoint`（OIDC）
+- 关系图（可选）：`neo4j.uri`、`neo4j.authentication.username`、`neo4j.authentication.password`
 
-对象存储配置已支持环境变量覆盖：
+- OAuth 与中间件的敏感配置均可通过环境变量覆盖：
+
+| 配置 | 环境变量 |
+| --- | --- |
+| 对象存储 | `MINIO_ENDPOINT` `MINIO_ACCESS_KEY` `MINIO_SECRET_KEY` `MINIO_BUCKET` `MINIO_PUBLIC_DOMAIN` |
+| GitHub OAuth | `GITHUB_CLIENT_ID` `GITHUB_CLIENT_SECRET` `GITHUB_REDIRECT_URI` |
+| 校园 OIDC | `CAMPUS_CLIENT_ID` `CAMPUS_CLIENT_SECRET` `CAMPUS_REDIRECT_URI` |
+| Neo4j | `NEO4J_URI` `NEO4J_USERNAME` `NEO4J_PASSWORD` |
+
+以对象存储为例（PowerShell）：
 
 ```powershell
 $env:MINIO_ENDPOINT="http://localhost:9000"
@@ -156,6 +177,10 @@ CREATE DATABASE zhiguang_auth DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unic
 ```powershell
 mysql -u root -p zhiguang_auth < zhiguang_be/docs/sql/schema.sql
 ```
+
+增量迁移脚本位于同目录：
+
+- `add_campus_id.sql`：为 `users` 表新增 `campus_id` 并建立唯一索引，启用校园账号登录时需要执行。
 
 ## 启动后端
 
@@ -206,11 +231,21 @@ npm run build
 zhiguang_be/docs
 ```
 
-重点文档：
+重点接口文档：
 
 - `API接口.md`：认证、资料、对象存储、知识内容、点赞收藏、关注、搜索等接口。
 - `API接口文档_knowpost.md`：知识内容发布流程、Feed、详情、RAG 问答和索引重建接口。
-- `docs-user`：用户资料、关注关系等补充说明。
+- `API接口文档_用户关系.md`：关注、粉丝、关系状态等接口。
+- `API接口文档_计数.md`：点赞、收藏、计数查询接口。
+
+另有面向具体专题的设计文档：
+
+- `计数系统设计方案.md`、`用户关系设计方案.md`：对应模块的设计说明。
+- `ARMS监控无数据排查纪实.md`：生产可观测性排查记录。
+- `deployment-automation.md`：自动化部署说明。
+- `RAG-Prompt-Nacos迁移手册.md`、`RAG多轮记忆改造方案.md`、`RAG-rerank测试报告.md`、`知光知识社区_RAG扩展方案报告.md`、`知光知识社区_全库RAG问答改造计划.md`：RAG 检索链路的设计与测试文档。
+
+前端接口契约另维护在 `zhiguang_fe/zhiguang_fe-main/docs`（认证 / 搜索 / 知文 / 用户关系 / 计数）。
 
 典型接口前缀：
 
@@ -218,10 +253,12 @@ zhiguang_be/docs
 - `/api/v1/profile`
 - `/api/v1/storage`
 - `/api/v1/knowposts`
+- `/api/v1/comments`
 - `/api/v1/action`
 - `/api/v1/counter`
 - `/api/v1/relation`
 - `/api/v1/search`
+- `/api/internal/rag-benchmark`（评测内部接口）
 
 ## 核心流程
 
@@ -258,6 +295,14 @@ RAG 检索链路采用多阶段处理：
 `postId`、`chunkId`、`position` 和 `indexVersion`。重排阶段使用标题、章节和
 章节类型增强输入，并根据解释、解决方案、面试和测试等问题意图做轻量分数校正。
 
+在基础 RAG 之上，保留额外的增强与校验路径：
+
+- 对话式问答维护多轮记忆，并支持单篇与全局两种问答范围。
+- 查询理解与实体匹配可将问题路由到关系图查询，返回概念间的关联证据。
+- Agent 编排层（`AgentPlannerService` `EvidenceCheckService`）负责任务规划、检索与证据校验。
+- 可选的 `ExternalKnowledge` 提供者（如 GitHub 官方文档）作为外部权威来源兜底。
+- AI 问答使用令牌桶限流，避免单个会话打满模型配额。
+
 正式 Benchmark 位于 `zhiguang_be/scripts/AUTO_Benchwork/`，包含五个互不重复的
 T2Retrieval 专题、真实 qrels Gold、检索漏斗报告和答案裁判。传统 BM25/Graph A/B
 工具位于 `zhiguang_be/scripts/rag-eval/`，可通过根目录的手动 Workflow 触发。
@@ -272,7 +317,8 @@ T2Retrieval 专题、真实 qrels Gold、检索漏斗报告和答案裁判。传
 ## 开发建议
 
 - 修改接口前先查看 `zhiguang_be/docs` 中的契约说明。
-- 修改数据表后同步更新 `zhiguang_be/docs/sql/schema.sql`。
+- 修改数据表后同步更新 `zhiguang_be/docs/sql/schema.sql`；增量变更以新迁移脚本（如 `add_campus_id.sql`）追加，不覆盖已发布结构。
+- 修改运行时配置时，同步更新 `application.yml` 与 `scripts/deploy/sync-nacos-config.sh` 对应的 Nacos 配置。
 - 修改前端接口调用时，同步检查 `src/services` 和 `src/types`。
 - 修改 RAG 或搜索逻辑时，确认 Elasticsearch 索引名、Embedding 维度和模型配置一致。
 - 涉及缓存、Kafka、Canal 的改动，建议同时验证同步链路和失败重试场景。
@@ -311,7 +357,10 @@ docker compose logs -f zhiguang-be
 
 真实 `.env`、数据库密码、模型 API Key 和私钥不得提交到 Git。生产环境采用
 “内网资源服务器运行后端和中间件、公网轻量服务器提供前端与反向代理”的拓扑，
-两台服务器通过 Tailscale 通信。
+两台服务器通过 Tailscale 通信；运行时配置由 Nacos 配置中心下发并监听热更新。
+
+GitHub OAuth 与校园 OIDC 的登录回跳依赖一个公网可达的 HTTPS 地址，生产部署需
+在对应平台把 `Redirect URL` 指向前端 `{域名}/callback`（校园端为 `/callback/campus`）。
 
 根目录 `.github/workflows/` 是唯一 Workflow 目录：
 
@@ -328,5 +377,6 @@ docker compose logs -f zhiguang-be
 
 - 完善敏感配置的环境变量化和示例配置。
 - 补充前后端自动化测试。
-- 优化 RAG 检索质量、流式问答体验和索引维护流程。
+- 优化 RAG 检索质量、流式问答体验和索引维护流程，深化关系图增强与证据校验。
+- 持续扩充 RAG Benchmark 场景和评测工具链。
 - 补齐部署脚本与容器化运行文档。
