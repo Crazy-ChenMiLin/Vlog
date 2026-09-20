@@ -15,6 +15,13 @@
 **/application-*.yml
 !**/application-example.yml
 
+# Acceptance artifacts: contain real signed JWTs, DB dumps and service logs.
+# Never commit — regenerate locally with scripts/acceptance/run_all.ps1.
+artifacts/
+**/artifacts/
+*.token.txt
+token.txt
+
 # Dependencies and build outputs
 node_modules/
 dist/

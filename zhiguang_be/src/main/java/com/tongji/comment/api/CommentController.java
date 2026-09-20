@@ -24,6 +24,7 @@ public class CommentController {
 
     private final CommentService commentService;
     private final JwtService jwtService;
+    private final com.tongji.agent.service.AgentTriggerService agentTriggerService;
 
     @PostMapping
     public ResponseEntity<Void> create(@Valid @RequestBody CreateCommentRequest request,
@@ -35,7 +36,9 @@ public class CommentController {
         } catch (NumberFormatException e) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "postId 非法");
         }
-        commentService.create(postId, userId, request.content());
+        // v5 §19.3: the comment is committed first; the Agent runs afterwards.
+        long commentId = commentService.create(postId, userId, request.content());
+        agentTriggerService.onCommentCreated(commentId, postId, userId, request.content());
         return ResponseEntity.noContent().build();
     }
 

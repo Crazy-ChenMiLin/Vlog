@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.agent.mapper.AgentRunMapper">
+
+    <insert id="insert" parameterType="com.tongji.agent.model.AgentRun">
+        INSERT INTO agent_run
+            (id, post_id, trigger_comment_id, actor_user_id, status, skill_name, reply_comment_id, started_at, finished_at, error_message)
+        VALUES
+            (#{id}, #{postId}, #{triggerCommentId}, #{actorUserId}, #{status}, #{skillName}, #{replyCommentId}, #{startedAt}, #{finishedAt}, #{errorMessage})
+    </insert>
+
+    <update id="claim">
+        UPDATE agent_run
+           SET status = 'RUNNING', started_at = NOW()
+         WHERE id = #{id} AND status = 'PENDING'
+    </update>
+
+    <update id="markSuccess">
+        UPDATE agent_run
+           SET status = 'SUCCESS', reply_comment_id = #{replyCommentId}, finished_at = NOW(), error_message = NULL
+         WHERE id = #{id}
+    </update>
+
+    <update id="markFinished">
+        UPDATE agent_run
+           SET status = #{status}, finished_at = NOW(), error_message = #{errorMessage}
+         WHERE id = #{id}
+    </update>
+
+    <select id="findById" resultType="com.tongji.agent.model.AgentRun">
+        SELECT id, post_id AS postId, trigger_comment_id AS triggerCommentId,
+               actor_user_id AS actorUserId, status, skill_name AS skillName,
+               reply_comment_id AS replyCommentId, started_at AS startedAt,
+               finished_at AS finishedAt, error_message AS errorMessage
+          FROM agent_run
+         WHERE id = #{id}
+    </select>
+
+    <select id="findByTriggerCommentId" resultType="com.tongji.agent.model.AgentRun">
+        SELECT id, post_id AS postId, trigger_comment_id AS triggerCommentId,
+               actor_user_id AS actorUserId, status, skill_name AS skillName,
+               reply_comment_id AS replyCommentId, started_at AS startedAt,
+               finished_at AS finishedAt, error_message AS errorMessage
+          FROM agent_run
+         WHERE trigger_comment_id = #{triggerCommentId}
+    </select>
+
+</mapper>

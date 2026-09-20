@@ -48,6 +48,16 @@ public class SecurityConfig {
     }
 
     /**
+     * 只作为 Spring Security 链中的过滤器注册（同样不加 {@code @Component}）。
+     */
+    @Bean
+    public AgentInternalTokenAuthenticationFilter agentInternalTokenAuthenticationFilter(
+            @Value("${AGENT_INTERNAL_TOKEN:}") String agentInternalToken
+    ) {
+        return new AgentInternalTokenAuthenticationFilter(agentInternalToken);
+    }
+
+    /**
      * 配置 Spring Security 过滤链。
      *
      * <p>主要包含：</p>
@@ -65,7 +75,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             @Qualifier("jwtDecoder") JwtDecoder jwtDecoder,
-            BenchmarkTokenAuthenticationFilter benchmarkTokenAuthenticationFilter
+            BenchmarkTokenAuthenticationFilter benchmarkTokenAuthenticationFilter,
+            AgentInternalTokenAuthenticationFilter agentInternalTokenAuthenticationFilter
     ) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -95,6 +106,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(benchmarkTokenAuthenticationFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterBefore(agentInternalTokenAuthenticationFilter, BearerTokenAuthenticationFilter.class)
                 // 站内访问令牌使用本项目的 RSA 公钥校验；校园 OIDC 的 decoder 仅校验回调 id_token。
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder)));
         return http.build();

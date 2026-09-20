@@ -6,6 +6,9 @@ target/
 
 # Local config / secrets
 #2
+.env
+.env.*
+!.env.example
 src/main/resources/application.yml
 src/main/resources/application-*.yml
 !src/main/resources/application-example.yml

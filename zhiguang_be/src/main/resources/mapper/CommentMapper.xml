@@ -3,8 +3,10 @@
 <mapper namespace="com.tongji.comment.mapper.CommentMapper">
 
     <insert id="insert" parameterType="com.tongji.comment.model.Comment">
-        INSERT INTO comments (id, post_id, user_id, content, create_time)
-        VALUES (#{id}, #{postId}, #{userId}, #{content}, #{createTime})
+        INSERT INTO comments (id, post_id, user_id, author_type, reply_comment_id, content, create_time)
+        VALUES (#{id}, #{postId}, #{userId},
+                COALESCE(#{authorType}, 'USER'),
+                #{replyCommentId}, #{content}, #{createTime})
     </insert>
 
     <select id="listByPostId" resultType="com.tongji.comment.api.dto.CommentResponse">
@@ -12,12 +14,13 @@
             c.id,
             c.post_id AS postId,
             c.user_id AS userId,
+            COALESCE(c.author_type, 'USER') AS authorType,
             c.content,
             u.nickname,
             u.avatar,
             c.create_time AS createTime
         FROM comments c
-        JOIN users u ON c.user_id = u.id
+        LEFT JOIN users u ON c.user_id = u.id
         WHERE c.post_id = #{postId}
         ORDER BY c.create_time ASC
         LIMIT #{limit} OFFSET #{offset}

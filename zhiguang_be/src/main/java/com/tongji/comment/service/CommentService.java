@@ -17,14 +17,17 @@ public class CommentService {
     private final CommentMapper commentMapper;
     private final SnowflakeIdGenerator idGenerator;
 
-    public void create(Long postId, Long userId, String content) {
+    /** @return the id of the stored comment, so the caller can trigger an Agent run. */
+    public Long create(Long postId, Long userId, String content) {
+        long id = idGenerator.nextId();
         commentMapper.insert(Comment.builder()
-                .id(idGenerator.nextId())
+                .id(id)
                 .postId(postId)
                 .userId(userId)
                 .content(content)
                 .createTime(Instant.now())
                 .build());
+        return id;
     }
 
     public List<CommentResponse> listByPostId(long postId, int page, int size) {

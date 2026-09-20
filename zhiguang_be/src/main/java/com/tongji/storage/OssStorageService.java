@@ -4,6 +4,7 @@ import com.tongji.storage.config.OssProperties;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -14,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 
@@ -105,6 +108,28 @@ public class OssStorageService {
             );
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "对象存储预签名失败");
+        }
+    }
+
+    /**
+     * 读取对象正文（UTF-8），用于 Agent 侧按需获取帖子正文。
+     *
+     * @param objectKey 对象键
+     * @return 对象内容文本
+     */
+    public String readObject(String objectKey) {
+        ensureConfigured();
+        if (!StringUtils.hasText(objectKey)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "对象键为空");
+        }
+        MinioClient client = buildClient();
+        try (InputStream in = client.getObject(GetObjectArgs.builder()
+                .bucket(props.getBucket())
+                .object(objectKey)
+                .build())) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "对象存储读取失败");
         }
     }
 
