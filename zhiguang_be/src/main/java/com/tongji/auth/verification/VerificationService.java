@@ -14,6 +14,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +24,9 @@ public class VerificationService {
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final VerificationCodeStore codeStore;
-    private final CodeSender codeSender;
+    /** Spring 自动收集所有验证码发送渠道（邮件、短信、日志兜底等），按收件标识自动路由。 */
+    private final List<CodeSender> senders;
+    /** 仅用于检查"邮件渠道是否启用"，决定是否允许显式指定接收邮箱。 */
     private final ObjectProvider<MailCodeSender> mailCodeSenderProvider;
     private final StringRedisTemplate stringRedisTemplate;
     private final AuthProperties properties;
@@ -37,15 +40,13 @@ public class VerificationService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请提供正确的验证码发送参数");
         }
 
-        MailCodeSender mailCodeSender = null;
         String normalizedDeliveryEmail = null;
         if (StringUtils.hasText(deliveryEmail)) {
             normalizedDeliveryEmail = deliveryEmail.trim().toLowerCase();
             if (!IdentifierValidator.isValidEmail(normalizedDeliveryEmail)) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码接收邮箱格式错误");
             }
-            mailCodeSender = mailCodeSenderProvider.getIfAvailable();
-            if (mailCodeSender == null) {
+            if (mailCodeSenderProvider.getIfAvailable() == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "邮件验证码服务未启用");
             }
         }
@@ -56,10 +57,14 @@ public class VerificationService {
 
         String code = generateNumericCode(cfg.getCodeLength());
         codeStore.saveCode(scene.name(), identifier, code, cfg.getTtl(), cfg.getMaxAttempts());
-        codeSender.sendCode(scene, identifier, code, (int) cfg.getTtl().toMinutes());
-        if (mailCodeSender != null) {
-            mailCodeSender.send(scene, normalizedDeliveryEmail, code, (int) cfg.getTtl().toMinutes());
-        }
+
+        // 收件标识：显式指定接收邮箱时用该邮箱，否则用账号标识本身
+        String recipient = normalizedDeliveryEmail != null ? normalizedDeliveryEmail : identifier;
+        CodeSender sender = senders.stream()
+                .filter(s -> s.canSend(recipient))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "暂无可用的验证码发送渠道"));
+        sender.sendCode(scene, recipient, code, (int) cfg.getTtl().toMinutes());
         return new SendCodeResult(identifier, scene, (int) cfg.getTtl().toSeconds());
     }
 

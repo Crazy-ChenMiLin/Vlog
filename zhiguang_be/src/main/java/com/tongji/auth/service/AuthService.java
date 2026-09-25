@@ -3,7 +3,6 @@ package com.tongji.auth.service;
 import lombok.RequiredArgsConstructor;
 import com.tongji.auth.api.dto.AuthResponse;
 import com.tongji.auth.api.dto.AuthUserResponse;
-import com.tongji.auth.api.dto.LoginRequest;
 import com.tongji.auth.api.dto.PasswordResetRequest;
 import com.tongji.auth.api.dto.RegisterRequest;
 import com.tongji.auth.api.dto.SendCodeRequest;
@@ -16,6 +15,8 @@ import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.auth.model.ClientInfo;
 import com.tongji.auth.model.IdentifierType;
+import com.tongji.auth.model.LoginCommand;
+import com.tongji.auth.model.LoginSuccess;
 import com.tongji.auth.token.JwtService;
 import com.tongji.auth.token.RefreshTokenStore;
 import com.tongji.auth.token.TokenPair;
@@ -34,6 +35,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -44,6 +46,8 @@ import org.springframework.security.oauth2.jwt.JwtException;
  * 认证业务服务。
  * <p>
  * 职责：发送验证码、注册、登录、刷新令牌、登出、重置密码、查询当前用户信息。
+ * 登录：按渠道名从 Spring 自动收集的登录渠道（List&lt;LoginChannelService&gt;）中分发到对应实现类，
+ * 认证成功后统一收尾（签发令牌、保存刷新令牌、记录成功审计日志、组装响应）。
  * 安全策略：
  * - 账号格式校验（手机号/邮箱）；
  * - 验证码状态检查（过期/错误/尝试超限）；
@@ -64,6 +68,8 @@ public class AuthService {
     private final RefreshTokenStore refreshTokenStore;
     private final LoginLogService loginLogService;
     private final AuthProperties authProperties;
+    /** Spring 自动收集所有登录渠道实现类（PasswordLoginChannelServiceImpl / CampusLoginChannelServiceImpl / GithubLoginChannelServiceImpl）。 */
+    private final List<LoginChannelService> loginChannels;
 
     /**
      * 发送验证码并返回过期信息。
@@ -134,39 +140,53 @@ public class AuthService {
     }
 
     /**
-     * 登录并签发令牌。
-     * <p>
-     * 支持密码或验证码通道；成功后记录审计，签发令牌对并保存刷新令牌白名单。
+     * 统一登录入口：按渠道名分发认证，成功后统一签发令牌与记录日志。
      *
-     * @param request    登录请求，包含：标识类型与值、密码或验证码（二选一）。
-     * @param clientInfo 客户端信息（IP/UA），用于登录审计。
-     * @return 认证响应，包含用户信息与令牌对。
-     * @throws BusinessException 当用户不存在、凭证错误或请求不合法时抛出。
+     * @param cmd 登录命令（含渠道名与各渠道参数）。
+     * @return 认证响应（用户 + 令牌对）。
      */
-    public AuthResponse login(LoginRequest request, ClientInfo clientInfo) {
-        validateIdentifier(request.identifierType(), request.identifier());
-        String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
-        Optional<User> userOptional = findUserByIdentifier(request.identifierType(), identifier);
-        if (userOptional.isEmpty()) {
-            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND);
+    public AuthResponse login(LoginCommand cmd) {
+        LoginChannelService channel = pickChannel(cmd.type());
+        LoginSuccess success = channel.authenticate(cmd);
+        return finishLogin(success, cmd.clientInfo());
+    }
+
+    /**
+     * 获取 OAuth 渠道的第三方授权链接。
+     *
+     * @param type 渠道名（campus / github）。
+     * @return 授权页完整 URL。
+     */
+    public String getOAuthLoginUrl(String type) {
+        LoginChannelService channel = pickChannel(type);
+        if (!(channel instanceof OAuthChannelService oauthChannel)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该登录方式不需要授权链接: " + type);
         }
-        User user = userOptional.get();
-        String channel;
-        if (StringUtils.hasText(request.password())) {
-            channel = "PASSWORD";
-            if (!StringUtils.hasText(user.getPasswordHash()) || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-                loginLogService.record(user.getId(), identifier, channel, clientInfo.ip(), clientInfo.userAgent(), "FAILED");
-                throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
-            }
-        } else if (StringUtils.hasText(request.code())) {
-            channel = "CODE";
-            ensureVerificationSuccess(verificationService.verify(VerificationScene.LOGIN, identifier, request.code()));
-        } else {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请提供验证码或密码");
-        }
+        return oauthChannel.getLoginUrl();
+    }
+
+    /**
+     * 按渠道名查找登录渠道实现，找不到时报错。
+     */
+    private LoginChannelService pickChannel(String type) {
+        return loginChannels.stream()
+                .filter(c -> c.getType().equals(type))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "不支持的登录方式: " + type));
+    }
+
+    /**
+     * 公共收尾：签发令牌、保存刷新令牌、记录成功审计日志、组装响应。
+     * <p>
+     * 这是各渠道共用的部分，历史上曾在 AuthService / CampusOAuthService /
+     * GitHubOAuthService 中重复三份，现统一收拢到此处。
+     */
+    private AuthResponse finishLogin(LoginSuccess success, ClientInfo clientInfo) {
+        User user = success.user();
         TokenPair tokenPair = jwtService.issueTokenPair(user);
         storeRefreshToken(user.getId(), tokenPair);
-        loginLogService.record(user.getId(), identifier, channel, clientInfo.ip(), clientInfo.userAgent(), "SUCCESS");
+        loginLogService.record(user.getId(), success.auditIdentifier(), success.channel(),
+                clientInfo.ip(), clientInfo.userAgent(), "SUCCESS");
         return new AuthResponse(mapUser(user), mapToken(tokenPair));
     }
 

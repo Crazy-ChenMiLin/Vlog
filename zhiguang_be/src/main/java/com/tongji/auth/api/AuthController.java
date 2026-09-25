@@ -14,6 +14,7 @@ import com.tongji.auth.api.dto.SendCodeResponse;
 import com.tongji.auth.api.dto.TokenRefreshRequest;
 import com.tongji.auth.api.dto.TokenResponse;
 import com.tongji.auth.model.ClientInfo;
+import com.tongji.auth.model.LoginCommand;
 import com.tongji.auth.service.AuthService;
 import com.tongji.auth.token.JwtService;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 暴露 REST 接口：发送验证码、注册、登录、刷新令牌、登出、重置密码、查询当前用户信息。
  * 集成：使用 Spring Security 的资源服务器能力，`/me` 通过 `@AuthenticationPrincipal Jwt` 提取用户。
  * 客户端信息：从请求头解析 IP 与 UA，用于审计登录日志。
+ * 登录：统一走 {@link AuthService}，按渠道分发到对应 {@link com.tongji.auth.service.LoginChannelService} 实现。
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -74,6 +76,7 @@ public class AuthController {
      * 登录并获取令牌对。
      * <p>
      * 支持两种通道：密码登录或验证码登录；成功后签发 Access/Refresh Token。
+     * 内部通过 {@link AuthService} 分发到密码/验证码登录渠道。
      *
      * @param request     请求体，包含：标识类型与值、密码或验证码（二选一）。
      * @param httpRequest 用于解析客户端信息（IP 与 User-Agent），记录审计日志。
@@ -81,7 +84,17 @@ public class AuthController {
      */
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        return authService.login(request, resolveClient(httpRequest));
+        LoginCommand cmd = new LoginCommand(
+                "password",
+                request.identifierType(),
+                request.identifier(),
+                request.password(),
+                request.code(),
+                null,
+                null,
+                resolveClient(httpRequest)
+        );
+        return authService.login(cmd);
     }
 
     /**

@@ -1,21 +1,14 @@
-package com.tongji.auth.service;
+package com.tongji.auth.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.auth.api.dto.AuthResponse;
-import com.tongji.auth.api.dto.AuthUserResponse;
-import com.tongji.auth.api.dto.CampusLoginUrlResponse;
 import com.tongji.auth.api.dto.CampusTokenResponse;
-import com.tongji.auth.api.dto.TokenResponse;
-import com.tongji.auth.audit.LoginLogService;
-import com.tongji.auth.model.ClientInfo;
-import com.tongji.auth.token.JwtService;
-import com.tongji.auth.token.RefreshTokenStore;
-import com.tongji.auth.token.TokenPair;
+import com.tongji.auth.model.LoginCommand;
+import com.tongji.auth.model.LoginSuccess;
+import com.tongji.auth.service.OAuthChannelService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.user.domain.User;
 import com.tongji.user.service.UserService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,24 +26,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 校园账号（CQUT-Auth OIDC）登录业务服务。
+ * 校园账号（CQUT-Auth OIDC）登录渠道实现（OAuthChannelService 的实现类）。
  * <p>
- * 职责：
- * - {@link #getLoginUrl()} 生成 PKCE 参数并返回校园认证授权页地址；
- * - {@link #callback(String, String, ClientInfo)} 用 code + verifier 换 token → 校验 id_token → 查/建用户 → 发 JWT。
- * <p>
- * 流程遵循 OIDC Authorization Code + PKCE S256，Web 客户端同时使用 client_secret_basic 认证。
+ * 独门逻辑：PKCE 生成授权链接 → 用 code + verifier 换 token → 校验 id_token →
+ * 查/建用户并同步资料。签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.service.AuthService} 统一处理。
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class CampusOAuthService {
+public class CampusLoginChannelServiceImpl implements OAuthChannelService {
 
     private static final String PKCE_KEY_PREFIX = "campus:pkce:";
     private static final long PKCE_TTL_MINUTES = 5;
@@ -61,9 +49,6 @@ public class CampusOAuthService {
     private static final String CODE_CHALLENGE_METHOD = "S256";
 
     private final UserService userService;
-    private final JwtService jwtService;
-    private final RefreshTokenStore refreshTokenStore;
-    private final LoginLogService loginLogService;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -94,14 +79,23 @@ public class CampusOAuthService {
 
     private final SecureRandom secureRandom = new SecureRandom();
 
-    /**
-     * 拼接校园认证授权页 URL，前端拿到后 window.location.href 跳转。
-     * <p>
-     * 同时生成 PKCE verifier 暂存 Redis，key 为 state，callback 时取出使用。
-     *
-     * @return 引导响应，code=10001 + loginUrl。
-     */
-    public CampusLoginUrlResponse getLoginUrl() {
+    public CampusLoginChannelServiceImpl(UserService userService,
+                                         ObjectMapper objectMapper,
+                                         StringRedisTemplate stringRedisTemplate,
+                                         @Qualifier("campusIdTokenDecoder") JwtDecoder campusIdTokenDecoder) {
+        this.userService = userService;
+        this.objectMapper = objectMapper;
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.campusIdTokenDecoder = campusIdTokenDecoder;
+    }
+
+    @Override
+    public String getType() {
+        return "campus";
+    }
+
+    @Override
+    public String getLoginUrl() {
         String state = generateRandomState();
         String codeVerifier = generateCodeVerifier();
         String codeChallenge = generateCodeChallenge(codeVerifier);
@@ -113,7 +107,7 @@ public class CampusOAuthService {
                 TimeUnit.MINUTES
         );
 
-        String url = authorizationEndpoint
+        return authorizationEndpoint
                 + "?client_id=" + urlEncode(clientId)
                 + "&redirect_uri=" + urlEncode(redirectUri)
                 + "&response_type=code"
@@ -121,22 +115,12 @@ public class CampusOAuthService {
                 + "&state=" + urlEncode(state)
                 + "&code_challenge=" + urlEncode(codeChallenge)
                 + "&code_challenge_method=" + CODE_CHALLENGE_METHOD;
-
-        return new CampusLoginUrlResponse(10001, "需要校园账号授权", url);
     }
 
-    /**
-     * 校园认证回调核心流程：用 code + verifier 换 token → 校验 id_token → 查/建用户 → 发 JWT。
-     *
-     * @param code       回调带来的授权码（一次性）。
-     * @param state      回调带回的 state，用于换取 PKCE verifier。
-     * @param clientInfo 客户端信息（IP/UA），用于审计。
-     * @return 认证响应，包含用户信息与令牌对。
-     * @throws BusinessException 当 code/state 无效或 OIDC 调用失败时抛出。
-     */
-    public AuthResponse callback(String code, String state, ClientInfo clientInfo) {
-        String codeVerifier = consumeCodeVerifier(state);
-        CampusTokenResponse tokenResponse = exchangeCodeForToken(code, codeVerifier);
+    @Override
+    public LoginSuccess authenticate(LoginCommand cmd) {
+        String codeVerifier = consumeCodeVerifier(cmd.state());
+        CampusTokenResponse tokenResponse = exchangeCodeForToken(cmd.oauthCode(), codeVerifier);
         Jwt idToken = verifyAndDecodeIdToken(tokenResponse.idToken());
 
         String campusId = Objects.toString(idToken.getClaim("sub"), null);
@@ -169,12 +153,7 @@ public class CampusOAuthService {
             userService.updateProfile(user);
         }
 
-        TokenPair tokenPair = jwtService.issueTokenPair(user);
-        storeRefreshToken(user.getId(), tokenPair);
-        loginLogService.record(user.getId(), preferredUsername != null ? preferredUsername : campusId,
-                "CAMPUS", clientInfo.ip(), clientInfo.userAgent(), "SUCCESS");
-
-        return new AuthResponse(mapUser(user), mapToken(tokenPair));
+        return new LoginSuccess(user, preferredUsername != null ? preferredUsername : campusId, "CAMPUS");
     }
 
     /**
@@ -273,37 +252,5 @@ public class CampusOAuthService {
     private String base64BasicAuth(String clientId, String clientSecret) {
         String credentials = clientId + ":" + clientSecret;
         return Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private void storeRefreshToken(Long userId, TokenPair tokenPair) {
-        Duration ttl = Duration.between(Instant.now(), tokenPair.refreshTokenExpiresAt());
-        if (ttl.isNegative()) {
-            ttl = Duration.ZERO;
-        }
-        refreshTokenStore.storeToken(userId, tokenPair.refreshTokenId(), ttl);
-    }
-
-    private AuthUserResponse mapUser(User user) {
-        return new AuthUserResponse(
-                user.getId(),
-                user.getNickname(),
-                user.getAvatar(),
-                user.getPhone(),
-                user.getZgId(),
-                user.getBirthday(),
-                user.getSchool(),
-                user.getBio(),
-                user.getGender(),
-                user.getTagsJson()
-        );
-    }
-
-    private TokenResponse mapToken(TokenPair tokenPair) {
-        return new TokenResponse(
-                tokenPair.accessToken(),
-                tokenPair.accessTokenExpiresAt(),
-                tokenPair.refreshToken(),
-                tokenPair.refreshTokenExpiresAt()
-        );
     }
 }

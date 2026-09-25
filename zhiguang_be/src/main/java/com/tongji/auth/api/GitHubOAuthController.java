@@ -1,13 +1,14 @@
 package com.tongji.auth.api;
 
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import com.tongji.auth.api.dto.AuthResponse;
 import com.tongji.auth.api.dto.GitHubLoginUrlResponse;
 import com.tongji.auth.model.ClientInfo;
-import com.tongji.auth.service.GitHubOAuthService;
+import com.tongji.auth.model.LoginCommand;
+import com.tongji.auth.service.AuthService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,13 +26,15 @@ import org.springframework.web.bind.annotation.RestController;
  * 1. 调 GET /github/login-url → 拿 loginUrl → window.location.href 跳 GitHub 授权页；
  * 2. 用户在 GitHub 点 Authorize → GitHub 跳回 redirect_uri（http://47.108.66.230/callback?code=xxx）；
  * 3. 前端回调页取 code → 调 GET /github/callback?code=xxx → 拿 JWT → 存 localStorage。
+ * <p>
+ * 内部统一走 {@link AuthService}，GitHub 认证逻辑在 GithubLoginChannelServiceImpl 渠道中。
  */
 @RestController
 @RequestMapping("/api/v1/auth/github")
 @RequiredArgsConstructor
 public class GitHubOAuthController {
 
-    private final GitHubOAuthService githubOAuthService;
+    private final AuthService authService;
 
     /**
      * 获取 GitHub 授权页 URL。
@@ -40,7 +43,7 @@ public class GitHubOAuthController {
      */
     @GetMapping("/login-url")
     public GitHubLoginUrlResponse getLoginUrl() {
-        return githubOAuthService.getLoginUrl();
+        return new GitHubLoginUrlResponse(10001, "需要 GitHub 授权", authService.getOAuthLoginUrl("github"));
     }
 
     /**
@@ -55,7 +58,13 @@ public class GitHubOAuthController {
         if (!StringUtils.hasText(code)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "缺少 code 参数");
         }
-        return githubOAuthService.callback(code, resolveClient(httpRequest));
+        LoginCommand cmd = new LoginCommand(
+                "github",
+                null, null, null, null,
+                code, null,
+                resolveClient(httpRequest)
+        );
+        return authService.login(cmd);
     }
 
     private ClientInfo resolveClient(HttpServletRequest request) {

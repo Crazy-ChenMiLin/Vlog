@@ -3,7 +3,8 @@ package com.tongji.auth.api;
 import com.tongji.auth.api.dto.AuthResponse;
 import com.tongji.auth.api.dto.CampusLoginUrlResponse;
 import com.tongji.auth.model.ClientInfo;
-import com.tongji.auth.service.CampusOAuthService;
+import com.tongji.auth.model.LoginCommand;
+import com.tongji.auth.service.AuthService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,13 +26,15 @@ import org.springframework.web.bind.annotation.RestController;
  * 1. 调 GET /campus/login-url → 拿 loginUrl → window.location.href 跳校园认证授权页；
  * 2. 用户授权后回跳 redirect_uri（/callback/campus?code=xxx&state=xxx）；
  * 3. 前端回调页取 code + state → 调 GET /campus/callback → 拿 JWT → 存 localStorage。
+ * <p>
+ * 内部统一走 {@link AuthService}，校园网认证逻辑在 CampusLoginChannelServiceImpl 渠道中。
  */
 @RestController
 @RequestMapping("/api/v1/auth/campus")
 @RequiredArgsConstructor
 public class CampusOAuthController {
 
-    private final CampusOAuthService campusOAuthService;
+    private final AuthService authService;
 
     /**
      * 获取校园认证授权页 URL。
@@ -40,7 +43,7 @@ public class CampusOAuthController {
      */
     @GetMapping("/login-url")
     public CampusLoginUrlResponse getLoginUrl() {
-        return campusOAuthService.getLoginUrl();
+        return new CampusLoginUrlResponse(10001, "需要校园账号授权", authService.getOAuthLoginUrl("campus"));
     }
 
     /**
@@ -61,7 +64,13 @@ public class CampusOAuthController {
         if (!StringUtils.hasText(state)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "缺少 state 参数");
         }
-        return campusOAuthService.callback(code, state, resolveClient(httpRequest));
+        LoginCommand cmd = new LoginCommand(
+                "campus",
+                null, null, null, null,
+                code, state,
+                resolveClient(httpRequest)
+        );
+        return authService.login(cmd);
     }
 
     private ClientInfo resolveClient(HttpServletRequest request) {
