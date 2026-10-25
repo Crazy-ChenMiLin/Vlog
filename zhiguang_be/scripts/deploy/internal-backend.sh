@@ -7,7 +7,7 @@ RUNTIME="$BASE/runtime"
 SOURCE="${GITHUB_WORKSPACE:-}"
 MODE="${1:-deploy}"
 MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://100.83.242.114:9000}"
-MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-https://47.108.66.230}"
+MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-https://web.chenmilin.xyz}"
 OSS_PRESIGN_ENDPOINT="${OSS_PRESIGN_ENDPOINT:-$MINIO_PUBLIC_DOMAIN}"
 MINIO_BUCKET="${MINIO_BUCKET:-zhiguang}"
 
@@ -144,6 +144,9 @@ update_env_value "$RUNTIME/.env" "NACOS_NAMESPACE" "${NACOS_NAMESPACE:-}"
 if [[ -n "${GITHUB_REDIRECT_URI:-}" ]]; then
   update_env_value "$RUNTIME/.env" "GITHUB_REDIRECT_URI" "$GITHUB_REDIRECT_URI"
 fi
+if [[ -n "${CAMPUS_REDIRECT_URI:-}" ]]; then
+  update_env_value "$RUNTIME/.env" "CAMPUS_REDIRECT_URI" "$CAMPUS_REDIRECT_URI"
+fi
 
 # Optional read-only credential used only by the external Go knowledge provider.
 # Keep it in GitHub Actions Secrets and the server runtime .env, never in source.
@@ -191,12 +194,12 @@ services:
       SPRING_CLOUD_NACOS_CONFIG_NAMESPACE: \${NACOS_NAMESPACE}
       GITHUB_CLIENT_ID: \${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: \${GITHUB_CLIENT_SECRET}
-      GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-https://47.108.66.230/callback}
+      GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-https://web.chenmilin.xyz/callback}
       GITHUB_EXTERNAL_SEARCH_TOKEN: \${GITHUB_EXTERNAL_SEARCH_TOKEN:-}
       BENCHMARK_TOKEN: \${BENCHMARK_TOKEN}
       CAMPUS_CLIENT_ID: \${CAMPUS_CLIENT_ID}
       CAMPUS_CLIENT_SECRET: \${CAMPUS_CLIENT_SECRET}
-      CAMPUS_REDIRECT_URI: \${CAMPUS_REDIRECT_URI:-https://47.108.66.230/callback/campus}
+      CAMPUS_REDIRECT_URI: \${CAMPUS_REDIRECT_URI:-https://web.chenmilin.xyz/callback/campus}
       CAMPUS_AUTHORIZATION_ENDPOINT: \${CAMPUS_AUTHORIZATION_ENDPOINT}
       CAMPUS_TOKEN_ENDPOINT: \${CAMPUS_TOKEN_ENDPOINT}
       CAMPUS_JWKS_URI: \${CAMPUS_JWKS_URI}

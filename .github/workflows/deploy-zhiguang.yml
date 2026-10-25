@@ -65,11 +65,12 @@ jobs:
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
           SMTP: ${{ secrets.SMTP }}
-          MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'https://47.108.66.230' }}
-          OSS_PRESIGN_ENDPOINT: ${{ vars.OSS_PRESIGN_ENDPOINT || 'https://47.108.66.230' }}
+          MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'https://web.chenmilin.xyz' }}
+          OSS_PRESIGN_ENDPOINT: ${{ vars.OSS_PRESIGN_ENDPOINT || 'https://web.chenmilin.xyz' }}
           GITHUB_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
-          GITHUB_REDIRECT_URI: ${{ vars.GITHUB_REDIRECT_URI || 'https://47.108.66.230/callback' }}
+          GITHUB_REDIRECT_URI: ${{ vars.PUBLIC_GITHUB_REDIRECT_URI || 'https://web.chenmilin.xyz/callback' }}
+          CAMPUS_REDIRECT_URI: ${{ vars.CAMPUS_REDIRECT_URI || 'https://web.chenmilin.xyz/callback/campus' }}
           GITHUB_EXTERNAL_SEARCH_TOKEN: ${{ secrets.GITHUB_EXTERNAL_SEARCH_TOKEN }}
           NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
@@ -95,7 +96,9 @@ jobs:
           CLOUD_HOST: ${{ secrets.CLOUD_HOST }}
           CLOUD_USER: ${{ secrets.CLOUD_USER }}
           CLOUD_SSH_KEY: ${{ secrets.CLOUD_SSH_KEY }}
-          CLOUD_WEB_ROOT: /opt/1panel/www/zhiguang-fe
+          CLOUD_PORT: ${{ vars.CLOUD_PORT || '20131' }}
+          CLOUD_SITE_DOMAIN: ${{ vars.CLOUD_SITE_DOMAIN || 'web.chenmilin.xyz' }}
+          CLOUD_WEB_ROOT: /opt/1panel/www/sites/zhiguang-web/index
         run: bash zhiguang_be/scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
 
   benchmark:

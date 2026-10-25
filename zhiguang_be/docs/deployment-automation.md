@@ -1,46 +1,71 @@
 # Zhiguang Deployment Automation
 
-This project uses a split deployment:
+The public frontend is served at `https://web.chenmilin.xyz` on the Korea
+gateway `146.56.102.26`. The backend, middleware, and self-hosted GitHub runner
+remain on the internal server `100.83.242.114`.
 
-- Frontend static files are served by the public cloud gateway.
-- Backend runs on the internal middleware server.
-- The public cloud gateway forwards `/api` and `/zhiguang` through Tailscale.
+## Gateway and backend connection
 
-## Recommended GitHub Actions Model
+1Panel OpenResty serves the frontend from
+`/opt/1panel/www/sites/zhiguang-web/index`. Its site configuration is
+`/opt/1panel/www/conf.d/zhiguang-web.conf`.
 
-Use a GitHub self-hosted runner on the internal server.
+The internal user's `zhiguang-kr-tunnel.service` maintains an outbound SSH
+connection to the gateway on port `20131`. Two listeners bind only to the
+gateway's loopback interface:
 
-Reason: GitHub-hosted runners cannot directly reach the private/internal server. A self-hosted runner runs inside the same network as the backend and can build the backend without loading the lightweight public cloud server.
+- `127.0.0.1:18080` forwards to the internal backend on port `18080`.
+- `127.0.0.1:19000` forwards to the internal MinIO S3 API on port `9000`.
 
-## Required GitHub Secrets
+The tunnel uses a dedicated account and restricted key. The internal user's
+linger setting keeps it running after logout and across boots. The old public
+gateway at `47.108.66.230` is no longer part of this connection.
 
-- `INTERNAL_SUDO_PASSWORD`: sudo password for backend Docker deployment on the internal server.
-- `CLOUD_HOST`: public gateway host, usually `47.108.66.230`.
-- `CLOUD_USER`: SSH user for the public gateway, usually `root`.
-- `CLOUD_SSH_KEY`: private SSH key that can log in to the public gateway.
-- `SMTP`: optional 163 SMTP authorization code used to update `SPRING_MAIL_PASSWORD` in the backend runtime `.env`.
+## Actions configuration
 
-## Workflow
+Secrets:
 
-On every push to `main`, or when you manually run `Deploy Zhiguang`:
+- `CLOUD_HOST`: `146.56.102.26`.
+- `CLOUD_USER`: the gateway SSH deployment user.
+- `CLOUD_SSH_KEY`: its private SSH key, stored only in GitHub Secrets.
+- Existing backend credentials remain required by the full deployment workflow.
 
-1. GitHub self-hosted runner checks out the repository.
-2. Backend deploy script syncs the checked-out repository to `/home/chenmilin/zhiguang-deploy/Vlog`.
-3. Backend Docker Compose uses `/home/chenmilin/zhiguang-deploy/runtime/.env` and rebuilds `zhiguang-be`.
-4. Frontend is built with Node 20.
-5. Frontend `dist` is synced to `/var/www/zhiguang-fe` on the public gateway.
-6. Nginx is reloaded and `/api/v1/knowposts/feed` is checked.
+Variables:
 
-## Manual Setup Still Needed
+- `CLOUD_PORT`: `20131`.
+- `CLOUD_SITE_DOMAIN`: `web.chenmilin.xyz`.
+- `MINIO_PUBLIC_DOMAIN` and `OSS_PRESIGN_ENDPOINT`: `https://web.chenmilin.xyz`.
+- `PUBLIC_GITHUB_REDIRECT_URI`: `https://web.chenmilin.xyz/callback` (forwarded
+  to the backend as `GITHUB_REDIRECT_URI`; GitHub reserves the `GITHUB_` prefix
+  for its own variable names).
+- `CAMPUS_REDIRECT_URI`: `https://web.chenmilin.xyz/callback/campus`.
 
-Register the internal server as a GitHub self-hosted runner. The workflow currently targets any `self-hosted` runner in this repository, matching the checkout test workflow.
+The OAuth providers must separately allow these callback URLs. Updating an
+application variable does not change the provider's registered callback.
+Provider-side migration was deferred by the user on 2026-10-25.
 
-After that, a normal local workflow becomes:
+## Full deployment
 
-```bash
-git add .
-git commit -m "your change"
-git push origin main
-```
+Pushing to `main` triggers `Deploy Zhiguang`. It injects the benchmark
+credential, publishes Nacos settings, deploys the internal backend, builds the
+frontend with Node 20, and uploads it to Korea. Scripts live under
+`zhiguang_be/scripts/deploy/`.
 
-Then GitHub Actions deploys the project.
+The frontend script supports `CLOUD_PORT`, uploads through a staging directory,
+reloads the active OpenResty container, and checks the named HTTPS site and a
+JSON Feed response. A request to `http://127.0.0.1/` would select an unrelated
+virtual host on this gateway and is not a suitable deployment check.
+
+## Frontend-only deployment
+
+Run `Deploy frontend only` from GitHub Actions when publishing just the
+frontend. It checks out the selected revision, builds it, uploads to the same
+Korea site, and performs the same checks, without deploying the backend or
+publishing Nacos configuration. Both workflows share the deployment concurrency
+group to prevent simultaneous uploads.
+
+For domain migrations, update both the current backend runtime environment and
+the Actions Variables. Otherwise, a later full deployment can restore stale
+public file or OAuth callback addresses. Keep the backend's private MinIO
+endpoint unchanged, and preserve the public Host when forwarding signed S3
+requests.

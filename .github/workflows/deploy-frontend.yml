@@ -1,0 +1,49 @@
+name: Deploy frontend only
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-zhiguang-main
+  cancel-in-progress: false
+
+jobs:
+  deploy-frontend:
+    name: Publish frontend to Korea
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: 2
+          GIT_CONFIG_KEY_0: url.https://v4.gh-proxy.org/https://github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
+          GIT_CONFIG_KEY_1: http.version
+          GIT_CONFIG_VALUE_1: HTTP/1.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: zhiguang_fe/zhiguang_fe-main/package-lock.json
+
+      - name: Build frontend
+        working-directory: zhiguang_fe/zhiguang_fe-main
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy frontend to Korea
+        env:
+          CLOUD_HOST: ${{ secrets.CLOUD_HOST }}
+          CLOUD_USER: ${{ secrets.CLOUD_USER }}
+          CLOUD_SSH_KEY: ${{ secrets.CLOUD_SSH_KEY }}
+          CLOUD_PORT: ${{ vars.CLOUD_PORT || '20131' }}
+          CLOUD_SITE_DOMAIN: ${{ vars.CLOUD_SITE_DOMAIN || 'web.chenmilin.xyz' }}
+          CLOUD_WEB_ROOT: /opt/1panel/www/sites/zhiguang-web/index
+        run: bash zhiguang_be/scripts/deploy/cloud-frontend.sh zhiguang_fe/zhiguang_fe-main/dist
