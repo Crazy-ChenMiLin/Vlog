@@ -1,7 +1,7 @@
 package com.tongji.relation.api;
 
 import com.tongji.relation.service.RelationService;
-import com.tongji.auth.token.JwtService;
+import com.tongji.auth.tokenservice.JwtService;
 import com.tongji.counter.application.UserCounterRebuildService;
 import com.tongji.profile.api.dto.ProfileResponse;
 import lombok.RequiredArgsConstructor;

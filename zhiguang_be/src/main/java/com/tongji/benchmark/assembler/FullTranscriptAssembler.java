@@ -1,7 +1,7 @@
 package com.tongji.benchmark.assembler;
 
 import com.tongji.benchmark.evaluator.StageHitEvaluator;
-import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
+import com.tongji.benchmark.pojo.dto.BenchmarkCaseDTO;
 import com.tongji.llm.observability.model.dto.evaluation.RagTranscriptEvaluationDTO;
 import com.tongji.llm.observability.model.dto.transcript.RagTranscriptDTO;
 import com.tongji.llm.observability.model.dto.transcript.RagTranscriptStageDTO;

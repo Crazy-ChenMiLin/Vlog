@@ -1,6 +1,6 @@
 package com.tongji.comment.api;
 
-import com.tongji.auth.token.JwtService;
+import com.tongji.auth.tokenservice.JwtService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.comment.api.dto.CommentResponse;

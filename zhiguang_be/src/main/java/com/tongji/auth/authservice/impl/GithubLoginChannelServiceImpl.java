@@ -1,11 +1,11 @@
-package com.tongji.auth.service.impl;
+package com.tongji.auth.authservice.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.auth.api.dto.GitHubTokenResponse;
-import com.tongji.auth.api.dto.GitHubUser;
-import com.tongji.auth.model.LoginCommand;
-import com.tongji.auth.model.LoginSuccess;
-import com.tongji.auth.service.OAuthChannelService;
+import com.tongji.auth.pojo.response.GitHubTokenResponse;
+import com.tongji.auth.pojo.dto.GitHubUser;
+import com.tongji.auth.pojo.cmd.LoginCommand;
+import com.tongji.auth.pojo.dto.LoginSuccess;
+import com.tongji.auth.authservice.OAuthChannelService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.user.domain.User;
@@ -26,7 +26,7 @@ import java.time.Duration;
  * GitHub OAuth 登录渠道实现（OAuthChannelService 的实现类）。
  * <p>
  * 独门逻辑：生成授权链接 → 用 code 换 access_token → 拉 GitHub 用户 →
- * 查/建用户并同步资料。签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.service.AuthService} 统一处理。
+ * 查/建用户并同步资料。签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.authservice.AuthService} 统一处理。
  */
 @Slf4j
 @Service

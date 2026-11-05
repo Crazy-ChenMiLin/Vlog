@@ -1,6 +1,6 @@
 package com.tongji.knowpost.service;
 
-import com.tongji.knowpost.api.dto.FeedPageResponse;
+import com.tongji.knowpost.pojo.response.FeedPageResponse;
 
 /**
  * 知文 Feed 业务接口。

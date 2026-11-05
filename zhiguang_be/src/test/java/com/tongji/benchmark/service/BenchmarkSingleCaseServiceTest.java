@@ -1,7 +1,7 @@
 package com.tongji.benchmark.service;
 
-import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
-import com.tongji.benchmark.model.dto.BenchmarkEvaluationContextDTO;
+import com.tongji.benchmark.pojo.dto.BenchmarkCaseDTO;
+import com.tongji.benchmark.pojo.cmd.BenchmarkEvaluationContextDTO;
 import com.tongji.llm.chat.RagQueryService;
 import com.tongji.llm.observability.enums.RagTranscriptStageEnum;
 import com.tongji.llm.observability.enums.RagTranscriptStatusEnum;

@@ -1,8 +1,8 @@
 package com.tongji.benchmark.service;
 
 import com.tongji.benchmark.assembler.FullTranscriptAssembler;
-import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
-import com.tongji.benchmark.model.dto.BenchmarkEvaluationContextDTO;
+import com.tongji.benchmark.pojo.dto.BenchmarkCaseDTO;
+import com.tongji.benchmark.pojo.cmd.BenchmarkEvaluationContextDTO;
 import com.tongji.llm.chat.RagQueryService;
 import com.tongji.llm.observability.model.dto.transcript.RagTranscriptDTO;
 import lombok.RequiredArgsConstructor;

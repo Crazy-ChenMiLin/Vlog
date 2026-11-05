@@ -8,8 +8,8 @@ import com.tongji.cache.config.CacheProperties;
 import com.tongji.counter.service.CounterReadService;
 import com.tongji.counter.service.CounterWriteService;
 import com.tongji.counter.service.UserCounterService;
-import com.tongji.knowpost.api.dto.FeedPageResponse;
-import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
+import com.tongji.knowpost.pojo.response.FeedPageResponse;
+import com.tongji.knowpost.pojo.response.KnowPostDetailResponse;
 import com.tongji.knowpost.id.SnowflakeIdGenerator;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.llm.searchService.RagIndexService;
@@ -113,7 +113,7 @@ class KnowPostServiceImplTest {
         assertThat(feedPublicCache.getIfPresent(currentPageKey)).isNull();
         assertThat(feedPublicCache.getIfPresent(previousPageKey)).isNull();
         verify(setOperations, never()).remove(eq(currentIndexKey), eq(""));
-        verify(redis, times(2)).delete("knowpost:detail:" + postId + ":v1");
+        verify(redis, times(2)).delete("knowpost:detail:" + postId + ":v2");
     }
 
     @Test

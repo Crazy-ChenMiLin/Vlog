@@ -1,7 +1,7 @@
 package com.tongji.benchmark.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
+import com.tongji.benchmark.pojo.dto.BenchmarkCaseDTO;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

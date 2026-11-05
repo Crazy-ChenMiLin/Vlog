@@ -5,7 +5,7 @@ import co.elastic.clients.elasticsearch._types.Conflicts;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.tongji.knowpost.mapper.KnowPostMapper;
-import com.tongji.knowpost.model.KnowPostDetailRow;
+import com.tongji.knowpost.pojo.dto.KnowPostDetailRow;
 import com.tongji.config.EsProperties;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;

@@ -1,7 +1,7 @@
 package com.tongji.benchmark.evaluator;
 
 import com.tongji.benchmark.assembler.FullTranscriptAssembler;
-import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
+import com.tongji.benchmark.pojo.dto.BenchmarkCaseDTO;
 import com.tongji.llm.observability.enums.RagTranscriptStageEnum;
 import com.tongji.llm.observability.enums.RagTranscriptStatusEnum;
 import com.tongji.llm.observability.model.dto.transcript.RagTranscriptCandidateDTO;

@@ -1,9 +1,9 @@
 package com.tongji.knowpost.mapper;
 
-import com.tongji.knowpost.model.KnowPost;
-import com.tongji.knowpost.model.KnowPostDetailRow;
+import com.tongji.knowpost.pojo.entity.KnowPost;
+import com.tongji.knowpost.pojo.dto.KnowPostDetailRow;
 
-import com.tongji.knowpost.model.KnowPostFeedRow;
+import com.tongji.knowpost.pojo.dto.KnowPostFeedRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

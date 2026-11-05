@@ -2,8 +2,8 @@ package com.tongji.cache.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.tongji.knowpost.api.dto.FeedPageResponse;
-import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
+import com.tongji.knowpost.pojo.response.FeedPageResponse;
+import com.tongji.knowpost.pojo.response.KnowPostDetailResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

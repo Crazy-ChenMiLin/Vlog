@@ -3,7 +3,7 @@ package com.tongji.counter.api;
 import com.tongji.counter.api.dto.CounterWriteRequest;
 import com.tongji.counter.service.CounterReadService;
 import com.tongji.counter.service.CounterWriteService;
-import com.tongji.auth.token.JwtService;
+import com.tongji.auth.tokenservice.JwtService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

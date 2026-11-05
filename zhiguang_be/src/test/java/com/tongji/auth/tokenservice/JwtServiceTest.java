@@ -1,4 +1,4 @@
-package com.tongji.auth.token;
+package com.tongji.auth.tokenservice;
 
 import com.tongji.auth.config.AuthConfiguration;
 import com.tongji.auth.config.AuthProperties;

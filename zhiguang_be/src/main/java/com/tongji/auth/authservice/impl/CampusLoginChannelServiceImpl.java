@@ -1,10 +1,10 @@
-package com.tongji.auth.service.impl;
+package com.tongji.auth.authservice.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.auth.api.dto.CampusTokenResponse;
-import com.tongji.auth.model.LoginCommand;
-import com.tongji.auth.model.LoginSuccess;
-import com.tongji.auth.service.OAuthChannelService;
+import com.tongji.auth.pojo.response.CampusTokenResponse;
+import com.tongji.auth.pojo.cmd.LoginCommand;
+import com.tongji.auth.pojo.dto.LoginSuccess;
+import com.tongji.auth.authservice.OAuthChannelService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.user.domain.User;
@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  * 校园账号（CQUT-Auth OIDC）登录渠道实现（OAuthChannelService 的实现类）。
  * <p>
  * 独门逻辑：PKCE 生成授权链接 → 用 code + verifier 换 token → 校验 id_token →
- * 查/建用户并同步资料。签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.service.AuthService} 统一处理。
+ * 查/建用户并同步资料。签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.authservice.AuthService} 统一处理。
  */
 @Slf4j
 @Service

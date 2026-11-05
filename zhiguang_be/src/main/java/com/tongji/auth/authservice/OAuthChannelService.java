@@ -1,4 +1,4 @@
-package com.tongji.auth.service;
+package com.tongji.auth.authservice;
 
 /**
  * OAuth 登录渠道接口（service 层子接口）。

@@ -1,4 +1,4 @@
-package com.tongji.auth.token;
+package com.tongji.auth.tokenservice;
 
 import lombok.RequiredArgsConstructor;
 import com.tongji.auth.config.AuthProperties;

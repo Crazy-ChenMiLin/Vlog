@@ -1,10 +1,10 @@
 package com.tongji.auth.api;
 
-import com.tongji.auth.api.dto.AuthResponse;
-import com.tongji.auth.api.dto.GitHubLoginUrlResponse;
-import com.tongji.auth.model.ClientInfo;
-import com.tongji.auth.model.LoginCommand;
-import com.tongji.auth.service.AuthService;
+import com.tongji.auth.pojo.response.AuthResponse;
+import com.tongji.auth.pojo.response.GitHubLoginUrlResponse;
+import com.tongji.auth.pojo.dto.ClientInfo;
+import com.tongji.auth.pojo.cmd.LoginCommand;
+import com.tongji.auth.authservice.AuthService;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;

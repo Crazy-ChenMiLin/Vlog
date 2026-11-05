@@ -1,6 +1,6 @@
 package com.tongji.search.api.dto;
 
-import com.tongji.knowpost.api.dto.FeedItemResponse;
+import com.tongji.knowpost.pojo.response.FeedItemResponse;
 import java.util.List;
 
 /**

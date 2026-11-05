@@ -1,7 +1,7 @@
-package com.tongji.auth.service;
+package com.tongji.auth.authservice;
 
-import com.tongji.auth.model.LoginCommand;
-import com.tongji.auth.model.LoginSuccess;
+import com.tongji.auth.pojo.cmd.LoginCommand;
+import com.tongji.auth.pojo.dto.LoginSuccess;
 
 /**
  * 登录渠道接口（策略模式，service 层接口）。

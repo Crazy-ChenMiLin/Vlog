@@ -8,7 +8,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.counter.service.CounterReadService;
 import com.tongji.knowpost.mapper.KnowPostMapper;
-import com.tongji.knowpost.model.KnowPostDetailRow;
+import com.tongji.knowpost.pojo.dto.KnowPostDetailRow;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import com.tongji.knowpost.model.KnowPostFeedRow;
+import com.tongji.knowpost.pojo.dto.KnowPostFeedRow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**

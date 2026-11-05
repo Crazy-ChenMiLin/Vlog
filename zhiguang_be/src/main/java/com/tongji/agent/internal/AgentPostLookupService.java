@@ -3,7 +3,7 @@ package com.tongji.agent.internal;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
 import com.tongji.knowpost.mapper.KnowPostMapper;
-import com.tongji.knowpost.model.KnowPostDetailRow;
+import com.tongji.knowpost.pojo.dto.KnowPostDetailRow;
 import com.tongji.storage.OssStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

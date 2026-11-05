@@ -1,8 +1,8 @@
 package com.tongji.benchmark.api;
 
-import com.tongji.benchmark.model.dto.BenchmarkSingleCaseRequest;
+import com.tongji.benchmark.pojo.request.BenchmarkSingleCaseRequest;
 import com.tongji.benchmark.controller.BenchmarkController;
-import com.tongji.benchmark.model.dto.BenchmarkEvaluationContextDTO;
+import com.tongji.benchmark.pojo.cmd.BenchmarkEvaluationContextDTO;
 import com.tongji.benchmark.service.BenchmarkSingleCaseService;
 import com.tongji.llm.observability.enums.RagTranscriptStatusEnum;
 import com.tongji.llm.observability.model.dto.evaluation.RagTranscriptEvaluationDTO;

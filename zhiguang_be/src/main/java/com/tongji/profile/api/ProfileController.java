@@ -3,7 +3,7 @@ package com.tongji.profile.api;
 import com.tongji.profile.api.dto.ProfilePatchRequest;
 import com.tongji.profile.api.dto.ProfileResponse;
 import com.tongji.storage.OssStorageService;
-import com.tongji.auth.token.JwtService;
+import com.tongji.auth.tokenservice.JwtService;
 import com.tongji.profile.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

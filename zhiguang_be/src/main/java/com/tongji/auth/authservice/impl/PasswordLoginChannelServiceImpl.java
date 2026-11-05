@@ -1,10 +1,10 @@
-package com.tongji.auth.service.impl;
+package com.tongji.auth.authservice.impl;
 
 import com.tongji.auth.audit.LoginLogService;
-import com.tongji.auth.model.IdentifierType;
-import com.tongji.auth.model.LoginCommand;
-import com.tongji.auth.model.LoginSuccess;
-import com.tongji.auth.service.LoginChannelService;
+import com.tongji.auth.enums.IdentifierType;
+import com.tongji.auth.pojo.cmd.LoginCommand;
+import com.tongji.auth.pojo.dto.LoginSuccess;
+import com.tongji.auth.authservice.LoginChannelService;
 import com.tongji.auth.util.IdentifierValidator;
 import com.tongji.auth.verification.VerificationCheckResult;
 import com.tongji.auth.verification.VerificationCodeStatus;
@@ -26,7 +26,7 @@ import java.util.Optional;
  * 密码 / 验证码登录渠道实现（LoginChannelService 的实现类）。
  * <p>
  * 独门逻辑：校验账号格式 → 校验密码或验证码 → 返回用户。
- * 成功后签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.service.AuthService} 统一处理。
+ * 成功后签发令牌、记录成功日志等公共逻辑由 {@link com.tongji.auth.authservice.AuthService} 统一处理。
  */
 @Service
 @RequiredArgsConstructor

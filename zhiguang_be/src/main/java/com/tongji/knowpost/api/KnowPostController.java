@@ -1,15 +1,15 @@
 package com.tongji.knowpost.api;
 
-import com.tongji.auth.token.JwtService;
-import com.tongji.knowpost.api.dto.KnowPostContentConfirmRequest;
-import com.tongji.knowpost.api.dto.KnowPostDraftCreateResponse;
-import com.tongji.knowpost.api.dto.KnowPostPatchRequest;
-import com.tongji.knowpost.api.dto.KnowPostTopPatchRequest;
-import com.tongji.knowpost.api.dto.KnowPostVisibilityPatchRequest;
-import com.tongji.knowpost.api.dto.FeedPageResponse;
+import com.tongji.auth.tokenservice.JwtService;
+import com.tongji.knowpost.pojo.request.KnowPostContentConfirmRequest;
+import com.tongji.knowpost.pojo.response.KnowPostDraftCreateResponse;
+import com.tongji.knowpost.pojo.request.KnowPostPatchRequest;
+import com.tongji.knowpost.pojo.request.KnowPostTopPatchRequest;
+import com.tongji.knowpost.pojo.request.KnowPostVisibilityPatchRequest;
+import com.tongji.knowpost.pojo.response.FeedPageResponse;
 import com.tongji.knowpost.service.KnowPostService;
 import com.tongji.knowpost.service.KnowPostFeedService;
-import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
+import com.tongji.knowpost.pojo.response.KnowPostDetailResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

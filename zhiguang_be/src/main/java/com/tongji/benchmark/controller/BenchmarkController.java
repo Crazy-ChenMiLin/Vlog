@@ -1,7 +1,7 @@
 package com.tongji.benchmark.controller;
 
-import com.tongji.benchmark.model.dto.BenchmarkSingleCaseRequest;
-import com.tongji.benchmark.model.dto.BenchmarkEvaluationContextDTO;
+import com.tongji.benchmark.pojo.request.BenchmarkSingleCaseRequest;
+import com.tongji.benchmark.pojo.cmd.BenchmarkEvaluationContextDTO;
 import com.tongji.benchmark.service.BenchmarkSingleCaseService;
 import com.tongji.llm.observability.model.dto.transcript.RagTranscriptDTO;
 import jakarta.validation.Valid;

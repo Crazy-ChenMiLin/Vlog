@@ -2,9 +2,9 @@ package com.tongji.storage.api;
 
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
-import com.tongji.auth.token.JwtService;
+import com.tongji.auth.tokenservice.JwtService;
 import com.tongji.knowpost.mapper.KnowPostMapper;
-import com.tongji.knowpost.model.KnowPost;
+import com.tongji.knowpost.pojo.entity.KnowPost;
 import com.tongji.storage.OssStorageService;
 import com.tongji.storage.api.dto.StoragePresignRequest;
 import com.tongji.storage.api.dto.StoragePresignResponse;

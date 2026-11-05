@@ -2,7 +2,7 @@ package com.tongji.benchmark.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tongji.benchmark.model.dto.BenchmarkCaseDTO;
+import com.tongji.benchmark.pojo.dto.BenchmarkCaseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;

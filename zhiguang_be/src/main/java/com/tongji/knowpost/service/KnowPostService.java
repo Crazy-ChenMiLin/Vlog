@@ -1,6 +1,6 @@
 package com.tongji.knowpost.service;
 
-import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
+import com.tongji.knowpost.pojo.response.KnowPostDetailResponse;
 
 import java.util.List;
 

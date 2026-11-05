@@ -1,7 +1,7 @@
 package com.tongji.knowpost.api;
 
-import com.tongji.auth.token.JwtService;
-import com.tongji.knowpost.api.dto.RagChatStreamRequest;
+import com.tongji.auth.tokenservice.JwtService;
+import com.tongji.knowpost.pojo.request.RagChatStreamRequest;
 import com.tongji.limit.AiRateLimiter;
 import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import com.tongji.llm.debugservice.RagDebugService;
@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 
 @RestController

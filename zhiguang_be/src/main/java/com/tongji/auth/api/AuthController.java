@@ -3,20 +3,20 @@ package com.tongji.auth.api;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import com.tongji.auth.api.dto.AuthResponse;
-import com.tongji.auth.api.dto.AuthUserResponse;
-import com.tongji.auth.api.dto.LoginRequest;
-import com.tongji.auth.api.dto.LogoutRequest;
-import com.tongji.auth.api.dto.PasswordResetRequest;
-import com.tongji.auth.api.dto.RegisterRequest;
-import com.tongji.auth.api.dto.SendCodeRequest;
-import com.tongji.auth.api.dto.SendCodeResponse;
-import com.tongji.auth.api.dto.TokenRefreshRequest;
-import com.tongji.auth.api.dto.TokenResponse;
-import com.tongji.auth.model.ClientInfo;
-import com.tongji.auth.model.LoginCommand;
-import com.tongji.auth.service.AuthService;
-import com.tongji.auth.token.JwtService;
+import com.tongji.auth.pojo.response.AuthResponse;
+import com.tongji.auth.pojo.response.AuthUserResponse;
+import com.tongji.auth.pojo.request.LoginRequest;
+import com.tongji.auth.pojo.request.LogoutRequest;
+import com.tongji.auth.pojo.request.PasswordResetRequest;
+import com.tongji.auth.pojo.request.RegisterRequest;
+import com.tongji.auth.pojo.request.SendCodeRequest;
+import com.tongji.auth.pojo.response.SendCodeResponse;
+import com.tongji.auth.pojo.request.TokenRefreshRequest;
+import com.tongji.auth.pojo.response.TokenResponse;
+import com.tongji.auth.pojo.dto.ClientInfo;
+import com.tongji.auth.pojo.cmd.LoginCommand;
+import com.tongji.auth.authservice.AuthService;
+import com.tongji.auth.tokenservice.JwtService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 暴露 REST 接口：发送验证码、注册、登录、刷新令牌、登出、重置密码、查询当前用户信息。
  * 集成：使用 Spring Security 的资源服务器能力，`/me` 通过 `@AuthenticationPrincipal Jwt` 提取用户。
  * 客户端信息：从请求头解析 IP 与 UA，用于审计登录日志。
- * 登录：统一走 {@link AuthService}，按渠道分发到对应 {@link com.tongji.auth.service.LoginChannelService} 实现。
+ * 登录：统一走 {@link AuthService}，按渠道分发到对应 {@link com.tongji.auth.authservice.LoginChannelService} 实现。
  */
 @RestController
 @RequestMapping("/api/v1/auth")

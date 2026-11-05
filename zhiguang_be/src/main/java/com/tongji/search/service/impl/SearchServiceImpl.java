@@ -10,7 +10,7 @@ import co.elastic.clients.elasticsearch.core.search.HighlightField;
 import co.elastic.clients.elasticsearch.core.search.Suggestion;
 import co.elastic.clients.util.NamedValue;
 import co.elastic.clients.elasticsearch.core.search.Hit;
-import com.tongji.knowpost.api.dto.FeedItemResponse;
+import com.tongji.knowpost.pojo.response.FeedItemResponse;
 import com.tongji.counter.service.CounterReadService;
 import com.tongji.search.api.dto.SearchResponse;
 import com.tongji.search.api.dto.SuggestResponse;
