@@ -109,7 +109,7 @@ const LoginPage = () => {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.titleBlock}>
-          <h1 className={styles.title}>欢迎回来</h1>
+          <h1 className={styles.title}>欢迎</h1>
           <p className={styles.subtitle}>登录知光，与知识发光</p>
         </div>
 
@@ -180,40 +180,14 @@ const LoginPage = () => {
             </div>
           </div>
         </form>
-        <button
-          type="button"
-          onClick={handleGitHubLogin}
-          style={{
-            width: "100%",
-            padding: "12px",
-            fontSize: "16px",
-            cursor: "pointer",
-            background: "#24292e",
-            color: "white",
-            border: "none",
-            borderRadius: "8px"
-          }}
-        >
-          GitHub 登录
-        </button>
-
-        <button
-          type="button"
-          onClick={handleCampusLogin}
-          style={{
-            width: "100%",
-            padding: "12px",
-            fontSize: "16px",
-            cursor: "pointer",
-            marginTop: "12px",
-            background: "var(--color-primary-strong, #2f6fed)",
-            color: "white",
-            border: "none",
-            borderRadius: "8px"
-          }}
-        >
-          校园账号登录
-        </button>
+        <div className={styles.oauthRow}>
+          <button type="button" className={styles.githubButton} onClick={handleGitHubLogin}>
+            GitHub 登录
+          </button>
+          <button type="button" className={styles.campusButton} onClick={handleCampusLogin}>
+            校园账号登录
+          </button>
+        </div>
       </div>
     </div>
   );

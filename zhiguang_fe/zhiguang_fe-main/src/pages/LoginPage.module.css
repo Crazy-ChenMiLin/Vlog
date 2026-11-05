@@ -147,6 +147,46 @@
   color: var(--color-text-muted);
 }
 
+.oauthRow {
+  display: flex;
+  gap: 12px;
+}
+
+.githubButton,
+.campusButton {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fffdf7;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.githubButton {
+  background: #24292e;
+  box-shadow: 0 12px 28px rgba(36, 41, 46, 0.18);
+}
+
+.campusButton {
+  background: #24292e;
+  box-shadow: 0 12px 28px rgba(159, 72, 35, 0.16);
+}
+
+.githubButton:hover,
+.campusButton:hover {
+  transform: translateY(-1px);
+}
+
+.githubButton:active,
+.campusButton:active {
+  transform: translateY(0);
+}
+
 .switchLink a {
   color: var(--color-primary-strong);
   font-weight: 600;
@@ -178,5 +218,11 @@
 
   .codeButton {
     min-height: 46px;
+  }
+
+  .githubButton,
+  .campusButton {
+    padding: 11px 8px;
+    font-size: 14px;
   }
 }
