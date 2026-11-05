@@ -83,7 +83,6 @@ const ProfilePage = () => {
       header={
         <MainHeader
           headline="我的知光主页"
-          subtitle="完善个人信息，积累你的知识资产"
           rightSlot={<AuthStatus />}
         />
       }

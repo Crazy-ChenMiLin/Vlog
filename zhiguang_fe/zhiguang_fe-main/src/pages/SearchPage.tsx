@@ -53,7 +53,6 @@ const SearchPage = () => {
       header={
         <MainHeader
           headline="搜索你想学习的知识"
-          subtitle="从提示词或你的历史记录开始探索，连接灵感与成长"
           rightSlot={<AuthStatus />}
         >
           <SearchBar

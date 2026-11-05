@@ -15,7 +15,6 @@ const LearningPage = () => {
       header={
         <MainHeader
           headline="我的学习"
-          subtitle="记录每一次学习进步，保持持续成长"
           rightSlot={<AuthStatus />}
         />
       }

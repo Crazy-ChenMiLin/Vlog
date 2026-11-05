@@ -177,14 +177,12 @@ const CreatePage = () => {
     <AppLayout
       header={
         <MainHeader
-          headline="创建新内容"
-          subtitle="分享你的知识，让更多人受益"
+          headline="创建内容"
           rightSlot={<AuthStatus />}
         />
       }
     >
       <div className={styles.formCard}>
-        <SectionHeader title="基本信息" subtitle="精准描述你的内容，帮助同学快速了解" />
         <div className={styles.formGrid}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="title">
