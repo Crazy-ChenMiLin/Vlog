@@ -85,8 +85,7 @@ const HomePage = () => {
     <AppLayout
       header={
         <MainHeader
-          headline="知光 · 让思想有温度，让知识会发光"
-          subtitle="按最新发布浏览知文、专题与作者线索。"
+          headline="知光"
           rightSlot={<AuthStatus />}
         />
       }
@@ -96,10 +95,6 @@ const HomePage = () => {
 
       <section className={styles.feedSection} aria-labelledby="latest-knowposts-title">
         <header className={styles.feedHeader}>
-          <div>
-            <span className={styles.eyebrow}>快速开始</span>
-            <h2 id="latest-knowposts-title">最新知文</h2>
-          </div>
           {!loading && items.length ? <span>{items.length} 篇</span> : null}
         </header>
         {error ? <div className={styles.feedError}>{error}</div> : null}

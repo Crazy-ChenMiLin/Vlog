@@ -32,7 +32,6 @@ const Sidebar = () => {
       <div className={styles.divider} />
       <div className={styles.footer}>
         <span>知光</span>
-        <div>让知识发光</div>
       </div>
     </aside>
   );
