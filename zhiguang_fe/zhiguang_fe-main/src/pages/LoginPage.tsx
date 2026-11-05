@@ -181,10 +181,6 @@ const LoginPage = () => {
             </div>
           </div>
         </form>
-
-        <div style={{ textAlign: "center", margin: "16px 0", color: "var(--color-text-secondary, #999)", fontSize: "14px" }}>
-          或
-        </div>
         <button
           type="button"
           onClick={handleGitHubLogin}
