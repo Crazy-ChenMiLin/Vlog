@@ -138,7 +138,6 @@ const LoginPage = () => {
               type="email"
               autoComplete="email"
             />
-            <span className={styles.tips}>邮箱只用于接收本次验证码，不作为登录账号。</span>
           </div>
 
           <div className={styles.field}>
