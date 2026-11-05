@@ -134,6 +134,7 @@ const LoginPage = () => {
               className={styles.input}
               value={deliveryEmail}
               onChange={event => setDeliveryEmail(event.target.value)}
+              placeholder="请输入您的邮箱"
               type="email"
               autoComplete="email"
             />
