@@ -128,13 +128,12 @@ const LoginPage = () => {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="deliveryEmail">验证码接收邮箱</label>
+            <label className={styles.label} htmlFor="deliveryEmail">邮箱</label>
             <input
               id="deliveryEmail"
               className={styles.input}
               value={deliveryEmail}
               onChange={event => setDeliveryEmail(event.target.value)}
-              placeholder="可选：把验证码发送到这个邮箱"
               type="email"
               autoComplete="email"
             />
