@@ -1,3 +1,5 @@
+import { getMockContentMarkdown } from "@/mock/mockData";
+
 const getBaseUrl = () => {
   const envBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
   // 默认使用相对路径，配合 Vite dev proxy，在生产通过环境变量显式配置。
@@ -29,6 +31,12 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<TResponse>(path: string, options: ApiFetchOptions = {}): Promise<TResponse> {
+  // 拦截 mock 静态内容请求
+  if (path.startsWith("/mock-content/")) {
+    const id = path.replace("/mock-content/", "");
+    return getMockContentMarkdown(id) as unknown as TResponse;
+  }
+
   const { method = "GET", headers = {}, body, accessToken, signal } = options;
 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
