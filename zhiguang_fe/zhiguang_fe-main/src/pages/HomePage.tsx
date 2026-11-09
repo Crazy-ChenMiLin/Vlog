@@ -3,6 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import MainHeader from "@/components/layout/MainHeader";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
+import WaterfallLayout from "@/components/common/WaterfallLayout";
 import { knowpostService } from "@/services/knowpostService";
 import type { FeedItem } from "@/types/knowpost";
 import AuthStatus from "@/features/auth/AuthStatus";
@@ -19,6 +20,23 @@ const shuffleItems = (items: FeedItem[]) => {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+};
+
+export const estimateFeedItemHeight = (item: FeedItem): number => {
+  let h = item.coverImage ? 210 : 160;
+  const titleLen = item.title ? item.title.length : 0;
+  h += titleLen > 15 ? 48 : 24;
+  const descLen = item.description ? item.description.trim().length : 0;
+  if (descLen > 0) {
+    h += descLen > 22 ? 40 : 20;
+  }
+  const tagCount = item.tags ? item.tags.length : 0;
+  if (tagCount > 0) {
+    h += tagCount > 3 ? 50 : 26;
+  }
+  h += 38; // footer
+  h += 48; // padding and gaps
+  return h;
 };
 
 const HomePage = () => {
@@ -98,29 +116,33 @@ const HomePage = () => {
           {!loading && items.length ? <span>{items.length} 篇</span> : null}
         </header>
         {error ? <div className={styles.feedError}>{error}</div> : null}
-        <div className={styles.masonry}>
-          {items.map(item => (
-            <div key={item.id} className={styles.masonryItem}>
-              <CourseCard
-                id={item.id}
-                title={item.title}
-                summary={item.description ?? ""}
-                tags={item.tags ?? []}
-                authorTags={(() => {
-                  try {
-                    return item.tagJson ? (JSON.parse(item.tagJson) as unknown[]).filter((t) => typeof t === "string") as string[] : [];
-                  } catch {
-                    return [];
-                  }
-                })()}
-                teacher={{ name: item.authorNickname, avatarUrl: item.authorAvatar ?? item.authorAvator }}
-                coverImage={item.coverImage}
-                to={`/post/${item.id}`}
-                footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
-              />
-            </div>
-          ))}
-        </div>
+
+        <WaterfallLayout
+          items={items}
+          getItemKey={(item) => item.id}
+          estimateHeight={estimateFeedItemHeight}
+          gap={18}
+          renderItem={(item) => (
+            <CourseCard
+              id={item.id}
+              title={item.title}
+              summary={item.description ?? ""}
+              tags={item.tags ?? []}
+              authorTags={(() => {
+                try {
+                  return item.tagJson ? (JSON.parse(item.tagJson) as unknown[]).filter((t) => typeof t === "string") as string[] : [];
+                } catch {
+                  return [];
+                }
+              })()}
+              teacher={{ name: item.authorNickname, avatarUrl: item.authorAvatar ?? item.authorAvator }}
+              coverImage={item.coverImage}
+              to={`/post/${item.id}`}
+              footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
+            />
+          )}
+        />
+
         {loading ? <div className={styles.feedState}>加载中...</div> : null}
         {!loading && items.length === 0 ? <div className={styles.feedState}>暂无内容</div> : null}
         {!loading && items.length > 0 ? (

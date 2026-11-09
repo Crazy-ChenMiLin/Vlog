@@ -9,7 +9,8 @@ import { searchService } from "@/services/searchService";
 import type { FeedItem } from "@/types/knowpost";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
-import feedStyles from "./HomePage.module.css";
+import WaterfallLayout from "@/components/common/WaterfallLayout";
+import { estimateFeedItemHeight } from "@/pages/HomePage";
 import { useAuth } from "@/context/AuthContext";
 
 const SearchPage = () => {
@@ -92,30 +93,34 @@ const SearchPage = () => {
           </div>
         ) : null}
         <SectionHeader title="搜索结果" subtitle={loading ? "加载中…" : items.length ? `共 ${items.length} 条（可能有更多）` : "请输入关键词后搜索"} />
-        <div className={feedStyles.masonry}>
-          {items.map(item => (
-            <div key={item.id} className={feedStyles.masonryItem}>
-              <CourseCard
-                id={item.id}
-                title={item.title}
-                summary={item.description ?? ""}
-                tags={item.tags ?? []}
-                isTop={item.isTop}
-                authorTags={(() => {
-                  try {
-                    return item.tagJson ? (JSON.parse(item.tagJson) as unknown[]).filter((t) => typeof t === "string") as string[] : [];
-                  } catch {
-                    return [];
-                  }
-                })()}
-                teacher={{ name: item.authorNickname, avatarUrl: item.authorAvatar ?? item.authorAvator }}
-                coverImage={item.coverImage}
-                to={`/post/${item.id}`}
-                footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
-              />
-            </div>
-          ))}
-        </div>
+
+        <WaterfallLayout
+          items={items}
+          getItemKey={(item) => item.id}
+          estimateHeight={estimateFeedItemHeight}
+          gap={18}
+          renderItem={(item) => (
+            <CourseCard
+              id={item.id}
+              title={item.title}
+              summary={item.description ?? ""}
+              tags={item.tags ?? []}
+              isTop={item.isTop}
+              authorTags={(() => {
+                try {
+                  return item.tagJson ? (JSON.parse(item.tagJson) as unknown[]).filter((t) => typeof t === "string") as string[] : [];
+                } catch {
+                  return [];
+                }
+              })()}
+              teacher={{ name: item.authorNickname, avatarUrl: item.authorAvatar ?? item.authorAvator }}
+              coverImage={item.coverImage}
+              to={`/post/${item.id}`}
+              footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
+            />
+          )}
+        />
+
         {hasMore ? (
           <button
             className={styles.loadMoreBtn}

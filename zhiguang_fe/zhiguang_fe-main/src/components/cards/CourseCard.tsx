@@ -217,8 +217,6 @@ const CourseCard = ({
 
   const content = (
     <>
-      {/* 取消免费标识展示，保持卡片简洁 */}
-      {/* 图片置于卡片顶部，保持原始比例；播放标识覆盖在封面中央 */}
       <div className={styles.coverWrap}>
         {coverImage ? (
           <img className={styles.cover} src={coverImage} alt={title} loading="lazy" />
@@ -254,7 +252,7 @@ const CourseCard = ({
         ) : null}
       </div>
 
-      <div className={styles.meta}>
+      <div className={styles.footer}>
         <div className={styles.teacher}>
           {teacher.avatarUrl && !avatarLoadFailed ? (
             <img
@@ -267,34 +265,27 @@ const CourseCard = ({
             <div className={styles.teacherAvatar}>{teacher.avatarText ?? (teacher.name?.charAt(0) || "?")}</div>
           )}
           <div className={styles.teacherInfo}>
-            <span className={styles.teacherName}>{teacher.name}</span>
+            <span className={styles.teacherName} title={teacher.name}>{teacher.name}</span>
             {authorTags?.length ? (
-              <div className={styles.authorTags}>
-                {authorTags.map(tag => (
-                  <span key={tag} className={styles.authorTag}>#{tag}</span>
-                ))}
-              </div>
+              <span className={styles.authorTag}>#{authorTags[0]}</span>
             ) : null}
           </div>
         </div>
-        {footerExtra ? null : (
-          <div className={styles.stats}>
-            {stats ? (
-              <>
-                <span className={styles.statItem}>
-                  <HeartIcon width={16} height={16} strokeWidth={1.6} />
-                  {stats.likes}
-                </span>
-                <span className={styles.statItem}>👁️ {stats.views}</span>
-              </>
-            ) : null}
-          </div>
-        )}
-      </div>
 
-      {footerExtra ? (
-        <div className={styles.footerExtra}>{footerExtra}</div>
-      ) : null}
+        <div className={styles.footerActions}>
+          {footerExtra ? (
+            footerExtra
+          ) : stats ? (
+            <div className={styles.stats}>
+              <span className={styles.statItem}>
+                <HeartIcon width={14} height={14} strokeWidth={1.6} />
+                {stats.likes}
+              </span>
+              <span className={styles.statItem}>👁️ {stats.views}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </>
   );
 

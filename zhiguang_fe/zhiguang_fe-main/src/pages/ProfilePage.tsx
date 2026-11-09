@@ -6,11 +6,13 @@ import SectionHeader from "@/components/common/SectionHeader";
 import AuthStatus from "@/features/auth/AuthStatus";
 import { useAuth } from "@/context/AuthContext";
 import styles from "./ProfilePage.module.css";
-import feedStyles from "./HomePage.module.css";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
+import WaterfallLayout from "@/components/common/WaterfallLayout";
+import { estimateFeedItemHeight } from "@/pages/HomePage";
 import { knowpostService } from "@/services/knowpostService";
 import RelationCounters from "@/components/common/RelationCounters";
+import type { FeedItem } from "@/types/knowpost";
 
 const ProfilePage = () => {
   const { user, tokens } = useAuth();
@@ -32,26 +34,10 @@ const ProfilePage = () => {
     return [];
   }, [user]);
 
-
   // 我的知文列表数据
-  const [items, setItems] = useState<Array<{
-    id: string;
-    title: string;
-    description: string;
-    coverImage?: string;
-    tags: string[];
-    tagJson?: string;
-    authorAvatar?: string;
-    authorAvator?: string;
-    authorNickname: string;
-    likeCount?: number;
-    favoriteCount?: number;
-    liked?: boolean;
-    faved?: boolean;
-    isTop?: boolean;
-  }>>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [, setPage] = useState(1);
+  const [, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +48,7 @@ const ProfilePage = () => {
     setError(null);
     try {
       const resp = await knowpostService.mine(1, 20, tokens.accessToken);
-      setItems(resp.items ?? []);
+      setItems((resp.items ?? []) as FeedItem[]);
       setHasMore(!!resp.hasMore);
       setPage(resp.page ?? 1);
     } catch (err) {
@@ -76,7 +62,6 @@ const ProfilePage = () => {
   useEffect(() => {
     void reloadMine();
   }, [tokens?.accessToken]);
-
 
   return (
     <AppLayout
@@ -126,9 +111,13 @@ const ProfilePage = () => {
         {!user ? (
           <div style={{ color: "var(--color-text-muted)", padding: 12 }}>请登录后查看你的知文</div>
         ) : (
-          <div className={feedStyles.masonry}>
-            {items.map(item => (
-              <div key={item.id} className={feedStyles.masonryItem}>
+          <>
+            <WaterfallLayout
+              items={items}
+              getItemKey={(item) => item.id}
+              estimateHeight={estimateFeedItemHeight}
+              gap={18}
+              renderItem={(item) => (
                 <CourseCard
                   id={item.id}
                   title={item.title}
@@ -153,15 +142,15 @@ const ProfilePage = () => {
                       void reloadMine();
                     }
                   }}
-              footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
+                  footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
+                />
+              )}
             />
-              </div>
-            ))}
-            {loading ? <div className={feedStyles.masonryItem}><div>加载中…</div></div> : null}
+            {loading ? <div style={{ color: "var(--color-text-muted)", padding: 16, textAlign: "center" }}>加载中…</div> : null}
             {!loading && items.length === 0 ? (
-              <div className={feedStyles.masonryItem}><div>暂无内容</div></div>
+              <div style={{ color: "var(--color-text-muted)", padding: 16, textAlign: "center" }}>暂无内容</div>
             ) : null}
-          </div>
+          </>
         )}
       </>
     </AppLayout>

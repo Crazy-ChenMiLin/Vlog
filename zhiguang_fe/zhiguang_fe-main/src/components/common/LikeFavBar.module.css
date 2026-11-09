@@ -6,6 +6,16 @@
   color: var(--color-text-muted);
 }
 
+.compact {
+  gap: 10px;
+  font-size: 12px;
+}
+
+.compact .btn {
+  padding: 0;
+  gap: 4px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -25,10 +35,6 @@
 
 .count {
   min-width: 10px;
-}
-
-.compact .btn {
-  padding: 0;
 }
 
 .disabled {
