@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import MainHeader from "@/components/layout/MainHeader";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import WaterfallLayout from "@/components/common/WaterfallLayout";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { knowpostService } from "@/services/knowpostService";
 import type { FeedItem } from "@/types/knowpost";
 import AuthStatus from "@/features/auth/AuthStatus";
@@ -41,14 +42,19 @@ export const estimateFeedItemHeight = (item: FeedItem): number => {
 
 const HomePage = () => {
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadingMoreRef = useRef(false);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(false);
+
   const loadPage = useCallback(async (nextPage: number, append = false) => {
     if (append) {
+      if (loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
       setLoadingMore(true);
     } else {
       setLoading(true);
@@ -57,14 +63,25 @@ const HomePage = () => {
 
     try {
       const resp = await knowpostService.feed(nextPage, PAGE_SIZE);
-      setItems(prev => append ? [...prev, ...(resp.items ?? [])] : (resp.items ?? []));
-      setPage(resp.page ?? nextPage);
-      setHasMore(Boolean(resp.hasMore));
+      const incoming = resp.items ?? [];
+      const resolvedPage = resp.page ?? nextPage;
+      const resolvedHasMore = append && incoming.length === 0 ? false : Boolean(resp.hasMore);
+
+      setItems(prev => {
+        if (!append) return incoming;
+        const seen = new Set(prev.map(x => x.id));
+        const uniqueIncoming = incoming.filter(x => !seen.has(x.id));
+        return [...prev, ...uniqueIncoming];
+      });
+      pageRef.current = resolvedPage;
+      hasMoreRef.current = resolvedHasMore;
+      setHasMore(resolvedHasMore);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "加载失败";
       setError(msg);
     } finally {
       if (append) {
+        loadingMoreRef.current = false;
         setLoadingMore(false);
       } else {
         setLoading(false);
@@ -73,16 +90,7 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      await loadPage(1);
-    };
-    if (!cancelled) {
-      void run();
-    }
-    return () => {
-      cancelled = true;
-    };
+    void loadPage(1);
   }, [loadPage]);
 
   useEffect(() => {
@@ -93,11 +101,18 @@ const HomePage = () => {
     return () => window.clearInterval(timer);
   }, []);
 
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
-      void loadPage(page + 1, true);
-    }
-  };
+  const handleLoadMore = useCallback(() => {
+    if (loadingMoreRef.current || !hasMoreRef.current) return;
+    void loadPage(pageRef.current + 1, true);
+  }, [loadPage]);
+
+  const sentinelRef = useInfiniteScroll({
+    hasMore,
+    loading: loading || loadingMore,
+    error,
+    itemCount: items.length,
+    onLoadMore: handleLoadMore
+  });
 
   return (
     <AppLayout
@@ -115,7 +130,7 @@ const HomePage = () => {
         <header className={styles.feedHeader}>
           {!loading && items.length ? <span>{items.length} 篇</span> : null}
         </header>
-        {error ? <div className={styles.feedError}>{error}</div> : null}
+        {error && items.length === 0 ? <div className={styles.feedError}>{error}</div> : null}
 
         <WaterfallLayout
           items={items}
@@ -146,19 +161,23 @@ const HomePage = () => {
         {loading ? <div className={styles.feedState}>加载中...</div> : null}
         {!loading && items.length === 0 ? <div className={styles.feedState}>暂无内容</div> : null}
         {!loading && items.length > 0 ? (
-          <div className={styles.feedActions}>
-            {hasMore ? (
+          <div ref={sentinelRef} className={styles.feedActions}>
+            {loadingMore ? (
+              <div className={styles.feedLoadingMore}>
+                <span className={styles.loadingSpinner} aria-hidden="true" />
+                <span>正在加载更多...</span>
+              </div>
+            ) : error && hasMore ? (
               <button
                 type="button"
-                className={styles.loadMoreButton}
+                className={styles.retryButton}
                 onClick={handleLoadMore}
-                disabled={loadingMore}
               >
-                {loadingMore ? "加载中..." : "加载更多"}
+                加载失败，下滑或点击重试
               </button>
-            ) : (
+            ) : !hasMore ? (
               <span className={styles.feedEnd}>已经到底了</span>
-            )}
+            ) : null}
           </div>
         ) : null}
       </section>

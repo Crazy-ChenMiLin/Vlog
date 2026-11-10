@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import MainHeader from "@/components/layout/MainHeader";
@@ -6,9 +6,11 @@ import SectionHeader from "@/components/common/SectionHeader";
 import AuthStatus from "@/features/auth/AuthStatus";
 import { useAuth } from "@/context/AuthContext";
 import styles from "./ProfilePage.module.css";
+import feedStyles from "./HomePage.module.css";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import WaterfallLayout from "@/components/common/WaterfallLayout";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { estimateFeedItemHeight } from "@/pages/HomePage";
 import { knowpostService } from "@/services/knowpostService";
 import RelationCounters from "@/components/common/RelationCounters";
@@ -36,32 +38,69 @@ const ProfilePage = () => {
 
   // 我的知文列表数据
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [, setPage] = useState(1);
-  const [, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadingMoreRef = useRef(false);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(false);
 
-  // 抽取成单一函数，供首次加载与编辑动作后复用
-  const reloadMine = async () => {
+  // 抽取成单一函数，供首次加载、编辑动作后及翻页复用
+  const loadMine = useCallback(async (nextPage = 1, append = false) => {
     if (!tokens?.accessToken) return;
-    setLoading(true);
+    if (append) {
+      if (loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const resp = await knowpostService.mine(1, 20, tokens.accessToken);
-      setItems((resp.items ?? []) as FeedItem[]);
-      setHasMore(!!resp.hasMore);
-      setPage(resp.page ?? 1);
+      const resp = await knowpostService.mine(nextPage, 20, tokens.accessToken);
+      const incoming = (resp.items ?? []) as FeedItem[];
+      const resolvedPage = resp.page ?? nextPage;
+      const resolvedHasMore = append && incoming.length === 0 ? false : Boolean(resp.hasMore);
+
+      setItems(prev => {
+        if (!append) return incoming;
+        const seen = new Set(prev.map(x => x.id));
+        const uniqueIncoming = incoming.filter(x => !seen.has(x.id));
+        return [...prev, ...uniqueIncoming];
+      });
+      pageRef.current = resolvedPage;
+      hasMoreRef.current = resolvedHasMore;
+      setHasMore(resolvedHasMore);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "加载失败";
       setError(msg);
     } finally {
-      setLoading(false);
+      if (append) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
-  };
+  }, [tokens?.accessToken]);
 
   useEffect(() => {
-    void reloadMine();
-  }, [tokens?.accessToken]);
+    void loadMine(1, false);
+  }, [loadMine]);
+
+  const handleLoadMore = useCallback(() => {
+    if (loadingMoreRef.current || !hasMoreRef.current) return;
+    void loadMine(pageRef.current + 1, true);
+  }, [loadMine]);
+
+  const sentinelRef = useInfiniteScroll({
+    hasMore,
+    loading: loading || loadingMore,
+    error,
+    itemCount: items.length,
+    onLoadMore: handleLoadMore
+  });
 
   return (
     <AppLayout
@@ -107,7 +146,7 @@ const ProfilePage = () => {
         ) : null}
 
         <SectionHeader title="我的知文" subtitle="仅显示你已发布的知文" />
-        {error ? <div style={{ color: "var(--color-danger)" }}>{error}</div> : null}
+        {error && items.length === 0 ? <div style={{ color: "var(--color-danger)" }}>{error}</div> : null}
         {!user ? (
           <div style={{ color: "var(--color-text-muted)", padding: 12 }}>请登录后查看你的知文</div>
         ) : (
@@ -139,7 +178,7 @@ const ProfilePage = () => {
                     if (action === "delete") {
                       setItems(prev => prev.filter(x => x.id !== item.id));
                     } else {
-                      void reloadMine();
+                      void loadMine(1, false);
                     }
                   }}
                   footerExtra={<LikeFavBar entityId={item.id} compact initialCounts={{ like: item.likeCount ?? 0, fav: item.favoriteCount ?? 0 }} initialState={{ liked: item.liked, faved: item.faved }} />}
@@ -149,6 +188,18 @@ const ProfilePage = () => {
             {loading ? <div style={{ color: "var(--color-text-muted)", padding: 16, textAlign: "center" }}>加载中…</div> : null}
             {!loading && items.length === 0 ? (
               <div style={{ color: "var(--color-text-muted)", padding: 16, textAlign: "center" }}>暂无内容</div>
+            ) : null}
+            {!loading && items.length > 0 ? (
+              <div ref={sentinelRef} className={feedStyles.feedActions}>
+                {loadingMore ? (
+                  <div className={feedStyles.feedLoadingMore}>
+                    <span className={feedStyles.loadingSpinner} aria-hidden="true" />
+                    <span>正在加载更多...</span>
+                  </div>
+                ) : !hasMore ? (
+                  <span className={feedStyles.feedEnd}>已经到底了</span>
+                ) : null}
+              </div>
             ) : null}
           </>
         )}

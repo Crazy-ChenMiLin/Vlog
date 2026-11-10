@@ -67,31 +67,49 @@
 .feedActions {
   display: flex;
   justify-content: center;
-  padding: 12px 0 28px;
+  align-items: center;
+  min-height: 28px;
+  padding: 10px 0 28px;
 }
 
-.loadMoreButton {
-  min-width: 132px;
-  height: 38px;
+.feedLoadingMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.loadingSpinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(159, 72, 35, 0.2);
+  border-top-color: var(--color-primary-strong, #9f4823);
+  animation: feedSpin 0.75s linear infinite;
+}
+
+@keyframes feedSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.retryButton {
+  padding: 6px 14px;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 253, 247, 0.78);
+  background: rgba(255, 253, 247, 0.85);
   box-shadow: inset 0 0 0 1px var(--color-border-soft);
-  color: var(--color-text-strong);
-  font-size: 14px;
-  font-weight: 700;
+  color: var(--color-text-muted);
+  font-size: 13px;
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
-.loadMoreButton:hover:not(:disabled) {
+.retryButton:hover {
   background: #eeeae1;
-  border-color: transparent;
-}
-
-.loadMoreButton:disabled {
-  cursor: wait;
-  opacity: 0.68;
+  color: var(--color-text-strong);
 }
 
 .feedEnd {

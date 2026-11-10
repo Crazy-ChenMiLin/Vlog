@@ -1,15 +1,17 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import MainHeader from "@/components/layout/MainHeader";
 import SectionHeader from "@/components/common/SectionHeader";
 import SearchBar from "@/components/common/SearchBar";
 import AuthStatus from "@/features/auth/AuthStatus";
 import styles from "./SearchPage.module.css";
+import feedStyles from "./HomePage.module.css";
 import { searchService } from "@/services/searchService";
 import type { FeedItem } from "@/types/knowpost";
 import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import WaterfallLayout from "@/components/common/WaterfallLayout";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { estimateFeedItemHeight } from "@/pages/HomePage";
 import { useAuth } from "@/context/AuthContext";
 
@@ -18,12 +20,15 @@ const SearchPage = () => {
   const [tags] = useState(""); // 逗号分隔
   const [size] = useState<number>(20);
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [after, setAfter] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  const loadingMoreRef = useRef(false);
+  const afterRef = useRef<string | null>(null);
+  const hasMoreRef = useRef(false);
   const { user } = useAuth();
   const [showLoginHint, setShowLoginHint] = useState(false);
 
@@ -37,17 +42,56 @@ const SearchPage = () => {
     setLoading(true);
     try {
       const resp = await searchService.query({ q: text, size, tags: tags.trim() || undefined });
-      setItems(resp.items ?? []);
-      setAfter(resp.nextAfter ?? null);
-      setHasMore(!!resp.hasMore);
+      const incoming = resp.items ?? [];
+      afterRef.current = resp.nextAfter ?? null;
+      hasMoreRef.current = Boolean(resp.hasMore);
+      setItems(incoming);
+      setHasMore(Boolean(resp.hasMore));
     } catch {
+      afterRef.current = null;
+      hasMoreRef.current = false;
       setItems([]);
-      setAfter(null);
       setHasMore(false);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current || !q.trim() || !afterRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const resp = await searchService.query({
+        q: q.trim(),
+        size,
+        tags: tags.trim() || undefined,
+        after: afterRef.current
+      });
+      const incoming = resp.items ?? [];
+      const nextHasMore = incoming.length === 0 ? false : Boolean(resp.hasMore);
+      setItems(prev => {
+        const seen = new Set(prev.map(x => x.id));
+        const uniqueIncoming = incoming.filter(x => !seen.has(x.id));
+        return [...prev, ...uniqueIncoming];
+      });
+      afterRef.current = resp.nextAfter ?? null;
+      hasMoreRef.current = nextHasMore;
+      setHasMore(nextHasMore);
+    } catch {
+      // 保持已有数据
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [q, size, tags]);
+
+  const sentinelRef = useInfiniteScroll({
+    hasMore,
+    loading: loading || loadingMore,
+    itemCount: items.length,
+    onLoadMore: handleLoadMore
+  });
 
   return (
     <AppLayout
@@ -121,25 +165,17 @@ const SearchPage = () => {
           )}
         />
 
-        {hasMore ? (
-          <button
-            className={styles.loadMoreBtn}
-            type="button"
-            onClick={async () => {
-              if (!q.trim() || !after) return;
-              setLoading(true);
-              try {
-                const resp = await searchService.query({ q: q.trim(), size, tags: tags.trim() || undefined, after });
-                setItems(prev => [...prev, ...(resp.items ?? [])]);
-                setAfter(resp.nextAfter ?? null);
-                setHasMore(!!resp.hasMore);
-              } catch {
-                // 保持已有数据
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >加载更多</button>
+        {items.length > 0 ? (
+          <div ref={sentinelRef} className={feedStyles.feedActions}>
+            {loadingMore ? (
+              <div className={feedStyles.feedLoadingMore}>
+                <span className={feedStyles.loadingSpinner} aria-hidden="true" />
+                <span>正在加载更多...</span>
+              </div>
+            ) : !hasMore ? (
+              <span className={feedStyles.feedEnd}>已经到底了</span>
+            ) : null}
+          </div>
         ) : null}
       </>
     </AppLayout>
