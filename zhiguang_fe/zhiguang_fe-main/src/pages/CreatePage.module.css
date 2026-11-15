@@ -657,66 +657,160 @@
   background: #e9e5de;
 }
 
+.detailTopNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detailBackBtn,
+.detailShareBtn {
+  font-size: 15px;
+  color: #333;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+}
+
+.detailAuthorGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detailAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e28743;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.detailAuthorName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #111;
+}
+
+.detailFollowBtn {
+  font-size: 10px;
+  font-weight: 600;
+  color: #ff2442;
+  border: 1px solid #ff2442;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: #fff;
+}
+
 .detailView {
   display: flex;
   flex-direction: column;
   background: #fff;
   min-height: 100%;
-  padding-bottom: 40px;
+  padding-bottom: 24px;
 }
 
 .detailImageWrap {
   width: 100%;
-  height: 240px;
-  background: #f0ece3;
-  display: grid;
-  place-items: center;
+  height: 220px;
+  background: #f7f5f0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  border-radius: 8px;
 }
 
 .detailImage {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  display: block;
 }
 
 .detailContent {
-  padding: 12px;
+  padding: 0 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .detailTitle {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: #111;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .detailDesc {
-  font-size: 12px;
-  color: #444;
-  line-height: 1.55;
+  font-size: 12.5px;
+  color: #333;
+  line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .detailTags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .detailTag {
   color: #133863;
   font-size: 11px;
+  background: #f0f4f8;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .detailMeta {
-  font-size: 10px;
+  font-size: 10.5px;
   color: #999;
   margin-top: 4px;
+}
+
+.detailBottomBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 6px;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+  gap: 10px;
+}
+
+.detailCommentPill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f4f4f4;
+  color: #999;
+  font-size: 11px;
+}
+
+.detailActionIcons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #444;
 }
 
 .phoneBottomNav {

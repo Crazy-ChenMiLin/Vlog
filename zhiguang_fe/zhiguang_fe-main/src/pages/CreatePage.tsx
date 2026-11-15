@@ -439,146 +439,181 @@ const CreatePage = () => {
                 <span>📶 🛜 🔋</span>
               </div>
 
-              <div className={styles.phoneTopNav}>
-                <span>☰</span>
-                <div className={styles.phoneTopTabs}>
-                  <span>关注</span>
-                  <span className={styles.phoneTabActive}>发现</span>
-                  <span>附近</span>
-                </div>
-                <span>🔍</span>
-              </div>
+              {previewTab === "feed" ? (
+                <>
+                  <div className={styles.phoneTopNav}>
+                    <span>☰</span>
+                    <div className={styles.phoneTopTabs}>
+                      <span>关注</span>
+                      <span className={styles.phoneTabActive}>发现</span>
+                      <span>附近</span>
+                    </div>
+                    <span>🔍</span>
+                  </div>
 
-              <div className={styles.phoneSubNav}>
-                <span className={styles.phoneSubActive}>推荐</span>
-                <span>直播</span>
-                <span>短剧</span>
-                <span>穿搭</span>
-                <span>旅行</span>
-                <span>动漫</span>
-              </div>
+                  <div className={styles.phoneSubNav}>
+                    <span className={styles.phoneSubActive}>推荐</span>
+                    <span>直播</span>
+                    <span>短剧</span>
+                    <span>穿搭</span>
+                    <span>旅行</span>
+                    <span>动漫</span>
+                  </div>
 
-              <div className={styles.phoneBody}>
-                {previewTab === "feed" ? (
-                  <div className={styles.feedGrid}>
-                    <div className={styles.feedCard}>
-                      <div className={styles.feedCardImageWrap}>
+                  <div className={styles.phoneBody}>
+                    <div className={styles.feedGrid}>
+                      <div className={styles.feedCard}>
+                        <div className={styles.feedCardImageWrap}>
+                          {uploadedImgUrls[0] ? (
+                            <img
+                              src={uploadedImgUrls[0]}
+                              alt="封面"
+                              className={styles.feedCardImage}
+                            />
+                          ) : (
+                            <DefaultDevilGraphic />
+                          )}
+                        </div>
+                        <div className={styles.feedCardBody}>
+                          <div className={styles.feedCardTitle}>
+                            {title.trim() || "示例笔记标题1"}
+                          </div>
+                          <div className={styles.feedCardFooter}>
+                            <div className={styles.feedAuthor}>
+                              <div className={styles.feedAvatar}>
+                                {authorName.slice(0, 1)}
+                              </div>
+                              <span>{authorName}</span>
+                            </div>
+                            <span className={styles.feedLike}>♡ 0</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={styles.feedCard}>
+                        <div className={styles.feedCardImageWrap}>
+                          <div className={styles.placeholderCover} />
+                        </div>
+                        <div className={styles.feedCardBody}>
+                          <div className={styles.feedCardTitle}>示例笔记标题1</div>
+                          <div className={styles.feedCardFooter}>
+                            <div className={styles.feedAuthor}>
+                              <div className={styles.feedAvatar}>用</div>
+                              <span>用户名</span>
+                            </div>
+                            <span className={styles.feedLike}>♡ 0</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={styles.feedCard}>
+                        <div className={styles.feedCardImageWrap}>
+                          <div className={styles.placeholderCover} />
+                        </div>
+                        <div className={styles.feedCardBody}>
+                          <div className={styles.feedCardTitle}>示例笔记标题2</div>
+                          <div className={styles.feedCardFooter}>
+                            <div className={styles.feedAuthor}>
+                              <div className={styles.feedAvatar}>用</div>
+                              <span>用户名</span>
+                            </div>
+                            <span className={styles.feedLike}>♡ 0</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={styles.feedCard}>
+                        <div className={styles.feedCardImageWrap}>
+                          <div className={styles.placeholderCover} />
+                        </div>
+                        <div className={styles.feedCardBody}>
+                          <div className={styles.feedCardTitle}>示例笔记标题3</div>
+                          <div className={styles.feedCardFooter}>
+                            <div className={styles.feedAuthor}>
+                              <div className={styles.feedAvatar}>用</div>
+                              <span>用户名</span>
+                            </div>
+                            <span className={styles.feedLike}>♡ 0</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.phoneBottomNav}>
+                    <span className={styles.phoneBottomActive}>首页</span>
+                    <span>市集</span>
+                    <span className={styles.phonePlusBtn}>+</span>
+                    <span>消息</span>
+                    <span>我</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.detailTopNav}>
+                    <button type="button" className={styles.detailBackBtn}>
+                      ‹
+                    </button>
+                    <div className={styles.detailAuthorGroup}>
+                      <div className={styles.detailAvatar}>
+                        {authorName.slice(0, 1)}
+                      </div>
+                      <span className={styles.detailAuthorName}>{authorName}</span>
+                      <span className={styles.detailFollowBtn}>+ 关注</span>
+                    </div>
+                    <button type="button" className={styles.detailShareBtn}>
+                      ↗
+                    </button>
+                  </div>
+
+                  <div className={styles.phoneBody}>
+                    <div className={styles.detailView}>
+                      <div className={styles.detailImageWrap}>
                         {uploadedImgUrls[0] ? (
                           <img
                             src={uploadedImgUrls[0]}
-                            alt="封面"
-                            className={styles.feedCardImage}
+                            alt="主图"
+                            className={styles.detailImage}
                           />
                         ) : (
                           <DefaultDevilGraphic />
                         )}
                       </div>
-                      <div className={styles.feedCardBody}>
-                        <div className={styles.feedCardTitle}>
-                          {title.trim() || "示例笔记标题1"}
-                        </div>
-                        <div className={styles.feedCardFooter}>
-                          <div className={styles.feedAuthor}>
-                            <div className={styles.feedAvatar}>
-                              {authorName.slice(0, 1)}
-                            </div>
-                            <span>{authorName}</span>
+                      <div className={styles.detailContent}>
+                        <h4 className={styles.detailTitle}>
+                          {title.trim() || "示例笔记标题"}
+                        </h4>
+                        <p className={styles.detailDesc}>
+                          {content.trim() || "输入正文描述，真诚有价值的分享予人温暖"}
+                        </p>
+                        {selectedTags.length > 0 && (
+                          <div className={styles.detailTags}>
+                            {selectedTags.map((tag) => (
+                              <span key={tag} className={styles.detailTag}>
+                                #{tag}
+                              </span>
+                            ))}
                           </div>
-                          <span className={styles.feedLike}>♡ 0</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={styles.feedCard}>
-                      <div className={styles.feedCardImageWrap}>
-                        <div className={styles.placeholderCover} />
-                      </div>
-                      <div className={styles.feedCardBody}>
-                        <div className={styles.feedCardTitle}>示例笔记标题1</div>
-                        <div className={styles.feedCardFooter}>
-                          <div className={styles.feedAuthor}>
-                            <div className={styles.feedAvatar}>用</div>
-                            <span>用户名</span>
-                          </div>
-                          <span className={styles.feedLike}>♡ 0</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={styles.feedCard}>
-                      <div className={styles.feedCardImageWrap}>
-                        <div className={styles.placeholderCover} />
-                      </div>
-                      <div className={styles.feedCardBody}>
-                        <div className={styles.feedCardTitle}>示例笔记标题2</div>
-                        <div className={styles.feedCardFooter}>
-                          <div className={styles.feedAuthor}>
-                            <div className={styles.feedAvatar}>用</div>
-                            <span>用户名</span>
-                          </div>
-                          <span className={styles.feedLike}>♡ 0</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={styles.feedCard}>
-                      <div className={styles.feedCardImageWrap}>
-                        <div className={styles.placeholderCover} />
-                      </div>
-                      <div className={styles.feedCardBody}>
-                        <div className={styles.feedCardTitle}>示例笔记标题3</div>
-                        <div className={styles.feedCardFooter}>
-                          <div className={styles.feedAuthor}>
-                            <div className={styles.feedAvatar}>用</div>
-                            <span>用户名</span>
-                          </div>
-                          <span className={styles.feedLike}>♡ 0</span>
-                        </div>
+                        )}
+                        <div className={styles.detailMeta}>刚刚 · 发布于 重庆</div>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className={styles.detailView}>
-                    <div className={styles.detailImageWrap}>
-                      {uploadedImgUrls[0] ? (
-                        <img
-                          src={uploadedImgUrls[0]}
-                          alt="主图"
-                          className={styles.detailImage}
-                        />
-                      ) : (
-                        <DefaultDevilGraphic />
-                      )}
+
+                  <div className={styles.detailBottomBar}>
+                    <div className={styles.detailCommentPill}>
+                      <span>✏️</span>
+                      <span>说点什么...</span>
                     </div>
-                    <div className={styles.detailContent}>
-                      <h4 className={styles.detailTitle}>
-                        {title.trim() || "示例笔记标题"}
-                      </h4>
-                      <p className={styles.detailDesc}>
-                        {content.trim() || "输入正文描述，真诚有价值的分享予人温暖"}
-                      </p>
-                      {selectedTags.length > 0 && (
-                        <div className={styles.detailTags}>
-                          {selectedTags.map((tag) => (
-                            <span key={tag} className={styles.detailTag}>
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className={styles.detailMeta}>刚刚 · 发布于 重庆</div>
+                    <div className={styles.detailActionIcons}>
+                      <span>♡ 0</span>
+                      <span>⭐ 0</span>
+                      <span>💬 0</span>
                     </div>
                   </div>
-                )}
-              </div>
+                </>
+              )}
 
-              <div className={styles.phoneBottomNav}>
-                <span className={styles.phoneBottomActive}>首页</span>
-                <span>市集</span>
-                <span className={styles.phonePlusBtn}>+</span>
-                <span>消息</span>
-                <span>我</span>
-              </div>
               <div className={styles.homeIndicator} />
             </div>
           </div>
