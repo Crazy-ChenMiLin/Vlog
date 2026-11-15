@@ -358,3 +358,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 600px) {
+  .card {
+    padding: 12px 12px 10px;
+    border-radius: 14px;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  .description {
+    font-size: 12.5px;
+  }
+}
