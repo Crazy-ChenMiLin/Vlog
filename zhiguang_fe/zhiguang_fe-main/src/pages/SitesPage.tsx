@@ -104,18 +104,6 @@ const SITES: SiteItem[] = [
     description: "站长个人技术沉淀博客，记录分布式架构演进、中间件实战调优与全栈开发心得。"
   },
   {
-    id: "portal",
-    name: "ChenMiLin 个人主页",
-    domain: "chenmilin.xyz",
-    url: "https://chenmilin.xyz",
-    icon: "🏠",
-    category: "portal",
-    categoryLabel: "个人主站",
-    status: "online",
-    statusText: "主站入口",
-    description: "站长主域名门户与作品主页，汇集个人开源项目、技术足迹与作品集。"
-  },
-  {
     id: "vpn",
     name: "VPN 专用网络控制台",
     domain: "vpn.chenmilin.xyz",
