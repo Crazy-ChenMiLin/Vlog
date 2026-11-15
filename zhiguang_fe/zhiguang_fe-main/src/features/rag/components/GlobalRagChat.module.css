@@ -594,15 +594,16 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .dock {
-    right: 16px;
-    bottom: 18px;
+    right: 14px;
+    bottom: calc(64px + env(safe-area-inset-bottom, 10px));
   }
 
   .panel {
-    width: calc(100vw - 32px);
-    height: min(calc(100vh * 4 / 5), calc(100vh - 60px));
+    width: calc(100vw - 24px);
+    height: min(calc(100vh * 4 / 5), calc(100vh - 84px));
+    max-height: calc(100vh - 84px);
   }
 
   .header {

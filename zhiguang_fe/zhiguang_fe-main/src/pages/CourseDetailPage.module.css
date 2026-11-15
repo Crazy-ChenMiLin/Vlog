@@ -355,3 +355,47 @@
     height: auto;
   }
 }
+
+@media (max-width: 768px) {
+  .detailCard {
+    padding: 16px 14px;
+    border-radius: 20px;
+    gap: 20px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .body {
+    padding: 16px 14px;
+    border-radius: 18px;
+    font-size: 14.5px;
+  }
+
+  .imageRow {
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .imageRow::-webkit-scrollbar {
+    display: none;
+  }
+
+  .imageItem {
+    width: 130px;
+    flex-shrink: 0;
+  }
+
+  .ragPanel {
+    width: 100%;
+    border-radius: 16px;
+  }
+
+  .ragTextarea {
+    font-size: 14px;
+  }
+}

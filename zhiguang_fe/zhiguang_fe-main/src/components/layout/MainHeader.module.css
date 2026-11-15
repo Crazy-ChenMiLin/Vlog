@@ -111,7 +111,7 @@
   gap: 16px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px) and (min-width: 769px) {
   .header {
     padding: 0 0 14px;
   }
@@ -124,5 +124,64 @@
   .extras {
     width: 100%;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 2px 0 10px;
+    gap: 12px;
+  }
+
+  .topRow {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .titles {
+    min-width: 0;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .headline {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .extras {
+    width: auto;
+    flex-shrink: 0;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .tabs,
+  .filters {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabs::-webkit-scrollbar,
+  .filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab,
+  .filterButton {
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 }

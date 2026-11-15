@@ -208,3 +208,46 @@
     align-items: flex-start;
   }
 }
+
+@media (max-width: 768px) {
+  .profileGrid {
+    grid-template-columns: 80px 1fr;
+    gap: 16px;
+  }
+
+  .avatarBox {
+    width: 80px;
+    height: 80px;
+    border-radius: 24px;
+    font-size: 32px;
+  }
+
+  .nickname {
+    font-size: 18px;
+  }
+
+  .tags {
+    font-size: 12px;
+    gap: 6px 8px;
+  }
+
+  .bioBlock {
+    margin-top: 10px;
+    font-size: 13px;
+  }
+
+  .contentItem {
+    padding: 16px 14px;
+    border-radius: 16px;
+    gap: 12px;
+  }
+
+  .contentTitle {
+    font-size: 16px;
+  }
+
+  .contentActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

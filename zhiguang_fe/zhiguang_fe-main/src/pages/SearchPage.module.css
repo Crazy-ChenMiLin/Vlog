@@ -110,3 +110,31 @@
   color: #ad6800;
   font-size: 13px;
 }
+
+@media (max-width: 768px) {
+  .searchArea {
+    padding: 16px 14px;
+    border-radius: 18px;
+    gap: 20px;
+  }
+
+  .suggestions {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .suggestionCard {
+    padding: 12px 14px;
+    font-size: 14px;
+    border-radius: 14px;
+  }
+
+  .history {
+    gap: 8px;
+  }
+
+  .historyItem {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}

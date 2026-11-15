@@ -199,7 +199,14 @@ const CourseDetailPage = () => {
           <div className={styles.titleRow}></div>
           <div className={styles.meta}>
             {detail?.authorAvatar ? (
-              <img className={styles.authorAvatar} src={detail.authorAvatar} alt={detail.authorNickname} />
+              <img
+                className={styles.authorAvatar}
+                src={detail.authorAvatar}
+                alt={detail.authorNickname}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
             ) : null}
             <span className={styles.authorName}>{detail?.authorNickname ?? ""}</span>
             {(() => {

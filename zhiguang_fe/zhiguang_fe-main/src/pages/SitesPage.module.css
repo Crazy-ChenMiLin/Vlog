@@ -50,6 +50,13 @@
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filterBar::-webkit-scrollbar {
+  display: none;
 }
 
 .filterBtn {
@@ -273,9 +280,17 @@
 
 @media (max-width: 640px) {
   .heroCard {
-    padding: 18px 20px;
+    padding: 16px 14px;
+    border-radius: 16px;
+  }
+  .heroTitle {
+    font-size: 18px;
+  }
+  .heroDesc {
+    font-size: 12.5px;
   }
   .grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 }

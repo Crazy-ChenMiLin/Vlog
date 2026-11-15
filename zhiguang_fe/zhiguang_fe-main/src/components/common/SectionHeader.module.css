@@ -44,3 +44,29 @@
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(255, 138, 65, 0.2);
 }
+
+@media (max-width: 600px) {
+  .header {
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .subtitle {
+    font-size: 12.5px;
+  }
+
+  .actions {
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .actionButton,
+  .actions :global(.ghost-button) {
+    padding: 6px 12px;
+    font-size: 12.5px;
+  }
+}
