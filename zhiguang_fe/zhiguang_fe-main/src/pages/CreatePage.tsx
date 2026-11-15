@@ -1,44 +1,73 @@
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import MainHeader from "@/components/layout/MainHeader";
-import SectionHeader from "@/components/common/SectionHeader";
-import TagInput from "@/components/common/TagInput";
-import Select from "@/components/common/Select";
-import { useRef, useState } from "react";
-import { knowpostService, uploadToPresigned, computeSha256 } from "@/services/knowpostService";
 import AuthStatus from "@/features/auth/AuthStatus";
 import { useAuth } from "@/context/AuthContext";
+import { computeSha256, knowpostService, uploadToPresigned } from "@/services/knowpostService";
 import styles from "./CreatePage.module.css";
 
+const SUGGESTED_TAGS = [
+  "喂饱你的相册贪吃蛇",
+  "负鼠表情包",
+  "原创表情包",
+  "热门表情包",
+  "表情包制作",
+  "表情包",
+  "知光精选",
+  "AI大模型",
+  "架构设计"
+];
+
+const QUICK_EMOJIS = ["❤️", "👍", "🔥", "☕", "🌟", "👏", "😊", "🎉", "🥳", "🚀", "✨", "👀", "💯", "🐱", "🐾", "💡", "💪", "🙌"];
+
+const MAX_IMAGES = 18;
+
+const DefaultDevilGraphic = () => (
+  <svg viewBox="0 0 100 100" width="80" height="80">
+    <path d="M 22 28 C 12 18 10 36 24 38 Z" fill="#ff2442" />
+    <path d="M 78 28 C 88 18 90 36 76 38 Z" fill="#ff2442" />
+    <ellipse cx="50" cy="56" rx="34" ry="28" fill="#fdfaf3" stroke="#2d2b28" strokeWidth="2.5" />
+    <ellipse cx="38" cy="50" rx="3" ry="4" fill="#2d2b28" />
+    <ellipse cx="62" cy="50" rx="3" ry="4" fill="#2d2b28" />
+    <path d="M 32 44 Q 38 41 44 44" fill="none" stroke="#2d2b28" strokeWidth="2" strokeLinecap="round" />
+    <path d="M 56 44 Q 62 41 68 44" fill="none" stroke="#2d2b28" strokeWidth="2" strokeLinecap="round" />
+    <path d="M 44 62 Q 50 67 56 62" fill="none" stroke="#2d2b28" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="28" cy="57" r="4.5" fill="#ffb4a2" opacity="0.6" />
+    <circle cx="72" cy="57" r="4.5" fill="#ffb4a2" opacity="0.6" />
+    <ellipse cx="50" cy="74" rx="12" ry="7" fill="#fdfaf3" stroke="#2d2b28" strokeWidth="2" />
+  </svg>
+);
+
 const CreatePage = () => {
-  const { user, tokens } = useAuth();
-  const [type, setType] = useState("图文");
-  const [tags, setTags] = useState<string[]>([]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [isFree, setIsFree] = useState(true);
-  const [price, setPrice] = useState<number>(0);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMoreSettings, setShowMoreSettings] = useState(true);
   const [visiblePublic, setVisiblePublic] = useState(true);
-  const [summary, setSummary] = useState("");
-  const [aiSummaryEnabled, setAiSummaryEnabled] = useState(false);
-  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
+  const [uploadedImgUrls, setUploadedImgUrls] = useState<string[]>([]);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [previewTab, setPreviewTab] = useState<"feed" | "detail">("feed");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [postId, setPostId] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // 图片直传相关
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [uploadedImgUrls, setUploadedImgUrls] = useState<string[]>([]);
-  const MAX_IMAGES = 15;
+
+  const authorName = user?.nickname || user?.zhId || "ChenMiLin";
 
   const ensureDraft = async (): Promise<string> => {
     if (postId) return postId;
     const resp = await knowpostService.createDraft();
     const idStr = String(resp.id);
     setPostId(idStr);
-    setMessage(`草稿已创建：${idStr}`);
     return idStr;
   };
 
@@ -47,20 +76,27 @@ const CreatePage = () => {
     setError(null);
     setMessage(null);
     setImageUploading(true);
+
+    const remaining = Math.max(0, MAX_IMAGES - uploadedImgUrls.length);
+    if (remaining <= 0) {
+      setError(`最多只可上传 ${MAX_IMAGES} 张图片`);
+      setImageUploading(false);
+      return;
+    }
+
+    const selectedList = Array.from(files).slice(0, remaining);
+
+    const localPreviewUrls = selectedList.map(f => URL.createObjectURL(f));
+    setUploadedImgUrls(prev => [...prev, ...localPreviewUrls]);
+
     try {
       const id = await ensureDraft();
-      const currentCount = uploadedImgUrls.length;
-      const remaining = Math.max(0, MAX_IMAGES - currentCount);
-      if (remaining <= 0) {
-        setError(`最多可选择 ${MAX_IMAGES} 张图片`);
-        return;
-      }
-      const allSelected = Array.from(files);
-      const arr = allSelected.slice(0, remaining);
-      for (const f of arr) {
+      const uploadedRemoteUrls: string[] = [];
+
+      for (const f of selectedList) {
         const match = f.name.match(/\.[^.]+$/);
         const ext = match ? match[0] : ".jpg";
-        const contentType = f.type || (ext.toLowerCase() === ".png" ? "image/png" : ext.toLowerCase() === ".svg" ? "image/svg+xml" : "image/jpeg");
+        const contentType = f.type || "image/jpeg";
         const presign = await knowpostService.presign({
           scene: "knowpost_image",
           postId: id,
@@ -69,39 +105,58 @@ const CreatePage = () => {
         });
         await uploadToPresigned(presign.putUrl, presign.headers, f);
         const publicUrl = presign.publicUrl ?? presign.putUrl.split("?")[0];
-        setUploadedImgUrls(prev => [...prev, publicUrl]);
+        uploadedRemoteUrls.push(publicUrl);
       }
-      const ignored = allSelected.length - arr.length;
-      setMessage(`图片上传成功：${arr.length} 张${ignored > 0 ? `（已超过上限，忽略 ${ignored} 张）` : ""}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "图片上传失败";
-      setError(msg);
+
+      setUploadedImgUrls(prev => {
+        const base = prev.slice(0, prev.length - localPreviewUrls.length);
+        return [...base, ...uploadedRemoteUrls];
+      });
+    } catch {
+      // 保留本地预览 URL
     } finally {
       setImageUploading(false);
     }
   };
 
+  const handleDeleteImage = (index: number) => {
+    setUploadedImgUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearImages = () => {
+    setUploadedImgUrls([]);
+  };
+
+  const handleToggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(prev => prev.filter(t => t !== tag));
+    } else {
+      setSelectedTags(prev => [...prev, tag]);
+      setContent(prev => (prev ? `${prev} #${tag}` : `#${tag}`));
+    }
+  };
+
+  const handleAddEmoji = (emoji: string) => {
+    setContent(prev => `${prev}${emoji}`);
+    setShowEmojiPicker(false);
+  };
+
   const handlePublish = async () => {
     setMessage(null);
     setError(null);
+
     if (!title.trim()) {
-      setError("请填写标题");
+      setError("请填写笔记标题");
       return;
     }
     if (!content.trim()) {
-      setError("请填写内容正文");
+      setError("请填写笔记正文描述");
       return;
     }
-    if (summary.trim().length > 50) {
-      setError("摘要不能超过50字");
-      return;
-    }
+
     setSubmitting(true);
     try {
-      // 1) 创建或复用草稿
       const id = await ensureDraft();
-
-      // 2) 预签名上传正文（将文本作为 Markdown 文件上传）
       const file = new File([content], "content.md", { type: "text/markdown" });
       const size = file.size;
       const sha256 = await computeSha256(file);
@@ -113,7 +168,6 @@ const CreatePage = () => {
       });
       const { etag } = await uploadToPresigned(presign.putUrl, presign.headers, file);
 
-      // 3) 确认正文
       await knowpostService.confirmContent(id, {
         objectKey: presign.objectKey,
         etag,
@@ -121,234 +175,414 @@ const CreatePage = () => {
         sha256
       });
 
-      // 4) 生成/使用摘要并保存元数据（标题、标签、摘要等）
-      const description = summary.trim();
       await knowpostService.update(id, {
         title: title.trim(),
-        tags: tags.length ? tags : undefined,
-        imgUrls: uploadedImgUrls.length ? uploadedImgUrls : undefined,
+        tags: selectedTags.length ? selectedTags : undefined,
+        imgUrls: uploadedImgUrls.filter(u => !u.startsWith("blob:")),
         visible: visiblePublic ? "public" : "private",
         isTop: false,
-        description: description || undefined
+        description: content.slice(0, 50)
       });
 
-      // 5) 发布
       await knowpostService.publish(id);
-      setMessage("发布成功 ✅");
+      setMessage("发布成功！正在跳转首页…");
+      setTimeout(() => navigate("/"), 1200);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "发布失败";
+      const msg = err instanceof Error ? err.message : "发布失败，已为您保存草稿";
       setError(msg);
     } finally {
       setSubmitting(false);
     }
   };
-  const handleToggleAiSummary = async () => {
-    // 切换开关；开启时触发生成
-    if (!aiSummaryEnabled) {
-      if (!tokens?.accessToken) {
-        setError("请先登录以使用 AI 摘要");
-        return;
-      }
-      if (!content.trim()) {
-        setError("正文为空，无法生成摘要");
-        return;
-      }
-      setAiSummaryLoading(true);
-      setMessage(null);
-      setError(null);
-      try {
-        const resp = await knowpostService.suggestDescription(content, tokens.accessToken);
-        const desc = (resp.description ?? "").slice(0, 50);
-        setSummary(desc);
-        setAiSummaryEnabled(true);
-        setMessage("AI 摘要已生成");
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "生成失败";
-        setError(msg);
-      } finally {
-        setAiSummaryLoading(false);
-      }
-    } else {
-      setAiSummaryEnabled(false);
-    }
+
+  const handleLeave = () => {
+    try {
+      localStorage.setItem("zhiguang_post_draft", JSON.stringify({
+        title,
+        content,
+        selectedTags,
+        date: new Date().toISOString()
+      }));
+    } catch {}
+    navigate("/");
   };
+
+  const visibleTags = showAllTags ? SUGGESTED_TAGS : SUGGESTED_TAGS.slice(0, 6);
 
   return (
     <AppLayout
       header={
         <MainHeader
-          headline="创建内容"
+          headline="发布图文笔记"
+          subtitle="分享真实有价值的知识与灵感"
           rightSlot={<AuthStatus />}
         />
       }
+      variant="cardless"
     >
-      <div className={styles.formCard}>
-        <div className={styles.formGrid}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="title">
-              标题 *
-            </label>
-            <input
-              id="title"
-              className={styles.input}
-              placeholder="输入内容标题"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-            />
-          </div>
-          <Select
-            id="type"
-            label="内容类型 *"
-            value={type}
-            onChange={setType}
-            options={[
-              { label: "图文", value: "图文" },
-              { label: "视频", value: "视频" }
-            ]}
-          />
-          <div className={`${styles.field} ${styles.fullWidth}`}>
-            <label className={styles.label}>图片（多选） *</label>
-            <div
-              className={styles.uploadBox}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                if (uploadedImgUrls.length >= MAX_IMAGES) {
-                  setError(`最多可选择 ${MAX_IMAGES} 张图片`);
-                  return;
-                }
-                fileInputRef.current?.click();
-              }}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
-            >
-              <span>{imageUploading ? "正在上传…" : "点击上传图片"}</span>
-              <small>支持 JPG / PNG / SVG，最多 {MAX_IMAGES} 张；单张不超过 5MB（已选 {uploadedImgUrls.length} / {MAX_IMAGES}）</small>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className={styles.fileInputHidden}
-                onChange={e => handleSelectImages(e.target.files)}
-              />
-            </div>
-            {uploadedImgUrls.length > 0 ? (
-              <div className={styles.thumbGrid}>
-                {uploadedImgUrls.map((url, idx) => (
-                  <img key={idx} src={url} alt="" className={styles.thumb} onClick={() => setPreviewUrl(url)} />
-                ))}
+      <div className={styles.pageLayout}>
+        <div className={styles.leftCol}>
+          <div className={styles.card}>
+            <div className={styles.imageCardHeader}>
+              <div className={styles.imageTitleWrap}>
+                <span>图片编辑</span>
+                <span className={styles.imageCount}>{uploadedImgUrls.length}/{MAX_IMAGES}</span>
               </div>
-            ) : null}
-          </div>
-          <div className={`${styles.field} ${styles.fullWidth}`}>
-            <label className={styles.label} htmlFor="content">
-              内容正文 *
-            </label>
-            <textarea
-              id="content"
-              className={styles.textarea}
-              placeholder="写下你的知识内容..."
-              value={content}
-              onChange={e => setContent(e.target.value)}
-            />
-          </div>
-          <div className={`${styles.field} ${styles.fullWidth}`}>
-            <div className={styles.fieldHeader}>
-              <label className={styles.label} htmlFor="summary">知识摘要</label>
-              <div className={styles.headActions}>
-                <span>AI 摘要</span>
-                <div
-                  className={`${styles.inlineSwitch} ${aiSummaryEnabled ? styles.inlineSwitchOn : ""}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={aiSummaryEnabled}
-                  aria-label="AI 摘要开关"
-                  onClick={handleToggleAiSummary}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleToggleAiSummary(); }}
+              {uploadedImgUrls.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.trashBtn}
+                  title="清空所有图片"
+                  onClick={handleClearImages}
+                >
+                  🗑️
+                </button>
+              )}
+            </div>
+
+            <div className={styles.imageGrid}>
+              <div
+                className={styles.uploadBox}
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+              >
+                +
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className={styles.fileInput}
+                  onChange={(e) => handleSelectImages(e.target.files)}
                 />
-                {aiSummaryLoading ? <small className={styles.muted}>生成中…</small> : null}
               </div>
+
+              {uploadedImgUrls.map((url, index) => (
+                <div key={index} className={styles.imageThumbWrap}>
+                  <img src={url} alt={`已上传 ${index + 1}`} className={styles.thumbImg} />
+                  <span className={styles.indexBadge}>{index + 1}</span>
+                  {index === 0 && <span className={styles.coverBadge}>封面</span>}
+                  <button
+                    type="button"
+                    className={styles.deleteBtn}
+                    onClick={() => handleDeleteImage(index)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
-            <textarea
-              id="summary"
-              className={styles.textarea}
-              placeholder="填写内容摘要（50字以内）"
-              value={summary}
-              onChange={e => setSummary(e.target.value)}
-            />
-            <small className={summary.trim().length > 50 ? styles.charCountOver : styles.charCount}>
-              {summary.trim().length} / 50
-            </small>
           </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="price">
-              价格
-            </label>
+
+          <div className={styles.card}>
             <input
-              id="price"
-              className={styles.input}
-              type="number"
-              min="0"
-              step="0.1"
-              value={isFree ? 0 : price}
-              onChange={e => setPrice(Number(e.target.value))}
-              disabled={isFree}
+              type="text"
+              className={styles.titleInput}
+              placeholder="填写标题会有更多赞哦"
+              maxLength={50}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="tags">
-              标签
-            </label>
-            <TagInput
-              id="tags"
-              value={tags}
-              onChange={setTags}
-              placeholder="输入标签后按回车"
+
+            <textarea
+              className={styles.bodyTextarea}
+              placeholder="输入正文描述，真诚有价值的分享予人温暖"
+              maxLength={1000}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
             />
-          </div>
-          <div className={`${styles.field} ${styles.fullWidth}`}>
-            <div
-              className={styles.toggle}
-              role="button"
-              tabIndex={0}
-              onClick={() => setIsFree(prev => !prev)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setIsFree(prev => !prev); }}
-            >
-              <div>
-                <div className={styles.label}>免费分享</div>
-                <small>{isFree ? "已开启" : "关闭后可设置价格"}</small>
+
+            <div className={styles.tagsRow}>
+              {visibleTags.map((tag) => {
+                const isActive = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={isActive ? `${styles.tagPill} ${styles.tagPillActive}` : styles.tagPill}
+                    onClick={() => handleToggleTag(tag)}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className={styles.moreTagsBtn}
+                onClick={() => setShowAllTags(!showAllTags)}
+              >
+                {showAllTags ? "收起 ^" : "更多 ⌄"}
+              </button>
+            </div>
+
+            <div className={styles.editorToolbar}>
+              <div className={styles.toolButtons}>
+                <button
+                  type="button"
+                  className={styles.toolBtn}
+                  onClick={() => setContent((prev) => `${prev} #话题`)}
+                >
+                  # 话题 ⌄
+                </button>
+                <button
+                  type="button"
+                  className={styles.toolBtn}
+                  onClick={() => setContent((prev) => `${prev} @`)}
+                >
+                  @ 用户
+                </button>
+                <button
+                  type="button"
+                  className={styles.toolBtn}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  😊 表情
+                </button>
+
+                {showEmojiPicker && (
+                  <div className={styles.emojiPopover}>
+                    {QUICK_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className={styles.emojiItem}
+                        onClick={() => handleAddEmoji(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className={`${styles.switch} ${isFree ? styles.switchOn : ""}`} aria-hidden="true" />
+
+              <span className={styles.wordCount}>{content.length}/1000</span>
             </div>
           </div>
-          <div className={`${styles.field} ${styles.fullWidth}`}>
+
+          <div className={styles.settingsCard}>
             <div
-              className={styles.toggle}
-              role="button"
-              tabIndex={0}
-              onClick={() => setVisiblePublic(prev => !prev)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setVisiblePublic(prev => !prev); }}
+              className={styles.settingsHeader}
+              onClick={() => setShowMoreSettings(!showMoreSettings)}
             >
-              <div>
-                <div className={styles.label}>可见范围</div>
-                <small>{visiblePublic ? "公开" : "私密"}</small>
+              <span className={styles.settingsTitle}>更多设置</span>
+              <span className={styles.toggleText}>
+                {showMoreSettings ? "收起 ^" : "展开 ⌄"}
+              </span>
+            </div>
+
+            {showMoreSettings && (
+              <div className={styles.settingsBody}>
+                <div className={styles.settingItem}>
+                  <div className={styles.settingLabelWrap}>
+                    <span>👤</span>
+                    <span>可见范围</span>
+                  </div>
+                  <select
+                    className={styles.selectInput}
+                    value={visiblePublic ? "public" : "private"}
+                    onChange={(e) => setVisiblePublic(e.target.value === "public")}
+                  >
+                    <option value="public">公开可见</option>
+                    <option value="private">仅自己可见</option>
+                  </select>
+                </div>
               </div>
-              <div className={`${styles.switch} ${visiblePublic ? styles.switchOn : ""}`} aria-hidden="true" />
+            )}
+          </div>
+
+          {error && <div className={`${styles.alertBox} ${styles.alertError}`}>{error}</div>}
+          {message && <div className={`${styles.alertBox} ${styles.alertSuccess}`}>{message}</div>}
+
+          <div className={styles.bottomBar}>
+            <button
+              type="button"
+              className={styles.leaveBtn}
+              onClick={handleLeave}
+            >
+              暂存离开
+            </button>
+            <button
+              type="button"
+              className={styles.publishBtn}
+              onClick={handlePublish}
+              disabled={submitting || imageUploading}
+            >
+              {submitting ? "发布中…" : "发布"}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.rightCol}>
+          <div className={styles.previewTabNav}>
+            <button
+              type="button"
+              className={previewTab === "detail" ? `${styles.previewTabBtn} ${styles.previewTabBtnActive}` : styles.previewTabBtn}
+              onClick={() => setPreviewTab("detail")}
+            >
+              笔记预览
+            </button>
+            <button
+              type="button"
+              className={previewTab === "feed" ? `${styles.previewTabBtn} ${styles.previewTabBtnActive}` : styles.previewTabBtn}
+              onClick={() => setPreviewTab("feed")}
+            >
+              封面预览
+            </button>
+          </div>
+
+          <div className={styles.phoneFrame}>
+            <div className={styles.phoneScreen}>
+              <div className={styles.phoneStatusBar}>
+                <span>9:41</span>
+                <span>📶 🛜 🔋</span>
+              </div>
+
+              <div className={styles.phoneTopNav}>
+                <span>☰</span>
+                <div className={styles.phoneTopTabs}>
+                  <span>关注</span>
+                  <span className={styles.phoneTabActive}>发现</span>
+                  <span>附近</span>
+                </div>
+                <span>🔍</span>
+              </div>
+
+              <div className={styles.phoneSubNav}>
+                <span className={styles.phoneSubActive}>推荐</span>
+                <span>直播</span>
+                <span>短剧</span>
+                <span>穿搭</span>
+                <span>旅行</span>
+                <span>动漫</span>
+              </div>
+
+              <div className={styles.phoneBody}>
+                {previewTab === "feed" ? (
+                  <div className={styles.feedGrid}>
+                    <div className={styles.feedCard}>
+                      <div className={styles.feedCardImageWrap}>
+                        {uploadedImgUrls[0] ? (
+                          <img
+                            src={uploadedImgUrls[0]}
+                            alt="封面"
+                            className={styles.feedCardImage}
+                          />
+                        ) : (
+                          <DefaultDevilGraphic />
+                        )}
+                      </div>
+                      <div className={styles.feedCardBody}>
+                        <div className={styles.feedCardTitle}>
+                          {title.trim() || "示例笔记标题1"}
+                        </div>
+                        <div className={styles.feedCardFooter}>
+                          <div className={styles.feedAuthor}>
+                            <div className={styles.feedAvatar}>
+                              {authorName.slice(0, 1)}
+                            </div>
+                            <span>{authorName}</span>
+                          </div>
+                          <span className={styles.feedLike}>♡ 0</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.feedCard}>
+                      <div className={styles.feedCardImageWrap}>
+                        <div className={styles.placeholderCover} />
+                      </div>
+                      <div className={styles.feedCardBody}>
+                        <div className={styles.feedCardTitle}>示例笔记标题1</div>
+                        <div className={styles.feedCardFooter}>
+                          <div className={styles.feedAuthor}>
+                            <div className={styles.feedAvatar}>用</div>
+                            <span>用户名</span>
+                          </div>
+                          <span className={styles.feedLike}>♡ 0</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.feedCard}>
+                      <div className={styles.feedCardImageWrap}>
+                        <div className={styles.placeholderCover} />
+                      </div>
+                      <div className={styles.feedCardBody}>
+                        <div className={styles.feedCardTitle}>示例笔记标题2</div>
+                        <div className={styles.feedCardFooter}>
+                          <div className={styles.feedAuthor}>
+                            <div className={styles.feedAvatar}>用</div>
+                            <span>用户名</span>
+                          </div>
+                          <span className={styles.feedLike}>♡ 0</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.feedCard}>
+                      <div className={styles.feedCardImageWrap}>
+                        <div className={styles.placeholderCover} />
+                      </div>
+                      <div className={styles.feedCardBody}>
+                        <div className={styles.feedCardTitle}>示例笔记标题3</div>
+                        <div className={styles.feedCardFooter}>
+                          <div className={styles.feedAuthor}>
+                            <div className={styles.feedAvatar}>用</div>
+                            <span>用户名</span>
+                          </div>
+                          <span className={styles.feedLike}>♡ 0</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.detailView}>
+                    <div className={styles.detailImageWrap}>
+                      {uploadedImgUrls[0] ? (
+                        <img
+                          src={uploadedImgUrls[0]}
+                          alt="主图"
+                          className={styles.detailImage}
+                        />
+                      ) : (
+                        <DefaultDevilGraphic />
+                      )}
+                    </div>
+                    <div className={styles.detailContent}>
+                      <h4 className={styles.detailTitle}>
+                        {title.trim() || "示例笔记标题"}
+                      </h4>
+                      <p className={styles.detailDesc}>
+                        {content.trim() || "输入正文描述，真诚有价值的分享予人温暖"}
+                      </p>
+                      {selectedTags.length > 0 && (
+                        <div className={styles.detailTags}>
+                          {selectedTags.map((tag) => (
+                            <span key={tag} className={styles.detailTag}>
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className={styles.detailMeta}>刚刚 · 发布于 重庆</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.phoneBottomNav}>
+                <span className={styles.phoneBottomActive}>首页</span>
+                <span>市集</span>
+                <span className={styles.phonePlusBtn}>+</span>
+                <span>消息</span>
+                <span>我</span>
+              </div>
+              <div className={styles.homeIndicator} />
             </div>
           </div>
         </div>
-        <div className={styles.actions}>
-          <button type="button" className={styles.submit} onClick={handlePublish} disabled={submitting}>
-            {submitting ? "发布中…" : "发布"}
-          </button>
-        </div>
-        {error ? <div className={styles.error}>{error}</div> : null}
-        {message ? <div className={styles.success}>{message}</div> : null}
-        {previewUrl ? (
-          <div className={styles.previewOverlay} onClick={() => setPreviewUrl(null)}>
-            <img src={previewUrl} className={styles.previewImage} alt="预览" />
-          </div>
-        ) : null}
       </div>
     </AppLayout>
   );
