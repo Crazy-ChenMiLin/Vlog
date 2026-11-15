@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { CreateIcon, HomeIcon, ProfileIcon, SearchIcon, SparkIcon, StudyIcon } from "@/components/icons/Icon";
+import { CreateIcon, GlobeIcon, HomeIcon, ProfileIcon, SearchIcon, SparkIcon, StudyIcon } from "@/components/icons/Icon";
 import styles from "./Sidebar.module.css";
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: "/search", label: "搜索", Icon: SearchIcon },
   { to: "/create", label: "创作", Icon: CreateIcon },
   { to: "/learn", label: "学习", Icon: StudyIcon },
+  { to: "/sites", label: "站点", Icon: GlobeIcon },
   { to: "/profile", label: "我的", Icon: ProfileIcon }
 ] as const;
 
@@ -31,6 +32,10 @@ const Sidebar = () => {
       </nav>
       <div className={styles.divider} />
       <div className={styles.footer}>
+        <NavLink to="/sites" className={styles.matrixBadge}>
+          <span className={styles.dot} />
+          chenmilin.xyz 矩阵
+        </NavLink>
         <span>知光</span>
       </div>
     </aside>

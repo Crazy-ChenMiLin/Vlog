@@ -98,3 +98,19 @@ export const BookmarkIcon = createIcon(
     <path d="M7.5 4h9a1 1 0 0 1 1 1v14l-5.5-3.5L6.5 19V5a1 1 0 0 1 1-1z" />
   </>
 );
+
+export const GlobeIcon = createIcon(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3.6 9h16.8M3.6 15h16.8" />
+    <path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+  </>
+);
+
+export const ExternalLinkIcon = createIcon(
+  <>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </>
+);

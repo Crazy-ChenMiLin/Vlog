@@ -3,6 +3,7 @@ import HomePage from "./pages/HomePage";
 import SearchPage from "./pages/SearchPage";
 import CreatePage from "./pages/CreatePage";
 import LearningPage from "./pages/LearningPage";
+import SitesPage from "./pages/SitesPage";
 import ProfilePage from "./pages/ProfilePage";
 import EditProfilePage from "./pages/EditProfilePage";
 import CourseDetailPage from "./pages/CourseDetailPage";
@@ -18,6 +19,7 @@ function App() {
       <Route path="/search" element={<SearchPage />} />
       <Route path="/create" element={<CreatePage />} />
       <Route path="/learn" element={<LearningPage />} />
+      <Route path="/sites" element={<SitesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/edit" element={<EditProfilePage />} />
       <Route path="/post/:id" element={<CourseDetailPage />} />

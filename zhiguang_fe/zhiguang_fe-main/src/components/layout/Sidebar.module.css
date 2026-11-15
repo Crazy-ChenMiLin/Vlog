@@ -90,6 +90,32 @@
   font-weight: 600;
 }
 
+.matrixBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(83, 75, 64, 0.05);
+  margin-bottom: 4px;
+  transition: all 0.16s ease;
+}
+
+.matrixBadge:hover {
+  color: var(--color-primary-strong);
+  background: rgba(83, 75, 64, 0.1);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
 @media (max-width: 900px) {
   .sidebar {
     position: relative;
