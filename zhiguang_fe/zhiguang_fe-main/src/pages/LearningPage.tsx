@@ -12,28 +12,20 @@ interface DonationRecord {
   date: string;
 }
 
-const INITIAL_RECORDS: DonationRecord[] = [
-  { id: "1", name: "匿名支持者", amount: 66.0, message: "感谢分享的知识社区与架构设计，干货满满！", date: "2026-11-15" },
-  { id: "2", name: "知光研友", amount: 18.88, message: "RAG 和向量数据库总结得很清晰，加个油！", date: "2026-11-14" },
-  { id: "3", name: "代码漫游者", amount: 10.0, message: "请作者喝杯咖啡 ☕，期待更多好内容！", date: "2026-11-12" },
-  { id: "4", name: "小林同学", amount: 6.66, message: "支持开源，支持原创知识沉淀！", date: "2026-11-10" },
-  { id: "5", name: "前端小工", amount: 8.88, message: "瀑布流做得很丝滑，界面排版很舒服！", date: "2026-11-08" },
-  { id: "6", name: "阿杰", amount: 20.0, message: "赞赏支持一下站长！", date: "2026-11-05" }
-];
-
-const STORAGE_KEY = "zhiguang_donation_records";
+const STORAGE_KEY = "zhiguang_donation_records_real";
 
 const LearningPage = () => {
   const [activeTab, setActiveTab] = useState<"donate" | "records">("donate");
   const [records, setRecords] = useState<DonationRecord[]>(() => {
     try {
+      localStorage.removeItem("zhiguang_donation_records");
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return INITIAL_RECORDS;
+    return [];
   });
 
   const [showForm, setShowForm] = useState(false);
@@ -193,23 +185,30 @@ const LearningPage = () => {
               )}
 
               <div className={styles.recordList}>
-                {records.map((item) => (
-                  <div key={item.id} className={styles.recordItem}>
-                    <div className={styles.recordLeft}>
-                      <div className={styles.avatar}>
-                        {item.name.slice(0, 1) || "知"}
-                      </div>
-                      <div className={styles.recordInfo}>
-                        <div className={styles.recordName}>{item.name}</div>
-                        <div className={styles.recordMsg}>{item.message}</div>
-                      </div>
-                    </div>
-                    <div className={styles.recordRight}>
-                      <span className={styles.amount}>+¥{item.amount.toFixed(2)}</span>
-                      <span className={styles.date}>{item.date}</span>
-                    </div>
+                {records.length === 0 ? (
+                  <div className={styles.emptyWrap}>
+                    <p className={styles.emptyText}>暂无打赏记录</p>
+                    <p className={styles.emptySubText}>微信扫码支持后，点击上方“+ 登记打赏”留下您的心意</p>
                   </div>
-                ))}
+                ) : (
+                  records.map((item) => (
+                    <div key={item.id} className={styles.recordItem}>
+                      <div className={styles.recordLeft}>
+                        <div className={styles.avatar}>
+                          {item.name.slice(0, 1) || "知"}
+                        </div>
+                        <div className={styles.recordInfo}>
+                          <div className={styles.recordName}>{item.name}</div>
+                          <div className={styles.recordMsg}>{item.message}</div>
+                        </div>
+                      </div>
+                      <div className={styles.recordRight}>
+                        <span className={styles.amount}>+¥{item.amount.toFixed(2)}</span>
+                        <span className={styles.date}>{item.date}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
