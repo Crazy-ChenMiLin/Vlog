@@ -597,7 +597,7 @@
 @media (max-width: 768px) {
   .dock {
     right: 14px;
-    bottom: calc(64px + env(safe-area-inset-bottom, 10px));
+    bottom: calc(76px + env(safe-area-inset-bottom, 10px));
   }
 
   .panel {
