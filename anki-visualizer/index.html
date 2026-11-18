@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anki 记忆主页 | 今日状态 • 坚持连击 • 卡片资产</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'><path d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'/></svg>">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            anki: {
+              blue: '#2563eb',
+              green: '#16a34a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <!-- SQL.js for client-side SQLite parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+  <!-- Pre-exported Data for 0-barrier offline & file:// loading -->
+  <script src="data.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+    
+    /* Strict Pure White Minimalist Style */
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: #ffffff;
+      color: #0f172a;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #ffffff;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #cbd5e1;
+    }
+    .clean-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    }
+    .clean-card:hover {
+      border-color: #cbd5e1;
+    }
+    .heatmap-cell {
+      transition: transform 0.1s ease;
+    }
+    .heatmap-cell:hover {
+      transform: scale(1.35);
+      z-index: 10;
+      outline: 2px solid #2563eb;
+    }
+  </style>
+</head>
+<body class="bg-white text-slate-900 min-h-screen">
+
+  <!-- Minimalist Pure White Header -->
+  <header class="sticky top-0 z-40 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-6 py-3.5">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      
+      <!-- Brand & Profile -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l2.87 6.64L22 9.24l-5.26 4.67 1.6 7.09L12 17.27l-6.34 3.73 1.6-7.09L2 9.24l7.13-.6z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
+              Anki
+              <span class="text-[11px] px-2 py-0.5 rounded font-medium bg-slate-100 text-slate-700 border border-slate-200">本地记忆库</span>
+            </h1>
+            <span class="text-xs text-slate-300">•</span>
+            <span id="headerProfile" class="text-xs font-medium text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+              账户 1
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="headerSyncTime">本地数据连接正常</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center space-x-2">
+        <!-- Live Sync Button -->
+        <button id="btnSync" onclick="triggerSync()" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition active:scale-[0.98]">
+          <i data-lucide="refresh-cw" id="syncIcon" class="w-3.5 h-3.5"></i>
+          <span>一键同步最新</span>
+        </button>
+
+        <!-- Drop/Import File Button -->
+        <button onclick="document.getElementById('fileInput').click()" class="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-300 flex items-center gap-1.5 transition">
+          <i data-lucide="folder-open" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span>导入 .anki2</span>
+        </button>
+        <input type="file" id="fileInput" accept=".anki2,.json" class="hidden" onchange="handleFileSelect(event)">
+      </div>
+    </div>
+  </header>
+
+  <!-- Global Drop Overlay for Drag & Drop -->
+  <div id="dropOverlay" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-6 transition-all">
+    <div class="text-center p-8 bg-white rounded-2xl border-2 border-dashed border-blue-600 shadow-2xl max-w-md w-full">
+      <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3 text-blue-600">
+        <i data-lucide="file-up" class="w-7 h-7"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900 mb-1">松开鼠标以导入 Anki 数据库</h3>
+      <p class="text-xs text-slate-500">支持拖入 <code class="text-blue-600 font-mono">collection.anki2</code> 或 <code class="text-blue-600 font-mono">anki_data.json</code></p>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-xs font-medium bg-slate-900 text-white border border-slate-800">
+    <i data-lucide="info" id="toastIcon" class="w-4 h-4 text-blue-400"></i>
+    <span id="toastMsg">通知信息</span>
+  </div>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-6 py-6 space-y-5">
+
+    <!-- ========================================================================= -->
+    <!-- 【核心焦点 1】：今天做没做？坚持了多久？累计了多少卡片？ (3 Pillars) -->
+    <!-- ========================================================================= -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      
+      <!-- Pillar 1: 今天做没做？做了多少？学了多久？ -->
+      <div class="clean-card rounded-2xl p-5 flex flex-col justify-between" id="todayCardWrapper">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+              今日状态
+            </span>
+            <span id="todayStatusBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
+              加载中...
+            </span>
+          </div>
+
+          <!-- Main Today Metric -->
+          <div class="flex items-baseline gap-2 mb-1">
+            <span class="text-4xl font-extrabold text-slate-900 tracking-tight font-mono" id="todayReviewCount">--</span>
+            <span class="text-xs font-semibold text-slate-500">张已复习</span>
+          </div>
+          <div class="text-xs text-slate-600 flex items-center gap-2 mb-4">
+            <span>用时 <b class="text-slate-900 font-mono" id="todayTime">--</b> 分钟</span>
+            <span>•</span>
+            <span id="todayRemainingHint" class="font-medium text-slate-700">还有 -- 张待复习</span>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="w-full bg-slate-100 rounded-full h-1.5 mb-3 overflow-hidden">
+            <div id="todayProgressBar" class="h-full bg-emerald-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span id="todaySubtext">昨日: -- 张</span>
+          <span id="todayRatingPills" class="flex gap-1.5 text-[11px] font-mono text-slate-600">
+            <!-- Populated by JS -->
+          </span>
+        </div>
+      </div>
+
+      <!-- Pillar 2: 坚持了多久？ (Streak & Consistency) -->
+      <div class="clean-card rounded-2xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <i data-lucide="flame" class="w-4 h-4 text-emerald-600"></i>
+              坚持了多久
+            </span>
+            <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+              打卡连击
+            </span>
+          </div>
+
+          <!-- Main Streak Metric -->
+          <div class="flex items-baseline gap-2 mb-1">
+            <span class="text-4xl font-extrabold text-slate-900 tracking-tight font-mono" id="streakCurrent">--</span>
+            <span class="text-xs font-semibold text-slate-500">天连续打卡</span>
+          </div>
+          <div class="text-xs text-slate-600 mb-4" id="streakMotivation">
+            保持记忆节奏，击败遗忘曲线
+          </div>
+
+          <!-- 2 Stat mini cards inside -->
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div class="text-[10px] text-slate-500">累计打卡</div>
+              <div class="text-sm font-bold text-slate-900 font-mono" id="streakTotalDays">-- 天</div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div class="text-[10px] text-slate-500">最长连胜纪录</div>
+              <div class="text-sm font-bold text-slate-900 font-mono" id="streakMax">-- 天</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span>历史复习总次数</span>
+          <span class="font-bold text-slate-900 font-mono" id="totalReviewsAllTime">-- 次</span>
+        </div>
+      </div>
+
+      <!-- Pillar 3: 累计了多少卡片？ (Accumulated Card Assets) -->
+      <div class="clean-card rounded-2xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-4 h-4 text-blue-600"></i>
+              累计卡片资产
+            </span>
+            <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+              知识库规模
+            </span>
+          </div>
+
+          <!-- Main Cards Metric -->
+          <div class="flex items-baseline gap-2 mb-1">
+            <span class="text-4xl font-extrabold text-blue-600 tracking-tight font-mono" id="totalActiveCards">--</span>
+            <span class="text-xs font-semibold text-slate-500">张活跃卡片</span>
+          </div>
+          <div class="text-xs text-slate-600 mb-3" id="lifetimeCardSummary">
+            历史累计沉淀：<b class="text-slate-900 font-mono" id="lifetimeCards">--</b> 张卡片
+          </div>
+
+          <!-- Memory Maturity Stack Progress -->
+          <div class="space-y-2 mb-2">
+            <!-- Multi-color Segmented Bar -->
+            <div class="w-full bg-slate-100 rounded-full h-2 flex overflow-hidden">
+              <div id="barMature" class="bg-emerald-600 transition-all duration-500" style="width: 0%" title="熟练卡"></div>
+              <div id="barYoung" class="bg-blue-600 transition-all duration-500" style="width: 0%" title="巩固卡"></div>
+              <div id="barLearn" class="bg-slate-700 transition-all duration-500" style="width: 0%" title="学习中"></div>
+              <div id="barNew" class="bg-slate-300 transition-all duration-500" style="width: 0%" title="新卡"></div>
+            </div>
+
+            <!-- Legend Pills (Strictly Blue, Green, Slate) -->
+            <div class="grid grid-cols-3 gap-1 text-[10px] text-slate-500 pt-1">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                <span>巩固期: <b class="text-slate-900 font-mono" id="cardCntYoung">--</b></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-slate-700"></span>
+                <span>学习中: <b class="text-slate-900 font-mono" id="cardCntLearn">--</b></span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>熟练卡: <b class="text-slate-900 font-mono" id="cardCntMature">--</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span>长期记忆留存率</span>
+          <span class="font-bold text-emerald-600 font-mono" id="cardRetentionRate">--%</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 【核心焦点 2】：经典 Anki 牌组大厅 (The Classic Anki Deck View) -->
+    <!-- ========================================================================= -->
+    <div class="clean-card rounded-2xl overflow-hidden">
+      <div class="p-4 sm:px-6 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="folder-kanban" class="w-4 h-4 text-blue-600"></i>
+            Anki 牌组总览 (Decks)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">经典 Anki 桌面端视图：新卡、学习中、待复习三维矩阵</p>
+        </div>
+        <div class="flex items-center gap-3 text-xs">
+          <div class="flex items-center gap-1.5 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+            <span>新卡 (New)</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-slate-700"></span>
+            <span>学习中 (Learn)</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+            <span>待复习 (Due)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Anki Deck Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-white text-slate-500 uppercase font-semibold text-[11px] border-b border-slate-200">
+            <tr>
+              <th scope="col" class="py-3 px-6">牌组名称 (Deck)</th>
+              <th scope="col" class="py-3 px-4 text-center">新卡 (New)</th>
+              <th scope="col" class="py-3 px-4 text-center">学习中 (Learn)</th>
+              <th scope="col" class="py-3 px-4 text-center">待复习 (Due)</th>
+              <th scope="col" class="py-3 px-4 text-center">总卡数</th>
+              <th scope="col" class="py-3 px-6 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="deckTableBody" class="divide-y divide-slate-100 font-medium">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 【核心焦点 3】：坚持了多久？打卡历史热力图 (Glutanimate Review Heatmap) -->
+    <!-- ========================================================================= -->
+    <div class="clean-card rounded-2xl p-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="calendar" class="w-4 h-4 text-emerald-600"></i>
+            坚持打卡热力图 (Review Heatmap)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">一年 365 天坚持轨迹，绿色越深代表投入越大，悬浮可查看单日详情</p>
+        </div>
+        <!-- Year Switch Buttons -->
+        <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl" id="yearSelector">
+          <button onclick="setHeatmapYear('all')" data-year="all" class="year-btn px-2.5 py-1 text-xs rounded-lg font-medium text-slate-600 hover:text-slate-900 transition">全部</button>
+          <button onclick="setHeatmapYear(2025)" data-year="2025" class="year-btn px-2.5 py-1 text-xs rounded-lg font-medium text-slate-600 hover:text-slate-900 transition">2025</button>
+          <button onclick="setHeatmapYear(2026)" data-year="2026" class="year-btn px-2.5 py-1 text-xs rounded-lg font-medium text-white bg-blue-600 shadow-sm transition">2026</button>
+        </div>
+      </div>
+
+      <!-- Heatmap Scrollable Wrapper -->
+      <div class="overflow-x-auto pb-2">
+        <div id="heatmapContainer" class="min-w-[850px] space-y-1.5">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Heatmap Footer Legend & Summary -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-100 text-xs text-slate-500">
+        <div class="flex items-center gap-4">
+          <span id="heatmapSummaryText">已累计打卡 -- 天，历史最高连胜 -- 天</span>
+        </div>
+        <div class="flex items-center gap-2 text-[11px]">
+          <span>少</span>
+          <div class="w-3 h-3 rounded-sm bg-slate-100 border border-slate-200"></div>
+          <div class="w-3 h-3 rounded-sm bg-emerald-200"></div>
+          <div class="w-3 h-3 rounded-sm bg-emerald-400"></div>
+          <div class="w-3 h-3 rounded-sm bg-emerald-600"></div>
+          <div class="w-3 h-3 rounded-sm bg-emerald-800"></div>
+          <span>多 (60+张)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 【核心焦点 4】：累计卡片知识浏览器 (Card Knowledge Library) -->
+    <!-- ========================================================================= -->
+    <div class="clean-card rounded-2xl p-5" id="cardExplorerSection">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="book-open-check" class="w-4 h-4 text-blue-600"></i>
+            已累计卡片浏览与复习 (Card Explorer)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">翻阅本地卡片资产，按题目或老齐讲解笔记全文检索</p>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Search input -->
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400"></i>
+            <input type="text" id="cardSearchInput" oninput="filterCards()" placeholder="搜索知识点 / 关键词..." class="pl-8 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 w-44 sm:w-56 transition shadow-sm">
+          </div>
+
+          <!-- Deck dropdown -->
+          <select id="deckFilterSelect" onchange="filterCards()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-600 shadow-sm">
+            <option value="all">所有牌组</option>
+          </select>
+
+          <!-- Status dropdown -->
+          <select id="statusFilterSelect" onchange="filterCards()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-600 shadow-sm">
+            <option value="all">所有状态</option>
+            <option value="due">今日待复习 (Due)</option>
+            <option value="young">巩固中 (Young)</option>
+            <option value="learn">学习中 (Learn)</option>
+            <option value="mature">熟练 (Mature)</option>
+          </select>
+
+          <!-- Sort dropdown -->
+          <select id="sortSelect" onchange="filterCards()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-600 shadow-sm">
+            <option value="reps_desc">复习次数 (多到少)</option>
+            <option value="lapses_desc">遗忘次数 (生疏优先)</option>
+            <option value="factor_asc">掌握度 (难度优先)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Cards Grid -->
+      <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <!-- Rendered by JS -->
+      </div>
+      
+      <!-- Empty state -->
+      <div id="cardsEmptyState" class="hidden text-center py-12 text-slate-400 text-xs">
+        未找到匹配的卡片，请尝试更换关键词或筛选条件
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 【辅助分析】：学习时段与认知反馈 (Habit Rhythm & Ease Feedback) -->
+    <!-- ========================================================================= -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      
+      <!-- 24-Hour Study Rhythm -->
+      <div class="clean-card rounded-2xl p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <h3 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-blue-600"></i>
+              24 小时专注作息时段 (Study Hours)
+            </h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">识别全天最专注高效的记忆习惯</p>
+          </div>
+          <span class="text-[11px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-medium">9-11点 & 19-21点 峰值</span>
+        </div>
+        <div id="chartHourly" class="h-48 w-full flex-1"></div>
+      </div>
+
+      <!-- Ease Buttons Feedback (Pure White, Blue, Green, Slate) -->
+      <div class="clean-card rounded-2xl p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <h3 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-emerald-600"></i>
+              四键认知反馈 (Ease Ratings)
+            </h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">良好与简单占比 67.6%，处于稳态巩固区间</p>
+          </div>
+        </div>
+        <div class="flex flex-col sm:flex-row items-center justify-between flex-1 gap-4">
+          <div id="chartEaseDonut" class="h-48 w-full sm:w-1/2"></div>
+          <div class="w-full sm:w-1/2 space-y-2 text-xs">
+            <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex justify-between items-center">
+              <span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>Good (良好)</span>
+              <span class="font-mono font-bold text-emerald-700" id="statGood">-- 次</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex justify-between items-center">
+              <span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>Easy (简单)</span>
+              <span class="font-mono font-bold text-blue-700" id="statEasy">-- 次</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex justify-between items-center">
+              <span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>Again (重来)</span>
+              <span class="font-mono font-bold text-slate-800" id="statAgain">-- 次</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex justify-between items-center">
+              <span class="flex items-center gap-2 font-medium text-slate-700"><span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>Hard (困难)</span>
+              <span class="font-mono font-bold text-slate-600" id="statHard">-- 次</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Minimalist Clean Footer -->
+  <footer class="border-t border-slate-200 py-6 text-center text-xs text-slate-400 mt-8">
+    <div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2 text-slate-500">
+        <span class="font-semibold text-slate-700">Anki Memory Space</span>
+        <span>•</span>
+        <span>极简纯白设计，数据 100% 留存在本地</span>
+      </div>
+      <div>
+        <a href="javascript:window.scrollTo({top:0, behavior:'smooth'})" class="text-blue-600 hover:underline">返回顶部 ↑</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    let appData = null;
+    let currentYear = 2026;
+    let charts = {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupDragAndDrop();
+
+      if (window.ANKI_INITIAL_DATA) {
+        loadData(window.ANKI_INITIAL_DATA);
+      } else {
+        fetch('anki_data.json')
+          .then(res => res.json())
+          .then(data => loadData(data))
+          .catch(err => {
+            console.warn('Initial fetch error:', err);
+            showToast('请拖入 collection.anki2 数据库文件或启动 python server.py', 'error');
+          });
+      }
+
+      window.addEventListener('resize', () => {
+        for (const k in charts) {
+          if (charts[k]) charts[k].resize();
+        }
+      });
+    });
+
+    // 1. Load and Render Data
+    function loadData(data) {
+      appData = data;
+      console.log('Loaded Anki Data:', data);
+
+      // Meta
+      document.getElementById('headerProfile').innerText = data.meta.profileName || '账户 1';
+      document.getElementById('headerSyncTime').innerText = `本地数据同步: ${data.meta.exportedAt || '刚刚'}`;
+
+      // -------------------------------------------------------------
+      // PILLAR 1: 今天做没做？做了多少？学了多久？
+      // -------------------------------------------------------------
+      const today = data.today || { isDone: false, reviews: 0, timeMinutes: 0, dueRemaining: 0, ease: {} };
+      const todayCount = today.reviews || 0;
+      const todayTime = today.timeMinutes || 0;
+      const dueRemaining = today.dueRemaining || 0;
+      const totalTodayGoal = todayCount + dueRemaining;
+      const progressPercent = totalTodayGoal > 0 ? Math.min(100, Math.round((todayCount / totalTodayGoal) * 100)) : 100;
+
+      const badge = document.getElementById('todayStatusBadge');
+      const cardWrapper = document.getElementById('todayCardWrapper');
+
+      if (todayCount > 0) {
+        badge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200';
+        badge.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i> 今日已打卡`;
+      } else {
+        badge.className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-300';
+        badge.innerHTML = `<i data-lucide="clock-3" class="w-3.5 h-3.5 text-slate-600"></i> 今日待完成`;
+      }
+
+      document.getElementById('todayReviewCount').innerText = todayCount;
+      document.getElementById('todayTime').innerText = todayTime.toFixed(1);
+      document.getElementById('todayProgressBar').style.width = `${progressPercent}%`;
+
+      if (dueRemaining > 0) {
+        document.getElementById('todayRemainingHint').innerText = `还有 ${dueRemaining} 张待复习`;
+        document.getElementById('todayRemainingHint').className = 'font-medium text-slate-700';
+      } else {
+        document.getElementById('todayRemainingHint').innerText = `今日复习全部完成！`;
+        document.getElementById('todayRemainingHint').className = 'text-emerald-700 font-semibold';
+      }
+
+      const yest = today.yesterday || { reviews: 0, timeMinutes: 0 };
+      document.getElementById('todaySubtext').innerText = `昨日: ${yest.reviews} 张 (${yest.timeMinutes} 分钟)`;
+
+      const tEase = today.ease || {};
+      const ratingPills = document.getElementById('todayRatingPills');
+      ratingPills.innerHTML = `
+        <span class="text-emerald-700" title="良好">G:${tEase.good || 0}</span>
+        <span class="text-blue-700" title="简单">E:${tEase.easy || 0}</span>
+        <span class="text-slate-700" title="重来">A:${tEase.again || 0}</span>
+        <span class="text-slate-500" title="困难">H:${tEase.hard || 0}</span>
+      `;
+
+      // -------------------------------------------------------------
+      // PILLAR 2: 坚持了多久？
+      // -------------------------------------------------------------
+      const streak = data.streak || { current: 0, max: 0, totalDays: 0 };
+      document.getElementById('streakCurrent').innerText = streak.current || 0;
+      document.getElementById('streakTotalDays').innerText = `${streak.totalDays || 0} 天`;
+      document.getElementById('streakMax').innerText = `${streak.max || 0} 天`;
+      document.getElementById('totalReviewsAllTime').innerText = `${(data.kpis.totalReviews || 0).toLocaleString()} 次`;
+
+      if (streak.current > 0) {
+        document.getElementById('streakMotivation').innerText = `连续打卡 ${streak.current} 天，保持冲劲击败遗忘`;
+      } else {
+        document.getElementById('streakMotivation').innerText = `今日完成复习，立即开启新的连胜纪录`;
+      }
+
+      // -------------------------------------------------------------
+      // PILLAR 3: 累计了多少卡片？
+      // -------------------------------------------------------------
+      const assets = data.cardAssets || {
+        totalActive: 0, lifetimeAccumulated: 0, mature: 0, young: 0, learning: 0, new: 0
+      };
+      const totalActive = assets.totalActive || (data.cards ? data.cards.length : 0);
+      document.getElementById('totalActiveCards').innerText = totalActive;
+      document.getElementById('lifetimeCards').innerText = (assets.lifetimeAccumulated || totalActive).toLocaleString();
+      document.getElementById('cardRetentionRate').innerText = `${data.kpis.retentionRate || 0}%`;
+
+      document.getElementById('cardCntMature').innerText = assets.mature || 0;
+      document.getElementById('cardCntYoung').innerText = assets.young || 0;
+      document.getElementById('cardCntLearn').innerText = assets.learning || 0;
+
+      // Maturity progress bar (Green, Blue, Slate, Gray)
+      if (totalActive > 0) {
+        const pMature = (assets.mature / totalActive) * 100;
+        const pYoung = (assets.young / totalActive) * 100;
+        const pLearn = (assets.learning / totalActive) * 100;
+        const pNew = (assets.new / totalActive) * 100;
+        document.getElementById('barMature').style.width = `${pMature}%`;
+        document.getElementById('barYoung').style.width = `${pYoung}%`;
+        document.getElementById('barLearn').style.width = `${pLearn}%`;
+        document.getElementById('barNew').style.width = `${pNew}%`;
+      }
+
+      // Decks, Heatmap, Cards, Charts
+      renderDeckTable();
+      renderHeatmap();
+      initDeckFilter();
+      filterCards();
+      renderHourlyChart();
+      renderEaseDonut();
+
+      lucide.createIcons();
+    }
+
+    // 2. Render Anki Deck Table
+    function renderDeckTable() {
+      const tbody = document.getElementById('deckTableBody');
+      if (!tbody || !appData) return;
+      tbody.innerHTML = '';
+
+      const decks = appData.decks || [];
+
+      decks.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition group cursor-pointer';
+        tr.onclick = () => selectDeckFilter(d.name);
+
+        const isChild = d.name.includes(' / ');
+        const displayName = isChild ? `&nbsp;&nbsp;&nbsp;&nbsp;↳ ${d.cleanName}` : d.cleanName;
+        const icon = isChild ? 'file-text' : 'folder';
+
+        tr.innerHTML = `
+          <td class="py-3 px-6">
+            <div class="flex items-center gap-2">
+              <i data-lucide="${icon}" class="w-3.5 h-3.5 ${isChild ? 'text-slate-400' : 'text-blue-600'}"></i>
+              <span class="font-medium ${isChild ? 'text-slate-600' : 'text-slate-900'} group-hover:text-blue-600 transition">${displayName}</span>
+            </div>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-block px-2 py-0.5 rounded font-mono text-xs ${d.new > 0 ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200' : 'text-slate-400'}">
+              ${d.new}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-block px-2 py-0.5 rounded font-mono text-xs ${d.learn > 0 ? 'bg-slate-100 text-slate-800 font-bold border border-slate-300' : 'text-slate-400'}">
+              ${d.learn}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-block px-2 py-0.5 rounded font-mono text-xs ${d.due > 0 ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200' : 'text-slate-400'}">
+              ${d.due}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-center font-mono text-slate-600">
+            ${d.total} 张
+          </td>
+          <td class="py-3 px-6 text-right">
+            <button onclick="event.stopPropagation(); selectDeckFilter('${d.name}')" class="px-2.5 py-1 rounded bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 text-[11px] font-medium transition flex items-center gap-1 ml-auto">
+              <span>查看</span>
+              <i data-lucide="arrow-right" class="w-3 h-3"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      lucide.createIcons();
+    }
+
+    function selectDeckFilter(deckName) {
+      const select = document.getElementById('deckFilterSelect');
+      if (select) {
+        select.value = deckName;
+        filterCards();
+        document.getElementById('cardExplorerSection').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    // 3. Render Glutanimate Review Heatmap (Pure White & Emerald Minimalist)
+    function renderHeatmap() {
+      if (!appData || !appData.dailyStats) return;
+
+      const container = document.getElementById('heatmapContainer');
+      container.innerHTML = '';
+
+      const dailyMap = {};
+      let maxDaily = 0;
+      appData.dailyStats.forEach(d => {
+        dailyMap[d.date] = d;
+        if (d.count > maxDaily) maxDaily = d.count;
+      });
+
+      let startDate, endDate;
+      if (currentYear === 'all') {
+        const sorted = appData.dailyStats.map(d => d.date).sort();
+        startDate = new Date(sorted[0] || '2025-01-01');
+        endDate = new Date(sorted[sorted.length - 1] || '2026-12-31');
+      } else {
+        startDate = new Date(`${currentYear}-01-01`);
+        endDate = new Date(`${currentYear}-12-31`);
+      }
+
+      const startDayOfWeek = startDate.getDay();
+      startDate.setDate(startDate.getDate() - startDayOfWeek);
+
+      const weeks = [];
+      let cur = new Date(startDate);
+      let curWeek = [];
+
+      while (cur <= endDate || cur.getDay() !== 0) {
+        curWeek.push(new Date(cur));
+        if (cur.getDay() === 6) {
+          weeks.push(curWeek);
+          curWeek = [];
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+      if (curWeek.length > 0) weeks.push(curWeek);
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex gap-1.5';
+
+      // Weekdays column
+      const daysCol = document.createElement('div');
+      daysCol.className = 'flex flex-col gap-1 pr-1 text-[10px] text-slate-400 pt-5';
+      const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+      for (let i = 0; i < 7; i++) {
+        const dDiv = document.createElement('div');
+        dDiv.className = 'h-3.5 flex items-center justify-end';
+        dDiv.innerText = i % 2 === 1 ? dayNames[i] : '';
+        daysCol.appendChild(dDiv);
+      }
+      wrapper.appendChild(daysCol);
+
+      // Months & Grid
+      const gridContainer = document.createElement('div');
+      gridContainer.className = 'flex flex-col';
+
+      const monthRow = document.createElement('div');
+      monthRow.className = 'flex gap-1 h-5 text-[10px] text-slate-500 mb-0.5';
+      
+      let lastMonth = -1;
+      weeks.forEach((week) => {
+        const firstDay = week[0];
+        const m = firstDay.getMonth();
+        const mCol = document.createElement('div');
+        mCol.className = 'w-3.5 flex justify-start text-[10px] overflow-visible whitespace-nowrap';
+        if (m !== lastMonth && firstDay.getDate() <= 7) {
+          mCol.innerText = `${m + 1}月`;
+          lastMonth = m;
+        }
+        monthRow.appendChild(mCol);
+      });
+      gridContainer.appendChild(monthRow);
+
+      const weeksRow = document.createElement('div');
+      weeksRow.className = 'flex gap-1';
+
+      weeks.forEach(week => {
+        const weekCol = document.createElement('div');
+        weekCol.className = 'flex flex-col gap-1';
+
+        week.forEach(dateObj => {
+          const y = dateObj.getFullYear();
+          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const d = String(dateObj.getDate()).padStart(2, '0');
+          const dateStr = `${y}-${m}-${d}`;
+          const stat = dailyMap[dateStr];
+          const count = stat ? stat.count : 0;
+
+          const cell = document.createElement('div');
+          cell.className = 'w-3.5 h-3.5 rounded-sm heatmap-cell cursor-pointer';
+          
+          if (count === 0) {
+            cell.className += ' bg-slate-100 border border-slate-200/60';
+          } else if (count <= 10) {
+            cell.className += ' bg-emerald-200';
+          } else if (count <= 30) {
+            cell.className += ' bg-emerald-400';
+          } else if (count <= 60) {
+            cell.className += ' bg-emerald-600';
+          } else {
+            cell.className += ' bg-emerald-800';
+          }
+
+          const timeMin = stat ? (stat.time_seconds / 60).toFixed(1) : 0;
+          cell.title = `${dateStr}\n复习: ${count} 张卡片\n耗时: ${timeMin} 分钟\n${stat ? `良好: ${stat.good} | 简单: ${stat.easy} | 重来: ${stat.again} | 困难: ${stat.hard}` : '未背卡'}`;
+
+          weekCol.appendChild(cell);
+        });
+
+        weeksRow.appendChild(weekCol);
+      });
+
+      gridContainer.appendChild(weeksRow);
+      wrapper.appendChild(gridContainer);
+      container.appendChild(wrapper);
+
+      const yearCount = appData.dailyStats.filter(d => currentYear === 'all' || d.date.startsWith(String(currentYear))).length;
+      document.getElementById('heatmapSummaryText').innerText = 
+        `${currentYear === 'all' ? '全部' : currentYear + '年'} 已坚持打卡 ${yearCount} 天，连续打卡最高达 ${appData.streak.max} 天！`;
+    }
+
+    function setHeatmapYear(year) {
+      currentYear = year;
+      document.querySelectorAll('.year-btn').forEach(btn => {
+        if (btn.dataset.year == year) {
+          btn.className = 'year-btn px-2.5 py-1 text-xs rounded-lg font-medium text-white bg-blue-600 shadow-sm transition';
+        } else {
+          btn.className = 'year-btn px-2.5 py-1 text-xs rounded-lg font-medium text-slate-600 hover:text-slate-900 transition';
+        }
+      });
+      renderHeatmap();
+    }
+
+    // 4. Card Knowledge Explorer
+    function initDeckFilter() {
+      const select = document.getElementById('deckFilterSelect');
+      if (!select || !appData) return;
+      select.innerHTML = '<option value="all">所有牌组</option>';
+      const decks = appData.decks || [];
+      decks.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.name;
+        opt.innerText = d.name;
+        select.appendChild(opt);
+      });
+    }
+
+    function filterCards() {
+      if (!appData || !appData.cards) return;
+
+      const q = (document.getElementById('cardSearchInput').value || '').toLowerCase();
+      const deckVal = document.getElementById('deckFilterSelect').value;
+      const statusVal = document.getElementById('statusFilterSelect').value;
+      const sortVal = document.getElementById('sortSelect').value;
+
+      let filtered = appData.cards.filter(c => {
+        const matchDeck = (deckVal === 'all') || (c.deckName === deckVal);
+        const matchQ = !q || c.question.toLowerCase().includes(q) || c.answer.toLowerCase().includes(q);
+        let matchStatus = true;
+        if (statusVal === 'due') matchStatus = c.isDueToday;
+        else if (statusVal === 'young') matchStatus = c.status === 'young';
+        else if (statusVal === 'learn') matchStatus = c.status === 'learn';
+        else if (statusVal === 'mature') matchStatus = c.status === 'mature';
+
+        return matchDeck && matchQ && matchStatus;
+      });
+
+      if (sortVal === 'reps_desc') {
+        filtered.sort((a, b) => b.reps - a.reps);
+      } else if (sortVal === 'lapses_desc') {
+        filtered.sort((a, b) => b.lapses - a.lapses);
+      } else if (sortVal === 'factor_asc') {
+        filtered.sort((a, b) => a.factor - b.factor);
+      }
+
+      renderCards(filtered);
+    }
+
+    function renderCards(cards) {
+      const grid = document.getElementById('cardsGrid');
+      const emptyState = document.getElementById('cardsEmptyState');
+      grid.innerHTML = '';
+
+      if (cards.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      cards.forEach((card) => {
+        const el = document.createElement('div');
+        el.className = 'rounded-xl p-4 bg-white border border-slate-200 hover:border-blue-500 transition duration-150 flex flex-col justify-between shadow-[0_1px_2px_rgba(0,0,0,0.03)]';
+        
+        let statusBadge = '';
+        if (card.isDueToday) {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]">待复习</span>';
+        } else if (card.status === 'mature') {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium text-[10px]">熟练卡</span>';
+        } else if (card.status === 'young') {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-medium text-[10px]">巩固中</span>';
+        } else if (card.status === 'learn') {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 font-bold text-[10px]">学习中</span>';
+        }
+
+        el.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between text-[11px] mb-2">
+              <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium truncate max-w-[170px]">
+                ${card.deckName.replace('设计模式 / ', '')}
+              </span>
+              ${statusBadge}
+            </div>
+
+            <!-- Front / Question -->
+            <div class="text-xs font-semibold text-slate-900 mb-2 leading-relaxed">
+              ${card.question}
+            </div>
+
+            <!-- Back / Answer -->
+            <div id="ans-${card.id}" class="hidden mt-2.5 pt-2.5 border-t border-slate-100 text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              ${card.answer}
+            </div>
+          </div>
+
+          <!-- Bottom Footer -->
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-700 font-medium font-mono">复习: ${card.reps} 次</span>
+              <span>•</span>
+              <span class="${card.lapses > 0 ? 'text-slate-900 font-semibold' : 'text-slate-400'} font-mono">遗忘: ${card.lapses} 次</span>
+            </div>
+            <button onclick="toggleAnswer('${card.id}')" class="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition">
+              <span id="btnText-${card.id}">翻看答案</span>
+              <i data-lucide="chevron-down" id="icon-${card.id}" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        `;
+        grid.appendChild(el);
+      });
+
+      lucide.createIcons();
+    }
+
+    function toggleAnswer(cardId) {
+      const ans = document.getElementById(`ans-${cardId}`);
+      const btnText = document.getElementById(`btnText-${cardId}`);
+      const icon = document.getElementById(`icon-${cardId}`);
+      if (ans.classList.contains('hidden')) {
+        ans.classList.remove('hidden');
+        btnText.innerText = '收起答案';
+        icon.classList.add('rotate-180');
+      } else {
+        ans.classList.add('hidden');
+        btnText.innerText = '翻看答案';
+        icon.classList.remove('rotate-180');
+      }
+    }
+
+    // 5. Minimalist Pure White Charts (Strictly Blue, Green, Slate)
+    function renderHourlyChart() {
+      const dom = document.getElementById('chartHourly');
+      if (!dom || !appData) return;
+      if (charts.hourly) charts.hourly.dispose();
+
+      const chart = echarts.init(dom, null, { renderer: 'canvas' });
+      charts.hourly = chart;
+
+      const hourly = appData.hourlyStats || [];
+      const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+      const counts = hourly.map(h => h.count);
+
+      const option = {
+        backgroundColor: '#ffffff',
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: '#ffffff',
+          borderColor: '#e2e8f0',
+          textStyle: { color: '#0f172a', fontSize: 11 },
+          formatter: params => {
+            const p = params[0];
+            const h = hourly[p.dataIndex];
+            return `<b>${p.name}</b><br/>复习卡片: <b style="color: #2563eb">${p.value}</b> 张<br/>专注用时: ${(h.time_seconds / 60).toFixed(1)} 分钟`;
+          }
+        },
+        grid: { top: '10%', left: '3%', right: '3%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: hours,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisLabel: { color: '#64748b', fontSize: 10, interval: 3 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+          axisLabel: { color: '#64748b', fontSize: 10 }
+        },
+        series: [
+          {
+            name: '复习卡片数',
+            type: 'bar',
+            data: counts,
+            itemStyle: {
+              borderRadius: [3, 3, 0, 0],
+              color: '#2563eb'
+            }
+          }
+        ]
+      };
+      chart.setOption(option);
+    }
+
+    function renderEaseDonut() {
+      const dom = document.getElementById('chartEaseDonut');
+      if (!dom || !appData) return;
+      if (charts.ease) charts.ease.dispose();
+
+      const ease = appData.easeDistribution || {};
+      const totalRev = appData.kpis.totalReviews || 1;
+
+      document.getElementById('statGood').innerText = `${(ease.good || 0).toLocaleString()} 次 (${((ease.good || 0) / totalRev * 100).toFixed(1)}%)`;
+      document.getElementById('statEasy').innerText = `${(ease.easy || 0).toLocaleString()} 次 (${((ease.easy || 0) / totalRev * 100).toFixed(1)}%)`;
+      document.getElementById('statAgain').innerText = `${(ease.again || 0).toLocaleString()} 次 (${((ease.again || 0) / totalRev * 100).toFixed(1)}%)`;
+      document.getElementById('statHard').innerText = `${(ease.hard || 0).toLocaleString()} 次 (${((ease.hard || 0) / totalRev * 100).toFixed(1)}%)`;
+
+      const chart = echarts.init(dom, null, { renderer: 'canvas' });
+      charts.ease = chart;
+
+      const option = {
+        backgroundColor: '#ffffff',
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c} 次 ({d}%)',
+          backgroundColor: '#ffffff',
+          borderColor: '#e2e8f0',
+          textStyle: { color: '#0f172a', fontSize: 11 }
+        },
+        series: [
+          {
+            name: '记忆反馈',
+            type: 'pie',
+            radius: ['45%', '72%'],
+            center: ['50%', '50%'],
+            itemStyle: { borderRadius: 3, borderColor: '#ffffff', borderWidth: 2 },
+            label: { show: false },
+            data: [
+              { value: ease.good || 0, name: 'Good (良好)', itemStyle: { color: '#16a34a' } },
+              { value: ease.easy || 0, name: 'Easy (简单)', itemStyle: { color: '#2563eb' } },
+              { value: ease.again || 0, name: 'Again (重来)', itemStyle: { color: '#334155' } },
+              { value: ease.hard || 0, name: 'Hard (困难)', itemStyle: { color: '#94a3b8' } }
+            ]
+          }
+        ]
+      };
+      chart.setOption(option);
+    }
+
+    // 6. Sync API Trigger
+    async function triggerSync() {
+      const btn = document.getElementById('btnSync');
+      const icon = document.getElementById('syncIcon');
+      icon.classList.add('animate-spin');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/sync');
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.success && resData.data) {
+            loadData(resData.data);
+            showToast('已从本地 Anki 同步最新数据！', 'success');
+          } else {
+            showToast('同步失败: ' + (resData.error || '未知错误'), 'error');
+          }
+        } else {
+          throw new Error('未运行本地服务');
+        }
+      } catch (e) {
+        showToast('无法连接本地同步服务。请双击运行 start.bat', 'info');
+      } finally {
+        setTimeout(() => {
+          icon.classList.remove('animate-spin');
+          btn.disabled = false;
+        }, 500);
+      }
+    }
+
+    // 7. Drag & Drop & WASM SQLite Parsing
+    function setupDragAndDrop() {
+      const dropOverlay = document.getElementById('dropOverlay');
+
+      window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropOverlay.classList.remove('hidden');
+        dropOverlay.classList.add('flex');
+      });
+
+      dropOverlay.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropOverlay.classList.add('hidden');
+        dropOverlay.classList.remove('flex');
+      });
+
+      dropOverlay.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropOverlay.classList.add('hidden');
+        dropOverlay.classList.remove('flex');
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          processFile(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        processFile(e.target.files[0]);
+      }
+    }
+
+    function processFile(file) {
+      showToast(`正在解析: ${file.name}...`);
+      if (file.name.endsWith('.json')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            loadData(JSON.parse(e.target.result));
+            showToast('JSON 数据导入成功！', 'success');
+          } catch (err) {
+            showToast('JSON 解析失败：' + err.message, 'error');
+          }
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith('.anki2')) {
+        const reader = new FileReader();
+        reader.onload = function() {
+          parseSqliteInBrowser(new Uint8Array(this.result), file.name);
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        showToast('请导入 .anki2 或 .json 文件', 'error');
+      }
+    }
+
+    async function parseSqliteInBrowser(uInt8Array, fileName) {
+      try {
+        showToast('正在通过浏览器 WASM SQLite 引擎解析...', 'info');
+        const SQL = await initSqlJs({
+          locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        });
+        const db = new SQL.Database(uInt8Array);
+
+        // Decks
+        const decksMap = {};
+        try {
+          const dRows = db.exec("SELECT id, name FROM decks")[0]?.values || [];
+          dRows.forEach(r => decksMap[r[0]] = String(r[1]).replace(/\x1f/g, ' / '));
+        } catch (e) {}
+
+        // Cards
+        const cardsList = [];
+        const deckCounts = {};
+        let mature = 0, young = 0, learn = 0, newCards = 0, dueToday = 0;
+
+        try {
+          const cRows = db.exec(`
+            SELECT c.id, c.nid, c.did, c.ord, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses, c.left,
+                   n.flds, n.tags
+            FROM cards c
+            JOIN notes n ON c.nid = n.id
+          `)[0]?.values || [];
+
+          cRows.forEach(r => {
+            const flds = String(r[12]).split('\x1f');
+            const dName = decksMap[r[2]] || '默认牌组';
+            if (!deckCounts[r[2]]) deckCounts[r[2]] = { new: 0, learn: 0, due: 0, total: 0 };
+            deckCounts[r[2]].total++;
+
+            let status = 'young';
+            let isDue = false;
+            if (r[5] === 0) { status = 'new'; newCards++; deckCounts[r[2]].new++; }
+            else if (r[5] === 1 || r[5] === 3) { status = 'learn'; learn++; isDue = true; deckCounts[r[2]].learn++; }
+            else if (r[5] === 2) {
+              if (r[7] >= 21) { status = 'mature'; mature++; }
+              else { status = 'young'; young++; }
+              isDue = true;
+              dueToday++;
+              deckCounts[r[2]].due++;
+            }
+
+            cardsList.push({
+              id: r[0],
+              nid: r[1],
+              deckId: r[2],
+              deckName: dName,
+              question: flds[0] || '',
+              answer: flds[1] || '',
+              status: status,
+              isDueToday: isDue,
+              factor: r[8] ? Math.round(r[8] / 10) : 250,
+              reps: r[9],
+              lapses: r[10]
+            });
+          });
+        } catch (e) {}
+
+        // Revlog
+        const daily = {};
+        const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: 0, time_seconds: 0 }));
+        const easeCounts = { again: 0, hard: 0, good: 0, easy: 0 };
+        let totalTimeMs = 0, totalRevs = 0;
+
+        const revRows = db.exec("SELECT id, cid, ease, time, type FROM revlog ORDER BY id ASC")[0]?.values || [];
+        totalRevs = revRows.length;
+
+        revRows.forEach(r => {
+          const dt = new Date(r[0]);
+          const dStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+          const h = dt.getHours();
+          const ease = r[2];
+          const stime = r[3];
+
+          totalTimeMs += stime;
+          hourly[h].count++;
+          hourly[h].time_seconds += Math.round(stime / 1000);
+
+          if (ease === 1) easeCounts.again++;
+          else if (ease === 2) easeCounts.hard++;
+          else if (ease === 3) easeCounts.good++;
+          else if (ease === 4) easeCounts.easy++;
+
+          if (!daily[dStr]) daily[dStr] = { date: dStr, count: 0, time_seconds: 0, again: 0, hard: 0, good: 0, easy: 0 };
+          daily[dStr].count++;
+          daily[dStr].time_seconds += Math.round(stime / 1000);
+          if (ease === 1) daily[dStr].again++;
+          else if (ease === 2) daily[dStr].hard++;
+          else if (ease === 3) daily[dStr].good++;
+          else if (ease === 4) daily[dStr].easy++;
+        });
+
+        const sortedDates = Object.keys(daily).sort();
+        let curStreak = 0, maxStreak = 0, prev = null;
+        sortedDates.forEach(dStr => {
+          const cd = new Date(dStr);
+          if (prev && (cd - prev) / (1000 * 3600 * 24) === 1) curStreak++;
+          else curStreak = 1;
+          if (curStreak > maxStreak) maxStreak = curStreak;
+          prev = cd;
+        });
+
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const todayRec = daily[todayStr] || { count: 0, time_seconds: 0, again: 0, hard: 0, good: 0, easy: 0 };
+
+        const decksSummary = Object.keys(decksMap).map(did => {
+          const cnt = deckCounts[did] || { new: 0, learn: 0, due: 0, total: 0 };
+          return {
+            id: did,
+            name: decksMap[did],
+            cleanName: decksMap[did].replace('设计模式 / ', ''),
+            new: cnt.new,
+            learn: cnt.learn,
+            due: cnt.due,
+            total: cnt.total
+          };
+        }).filter(d => d.total > 0);
+
+        const parsed = {
+          meta: {
+            exportedAt: new Date().toLocaleString(),
+            profileName: fileName,
+            firstDate: sortedDates[0] || '',
+            lastDate: sortedDates[sortedDates.length - 1] || '',
+            activeDays: sortedDates.length
+          },
+          today: {
+            date: todayStr,
+            isDone: todayRec.count > 0,
+            reviews: todayRec.count,
+            timeMinutes: Number((todayRec.time_seconds / 60).toFixed(1)),
+            dueRemaining: dueToday,
+            ease: { again: todayRec.again, hard: todayRec.hard, good: todayRec.good, easy: todayRec.easy }
+          },
+          streak: {
+            current: curStreak,
+            max: maxStreak,
+            totalDays: sortedDates.length
+          },
+          cardAssets: {
+            totalActive: cardsList.length,
+            lifetimeAccumulated: cardsList.length,
+            mature: mature,
+            young: young,
+            learning: learn,
+            new: newCards
+          },
+          kpis: {
+            totalReviews: totalRevs,
+            totalStudyTimeMinutes: Math.round(totalTimeMs / 60000),
+            totalStudyTimeHours: Number((totalTimeMs / 3600000).toFixed(2)),
+            retentionRate: totalRevs > 0 ? Number(((easeCounts.good + easeCounts.easy + easeCounts.hard) / totalRevs * 100).toFixed(1)) : 0
+          },
+          decks: decksSummary,
+          dailyStats: sortedDates.map(k => daily[k]),
+          hourlyStats: hourly,
+          easeDistribution: easeCounts,
+          cards: cardsList
+        };
+
+        loadData(parsed);
+        showToast('数据库解析成功！', 'success');
+      } catch (err) {
+        showToast('解析失败: ' + err.message, 'error');
+      }
+    }
+
+    // 8. Toast
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.innerText = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+
+      if (type === 'success') {
+        toast.className = 'fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-xs font-medium bg-emerald-800 text-white border border-emerald-900 transition-all duration-300';
+        toastIcon.setAttribute('data-lucide', 'check-circle');
+      } else if (type === 'error') {
+        toast.className = 'fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-xs font-medium bg-slate-900 text-white border border-slate-800 transition-all duration-300';
+        toastIcon.setAttribute('data-lucide', 'alert-circle');
+      } else {
+        toast.className = 'fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-xs font-medium bg-slate-900 text-white border border-slate-800 transition-all duration-300';
+        toastIcon.setAttribute('data-lucide', 'info');
+      }
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
