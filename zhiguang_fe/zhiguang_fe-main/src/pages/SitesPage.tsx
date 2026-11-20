@@ -32,6 +32,30 @@ const SITES: SiteItem[] = [
     description: "当前所在的知识分享社区，支持瀑布流排版、RAG 知识检索与技术卡片互动。"
   },
   {
+    id: "note",
+    name: "Note 知识与记忆看板",
+    domain: "note.chenmilin.xyz",
+    url: "https://note.chenmilin.xyz",
+    icon: "📓",
+    category: "portal",
+    categoryLabel: "知识看板",
+    status: "online",
+    statusText: "在线运行",
+    description: "个人专属双链笔记与记忆中枢，无缝聚合 Obsidian 知识写作活动与 Anki 间隔重复复习数据追踪。"
+  },
+  {
+    id: "svg",
+    name: "SVG → MP4 · 抖音竖版生成器",
+    domain: "svg.chenmilin.xyz",
+    url: "https://svg.chenmilin.xyz",
+    icon: "🎬",
+    category: "tools",
+    categoryLabel: "创作工具",
+    status: "online",
+    statusText: "在线运行",
+    description: "SVG 动画一键渲染转换为 1080×1920 抖音竖版高清视频，内置推近、拉远、斜向漂移等运镜动效，提供同一套接口本地与云端通用渲染。"
+  },
+  {
     id: "openlist",
     name: "OpenList 云盘共享",
     domain: "openlist.chenmilin.xyz",
@@ -121,7 +145,7 @@ const CATEGORIES = [
   { key: "all", label: "全部站点" },
   { key: "cloud", label: "云盘存储" },
   { key: "ai", label: "AI 助手" },
-  { key: "tools", label: "协同办公" },
+  { key: "tools", label: "办公与工具" },
   { key: "portal", label: "博客与主页" },
   { key: "service", label: "系统服务" }
 ] as const;
