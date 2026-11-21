@@ -826,8 +826,9 @@
       container.appendChild(wrapper);
 
       const yearCount = appData.dailyStats.filter(d => currentYear === 'all' || d.date.startsWith(String(currentYear))).length;
+      const maxStreak = (appData.streak && appData.streak.max) || (appData.kpis && appData.kpis.maxStreak) || 0;
       document.getElementById('heatmapSummaryText').innerText = 
-        `${currentYear === 'all' ? '全部' : currentYear + '年'} 已坚持打卡 ${yearCount} 天，连续打卡最高达 ${appData.streak.max} 天！`;
+        `${currentYear === 'all' ? '全部' : currentYear + '年'} 已坚持打卡 ${yearCount} 天，连续打卡最高达 ${maxStreak} 天！`;
     }
 
     function setHeatmapYear(year) {
@@ -1066,7 +1067,7 @@
       chart.setOption(option);
     }
 
-    // 6. Sync API Trigger
+    // 6. Sync API Trigger (Local + Cloud Fallback)
     async function triggerSync() {
       const btn = document.getElementById('btnSync');
       const icon = document.getElementById('syncIcon');
@@ -1074,20 +1075,32 @@
       btn.disabled = true;
 
       try {
-        const res = await fetch('/api/sync');
-        if (res.ok) {
-          const resData = await res.json();
-          if (resData.success && resData.data) {
-            loadData(resData.data);
-            showToast('已从本地 Anki 同步最新数据！', 'success');
-          } else {
-            showToast('同步失败: ' + (resData.error || '未知错误'), 'error');
+        let resData = null;
+        // 1. Try local server first
+        try {
+          const res = await fetch('/api/sync');
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) resData = json.data;
           }
+        } catch (_) {}
+
+        // 2. Fallback to cloud / static anki_data.json
+        if (!resData) {
+          const res = await fetch('anki_data.json?t=' + Date.now(), { cache: 'no-store' });
+          if (res.ok) {
+            resData = await res.json();
+          }
+        }
+
+        if (resData) {
+          loadData(resData);
+          showToast('已同步最新 Anki 复习数据！', 'success');
         } else {
-          throw new Error('未运行本地服务');
+          showToast('无法连接本地同步服务。请双击运行 start.bat', 'info');
         }
       } catch (e) {
-        showToast('无法连接本地同步服务。请双击运行 start.bat', 'info');
+        showToast('获取数据失败：' + e.message, 'error');
       } finally {
         setTimeout(() => {
           icon.classList.remove('animate-spin');
