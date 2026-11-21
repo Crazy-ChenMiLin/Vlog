@@ -1077,16 +1077,15 @@
 
       try {
         let resData = null;
-        // 1. Try local server first
+        // 1. Try Cloudflare Worker KV API
         try {
-          const res = await fetch('/api/sync');
+          const res = await fetch('/api/anki?t=' + Date.now(), { cache: 'no-store' });
           if (res.ok) {
-            const json = await res.json();
-            if (json.success && json.data) resData = json.data;
+            resData = await res.json();
           }
         } catch (_) {}
 
-        // 2. Fallback to cloud / static anki_data.json
+        // 2. Fallback to anki_data.json
         if (!resData) {
           const res = await fetch('anki_data.json?t=' + Date.now(), { cache: 'no-store' });
           if (res.ok) {
