@@ -517,15 +517,16 @@
 
       if (window.ANKI_INITIAL_DATA) {
         loadData(window.ANKI_INITIAL_DATA);
-      } else {
-        fetch('anki_data.json')
-          .then(res => res.json())
-          .then(data => loadData(data))
-          .catch(err => {
-            console.warn('Initial fetch error:', err);
-            showToast('请拖入 collection.anki2 数据库文件或启动 python server.py', 'error');
-          });
       }
+      // 静默拉取最新云端数据，绕过 CDN / 浏览器缓存
+      fetch('anki_data.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) loadData(data);
+        })
+        .catch(err => {
+          console.warn('Silent fetch error:', err);
+        });
 
       window.addEventListener('resize', () => {
         for (const k in charts) {
