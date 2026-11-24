@@ -111,7 +111,11 @@ sudo_cmd rsync -a --delete \
 
 if [[ -n "${SMTP:-}" ]]; then
   update_env_value "$RUNTIME/.env" "AUTH_MAIL_ENABLED" "true"
+  update_env_value "$RUNTIME/.env" "SPRING_MAIL_HOST" "${SPRING_MAIL_HOST:-smtp.resend.com}"
+  update_env_value "$RUNTIME/.env" "SPRING_MAIL_PORT" "${SPRING_MAIL_PORT:-465}"
+  update_env_value "$RUNTIME/.env" "SPRING_MAIL_USERNAME" "${SPRING_MAIL_USERNAME:-resend}"
   update_env_value "$RUNTIME/.env" "SPRING_MAIL_PASSWORD" "$SMTP"
+  update_env_value "$RUNTIME/.env" "AUTH_MAIL_FROM" "${AUTH_MAIL_FROM:-service@chenmilin.xyz}"
 fi
 
 require_env_value "GITHUB_CLIENT_ID" "${GITHUB_CLIENT_ID:-}"
@@ -204,6 +208,12 @@ services:
       CAMPUS_TOKEN_ENDPOINT: \${CAMPUS_TOKEN_ENDPOINT}
       CAMPUS_JWKS_URI: \${CAMPUS_JWKS_URI}
       CAMPUS_SCOPES: \${CAMPUS_SCOPES:-openid profile}
+      AUTH_MAIL_ENABLED: \${AUTH_MAIL_ENABLED:-true}
+      SPRING_MAIL_HOST: \${SPRING_MAIL_HOST:-smtp.resend.com}
+      SPRING_MAIL_PORT: \${SPRING_MAIL_PORT:-465}
+      SPRING_MAIL_USERNAME: \${SPRING_MAIL_USERNAME:-resend}
+      SPRING_MAIL_PASSWORD: \${SPRING_MAIL_PASSWORD}
+      AUTH_MAIL_FROM: \${AUTH_MAIL_FROM:-service@chenmilin.xyz}
 EOF
 
 if ! sudo_cmd test -s "$RUNTIME/docker-compose.zhiguang-env.yml"; then
