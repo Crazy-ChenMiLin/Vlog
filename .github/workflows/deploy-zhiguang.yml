@@ -65,6 +65,10 @@ jobs:
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
           SMTP: ${{ secrets.SMTP }}
+          ALIPAY_APP_ID: ${{ secrets.ALIPAY_APP_ID }}
+          ALIPAY_PRIVATE_KEY: ${{ secrets.ALIPAY_PRIVATE_KEY }}
+          ALIPAY_PUBLIC_KEY: ${{ secrets.ALIPAY_PUBLIC_KEY }}
+          VIBE_PAY_CALLBACK_URL: ${{ vars.VIBE_PAY_CALLBACK_URL || 'https://web.chenmilin.xyz/vip' }}
           MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'https://web.chenmilin.xyz' }}
           OSS_PRESIGN_ENDPOINT: ${{ vars.OSS_PRESIGN_ENDPOINT || 'https://web.chenmilin.xyz' }}
           GITHUB_CLIENT_ID: ${{ secrets.CLIENT_ID }}

@@ -12,6 +12,8 @@ import RegisterPage from "./pages/RegisterPage";
 import GitHubCallbackPage from "./pages/GitHubCallbackPage";
 import CampusCallbackPage from "./pages/CampusCallbackPage";
 
+import VipPage from "./pages/VipPage";
+
 function App() {
   return (
     <Routes>
@@ -23,6 +25,7 @@ function App() {
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/edit" element={<EditProfilePage />} />
       <Route path="/post/:id" element={<CourseDetailPage />} />
+      <Route path="/vip" element={<VipPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/callback" element={<GitHubCallbackPage />} />

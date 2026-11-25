@@ -158,6 +158,13 @@ if [[ -n "${GITHUB_EXTERNAL_SEARCH_TOKEN:-}" ]]; then
   update_env_value "$RUNTIME/.env" "GITHUB_EXTERNAL_SEARCH_TOKEN" "$GITHUB_EXTERNAL_SEARCH_TOKEN"
 fi
 
+# Payment secrets are optional so an existing server-side configuration is preserved.
+for key in ALIPAY_APP_ID ALIPAY_PRIVATE_KEY ALIPAY_PUBLIC_KEY VIBE_PAY_CALLBACK_URL; do
+  if [[ -n "${!key:-}" ]]; then
+    update_env_value "$RUNTIME/.env" "$key" "${!key}"
+  fi
+done
+
 MINIO_ACCESS_KEY_VALUE="${MINIO_ACCESS_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_ACCESS_KEY")}"
 MINIO_SECRET_KEY_VALUE="${MINIO_SECRET_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_SECRET_KEY")}"
 
@@ -201,6 +208,11 @@ services:
       GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-https://web.chenmilin.xyz/callback}
       GITHUB_EXTERNAL_SEARCH_TOKEN: \${GITHUB_EXTERNAL_SEARCH_TOKEN:-}
       BENCHMARK_TOKEN: \${BENCHMARK_TOKEN}
+      ALIPAY_APP_ID: \${ALIPAY_APP_ID:-}
+      ALIPAY_PRIVATE_KEY: \${ALIPAY_PRIVATE_KEY:-}
+      ALIPAY_PUBLIC_KEY: \${ALIPAY_PUBLIC_KEY:-}
+      VIBE_PAY_PRODUCT_ID: \${VIBE_PAY_PRODUCT_ID:-DIRECT_235811fb77c636e2a1a45d5d1ff0594f}
+      VIBE_PAY_CALLBACK_URL: \${VIBE_PAY_CALLBACK_URL:-}
       CAMPUS_CLIENT_ID: \${CAMPUS_CLIENT_ID}
       CAMPUS_CLIENT_SECRET: \${CAMPUS_CLIENT_SECRET}
       CAMPUS_REDIRECT_URI: \${CAMPUS_REDIRECT_URI:-https://web.chenmilin.xyz/callback/campus}

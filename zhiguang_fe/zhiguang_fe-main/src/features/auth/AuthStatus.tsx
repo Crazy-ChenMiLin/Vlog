@@ -42,6 +42,7 @@ const AuthStatus = () => {
 
   return (
     <div className={styles.wrapper}>
+      <button type="button" className={styles.logoutButton} onClick={() => navigate("/vip")}>VIP</button>
       <UserBadge name={displayName} avatarUrl={avatarUrl} />
       <button type="button" className={styles.logoutButton} onClick={handleLogout}>
         退出

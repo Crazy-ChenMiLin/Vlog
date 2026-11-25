@@ -8,6 +8,11 @@ services:
     ports:
       - "${APP_PORT:-8080}:8080"
     environment:
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-}
+      ALIPAY_PUBLIC_KEY: ${ALIPAY_PUBLIC_KEY:-}
+      VIBE_PAY_PRODUCT_ID: ${VIBE_PAY_PRODUCT_ID:-DIRECT_235811fb77c636e2a1a45d5d1ff0594f}
+      VIBE_PAY_CALLBACK_URL: ${VIBE_PAY_CALLBACK_URL:-}
       JAVA_OPTS: ${JAVA_OPTS:-"-Xms256m -Xmx768m"}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       # Nacos is optional at bootstrap: an unavailable config center must not stop the service.

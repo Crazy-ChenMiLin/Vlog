@@ -1,0 +1,30 @@
+.page { min-height: 100vh; background: #f6f5f1; color: #1d2939; padding: 48px 24px; }
+.shell { max-width: 920px; margin: 0 auto; }
+.back { color: #657082; text-decoration: none; font-size: 14px; }
+.back:hover { color: #2866cc; }
+.card { display: grid; grid-template-columns: 1.35fr 1fr; margin-top: 28px; border: 1px solid #e7e8eb; border-radius: 20px; background: #fff; overflow: hidden; box-shadow: 0 20px 60px rgba(31,48,78,.08); }
+.content { padding: 48px; min-width: 0; }
+.eyebrow { color: #447cd6; font-size: 11px; font-weight: 700; letter-spacing: .15em; }
+.content h1 { font-size: 36px; margin: 14px 0 8px; }
+.subtitle { color: #758093; margin: 0; }
+.divider { height: 1px; background: #eef0f2; margin: 28px 0; }
+.account { color: #788393; font-size: 14px; }
+.account strong { color: #344054; }
+.status { min-height: 136px; margin-top: 28px; color: #667085; line-height: 1.7; }
+.status h2 { color: #202c3c; font-size: 22px; margin: 12px 0 8px; }
+.badge { display: inline-block; color: #2866cc; background: #edf4ff; border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.price { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; background:#f7f9fd; border-radius:12px; margin-top:18px; }
+.price strong { color:#245ec2; font-size:24px; }
+.actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
+.primary,.secondary { display:inline-block; padding:11px 16px; border-radius:9px; font-size:14px; text-decoration:none; font-weight:600; }
+.primary { background:#2563cf; color:#fff; }
+.secondary { border:1px solid #d6e2f7; color:#2563cf; }
+.hint { font-size:13px; color:#8791a0; }
+.refresh { cursor:pointer; background:transparent; border:0; padding:12px 0; color:#326bc9; font-size:14px; }
+.refresh:disabled { opacity:.5; cursor:wait; }
+.error { color:#ba4141; }
+.aside { background:linear-gradient(145deg,#e9f2ff,#cbdffb); color:#2857a1; padding:48px; display:flex; flex-direction:column; justify-content:center; }
+.aside span { font-size:52px; color:#72a2e8; }
+.aside p { font-size:28px; font-weight:600; line-height:1.5; }
+.aside small { color:#6483b4; }
+@media(max-width:700px) { .page{padding:24px 16px}.card{grid-template-columns:1fr}.content{padding:30px 24px}.aside{padding:24px;min-height:120px}.aside span{font-size:26px}.aside p{font-size:18px;margin:6px 0}.aside p br{display:none} }
