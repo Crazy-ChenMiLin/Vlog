@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError, apiFetch } from "@/services/apiClient";
 import styles from "./VipPage.module.css";
@@ -22,6 +22,10 @@ function safeLink(url?: string, protocols: string[] = ["https:", "alipays:"]) {
 
 export default function VipPage() {
   const { user, isLoading, tokens } = useAuth();
+  const { state } = useLocation();
+  const requestedReturn = (state as { returnTo?: string } | null)?.returnTo;
+  const returnTo = typeof requestedReturn === "string" && /^\/(?![\/\\])/.test(requestedReturn)
+    ? requestedReturn : undefined;
   const [status, setStatus] = useState<PurchaseStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -67,12 +71,16 @@ export default function VipPage() {
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
-        <Link className={styles.back} to="/">← 返回知光</Link>
+        <Link className={styles.back} to={returnTo ?? "/"}>
+          {returnTo ? "← 返回问答" : "← 返回知光"}
+        </Link>
         <section className={styles.card}>
           <div className={styles.content}>
             <span className={styles.eyebrow}>ZHIGUANG MEMBERSHIP</span>
             <h1>知光 VIP</h1>
-            <p className={styles.subtitle}>一次购买，长期拥有。</p>
+            <p className={styles.subtitle}>
+              {returnTo && status?.decision !== "ALLOW" ? "开通知光 VIP 后即可发起知识问答。" : "一次购买，长期拥有。"}
+            </p>
             <div className={styles.divider} />
             <p className={styles.account}>当前账号：<strong>{user.nickname || user.phone || user.email || "知光用户"}</strong></p>
             <div aria-live="polite" className={styles.status}>

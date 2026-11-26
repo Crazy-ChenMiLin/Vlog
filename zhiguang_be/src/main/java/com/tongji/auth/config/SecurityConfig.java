@@ -91,8 +91,6 @@ public class SecurityConfig {
                         // 评论列表（公开读取，发评论需鉴权由 POST 路径默认 authenticated 覆盖）
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/comments").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/search", "/api/v1/search/suggest").permitAll()
-                        // 知文详情页 RAG 问答（SSE 流式输出）允许匿名访问
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/*/qa/stream").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/send-code",
                                 "/api/v1/auth/register",

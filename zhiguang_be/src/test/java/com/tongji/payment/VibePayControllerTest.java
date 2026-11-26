@@ -21,11 +21,12 @@ class VibePayControllerTest {
         Jwt jwt = mock(Jwt.class);
         when(jwt.getClaimAsString("token_type")).thenReturn("access");
         when(jwtService.extractUserId(jwt)).thenReturn(42L);
-        VibePayController controller = spy(new VibePayController(new ObjectMapper(), jwtService));
-        ReflectionTestUtils.setField(controller, "productId", "product");
-        ReflectionTestUtils.setField(controller, "callbackUrl", "");
+        VibePayService payment = spy(new VibePayService(new ObjectMapper()));
+        VibePayController controller = new VibePayController(payment, jwtService);
+        ReflectionTestUtils.setField(payment, "productId", "product");
+        ReflectionTestUtils.setField(payment, "callbackUrl", "");
         AlipayClient client = mock(AlipayClient.class);
-        doReturn(client).when(controller).client();
+        doReturn(client).when(payment).client();
         AlipayAipayNowpaydirectPurchaseConsultResponse response = mock(AlipayAipayNowpaydirectPurchaseConsultResponse.class);
         when(response.isSuccess()).thenReturn(true);
         when(response.getBody()).thenReturn("{\"alipay_aipay_nowpaydirect_purchase_consult_response\":{\"code\":\"10000\",\"decision\":\"ALLOW\",\"purchase_url\":\"alipays://unexpected\"}}");
@@ -47,11 +48,12 @@ class VibePayControllerTest {
         Jwt jwt = mock(Jwt.class);
         when(jwt.getClaimAsString("token_type")).thenReturn("access");
         when(service.extractUserId(jwt)).thenReturn(17L);
-        VibePayController controller = spy(new VibePayController(new ObjectMapper(), service));
-        ReflectionTestUtils.setField(controller, "productId", "product");
-        ReflectionTestUtils.setField(controller, "callbackUrl", "");
+        VibePayService payment = spy(new VibePayService(new ObjectMapper()));
+        VibePayController controller = new VibePayController(payment, service);
+        ReflectionTestUtils.setField(payment, "productId", "product");
+        ReflectionTestUtils.setField(payment, "callbackUrl", "");
         AlipayClient client = mock(AlipayClient.class);
-        doReturn(client).when(controller).client();
+        doReturn(client).when(payment).client();
         AlipayAipayNowpaydirectPurchaseConsultResponse response = mock(AlipayAipayNowpaydirectPurchaseConsultResponse.class);
         when(response.isSuccess()).thenReturn(true);
         when(client.execute(any(AlipayAipayNowpaydirectPurchaseConsultRequest.class))).thenReturn(response);
@@ -69,11 +71,12 @@ class VibePayControllerTest {
         when(jwt.getClaimAsString("token_type")).thenReturn("access");
         JwtService service = mock(JwtService.class);
         when(service.extractUserId(jwt)).thenReturn(17L);
-        VibePayController controller = spy(new VibePayController(new ObjectMapper(), service));
-        ReflectionTestUtils.setField(controller, "productId", "product");
-        ReflectionTestUtils.setField(controller, "callbackUrl", "");
+        VibePayService payment = spy(new VibePayService(new ObjectMapper()));
+        VibePayController controller = new VibePayController(payment, service);
+        ReflectionTestUtils.setField(payment, "productId", "product");
+        ReflectionTestUtils.setField(payment, "callbackUrl", "");
         AlipayClient client = mock(AlipayClient.class);
-        doReturn(client).when(controller).client();
+        doReturn(client).when(payment).client();
         AlipayAipayNowpaydirectPurchaseConsultResponse response = mock(AlipayAipayNowpaydirectPurchaseConsultResponse.class);
         when(response.isSuccess()).thenReturn(false);
         when(client.execute(any(AlipayAipayNowpaydirectPurchaseConsultRequest.class))).thenReturn(response);
@@ -82,9 +85,11 @@ class VibePayControllerTest {
 
     @Test
     void refusesRefreshTokensBeforeCallingAlipay() {
-        VibePayController controller = new VibePayController(new ObjectMapper(), mock(JwtService.class));
+        VibePayService payment = mock(VibePayService.class);
+        VibePayController controller = new VibePayController(payment, mock(JwtService.class));
         Jwt jwt = mock(Jwt.class);
         when(jwt.getClaimAsString("token_type")).thenReturn("refresh");
         assertEquals(401, assertThrows(ResponseStatusException.class, () -> controller.consult(jwt)).getStatusCode().value());
+        verifyNoInteractions(payment);
     }
 }

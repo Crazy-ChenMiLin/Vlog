@@ -268,7 +268,7 @@ const CourseDetailPage = () => {
             <div className={styles.ragBody}>
               <textarea
                 className={styles.ragTextarea}
-                placeholder="围绕本知文提问，例如：这篇知文的核心观点是什么？"
+                placeholder="VIP 知文问答，例如：这篇知文的核心观点是什么？"
                 value={ragQuestion}
                 onChange={(e) => setRagQuestion(e.target.value)}
               />

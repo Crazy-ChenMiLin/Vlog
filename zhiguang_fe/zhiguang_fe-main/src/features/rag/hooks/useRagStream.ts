@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 const CONNECTION_ERROR = "问答服务暂时不可用，请稍后再试。";
 
@@ -19,18 +21,12 @@ export type AgentStep = {
   summary: string;
 };
 
-const getStoredAccessToken = (): string | null => {
-  try {
-    const raw = localStorage.getItem("zhiguang_auth_tokens");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { accessToken?: string };
-    return parsed.accessToken ?? null;
-  } catch {
-    return null;
-  }
-};
-
 export const useRagStream = () => {
+  const { tokens, reloadUser } = useAuth();
+  const accessToken = tokens?.accessToken;
+  const navigate = useNavigate();
+  const { pathname, search, hash } = useLocation();
+  const returnTo = pathname + search + hash;
   const [answer, setAnswer] = useState("");
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,6 +42,11 @@ export const useRagStream = () => {
   }, []);
 
   const start = useCallback((url: string, options: StartOptions = {}) => {
+    if (!accessToken) {
+      navigate("/login", { state: { from: returnTo } });
+      return;
+    }
+
     stop();
     answerRef.current = "";
     setAnswer("");
@@ -99,13 +100,12 @@ export const useRagStream = () => {
 
     void (async () => {
       try {
-        const headers: Record<string, string> = { Accept: "text/event-stream" };
+        const headers: Record<string, string> = {
+          Accept: "text/event-stream",
+          Authorization: `Bearer ${accessToken}`
+        };
         if (options.method === "POST") {
           headers["Content-Type"] = "application/json";
-          const token = getStoredAccessToken();
-          if (token) {
-            headers.Authorization = `Bearer ${token}`;
-          }
         }
         const response = await fetch(url, {
           method: options.method ?? "GET",
@@ -114,6 +114,18 @@ export const useRagStream = () => {
           credentials: "include",
           signal: controller.signal
         });
+        if (controllerRef.current !== controller) return;
+        if (response.status === 403) {
+          navigate("/vip", { state: { returnTo } });
+          return;
+        }
+        if (response.status === 401) {
+          await reloadUser();
+          if (controllerRef.current === controller) {
+            navigate("/login", { state: { from: returnTo } });
+          }
+          return;
+        }
         if (!response.ok || !response.body) {
           throw new Error(`RAG stream failed: ${response.status}`);
         }
@@ -142,7 +154,7 @@ export const useRagStream = () => {
         }
       }
     })();
-  }, [stop]);
+  }, [accessToken, navigate, reloadUser, returnTo, stop]);
 
   useEffect(() => stop, [stop]);
 

@@ -393,12 +393,12 @@ N[注意：需在 OSS CORS 暴露 ETag] --- D
 #### 知文 RAG 问答（流式）
 
 - 路径：`GET /api/v1/knowposts/{id}/qa/stream`
-  - 鉴权：公开访问（仅对已发布且 `visible=public` 的知文有效）。
+  - 鉴权：携带已开通知光 VIP 的账号的 Bearer access token。仅支持已发布且 `visible=public` 的知文。
+  - 权益校验：单篇问答、全库问答和多轮问答均检查同一份 VIP 权益。未登录返回 `401`，无权益返回 `403`，权益服务异常返回 `5xx`。
   - 内容类型：`text/event-stream`（SSE，服务端持续推送分片内容）。
   - 查询参数：
     - `question`：必填，用户问题（字符串）。
     - `topK`：可选，默认 `5`，用于拼接的上下文片段数。
-    - `maxTokens`：可选，默认 `1024`，LLM 最大生成长度。
   - 行为：
     - 服务端先基于向量索引检索与问题相关的上下文（按 `postId` 过滤，仅取当前知文的片段）。
     - 将若干上下文（最多 `topK`）拼接为提示词，调用 DeepSeek 模型进行流式生成。
@@ -415,17 +415,13 @@ N[注意：需在 OSS CORS 暴露 ETag] --- D
   data: （生成完成，连接关闭）
   ```
 
-- 前端消费示例（EventSource）：
-  ```js
-  const es = new EventSource(`/api/v1/knowposts/1234567890123/qa/stream?question=Markdown有哪些基本语法&topK=5&maxTokens=1024`);
-  let answer = '';
-  es.onmessage = (e) => { answer += e.data; /* 可逐步渲染 */ };
-  es.onerror = () => { es.close(); };
-  ```
+- 前端使用 `fetch` 附带登录令牌，并通过 `response.body` 读取 SSE。
 
 - `curl` 示例：
   ```bash
-  curl -N "http://localhost:8080/api/v1/knowposts/1234567890123/qa/stream?question=Markdown有哪些基本语法&topK=5&maxTokens=1024"
+  curl -NG -H "Authorization: Bearer $ACCESS_TOKEN" \
+    --data-urlencode "question=Markdown有哪些基本语法" \
+    --data-urlencode "topK=5" http://localhost:8080/api/v1/knowposts/1234567890123/qa/stream
   ```
 
 - 说明与约束：

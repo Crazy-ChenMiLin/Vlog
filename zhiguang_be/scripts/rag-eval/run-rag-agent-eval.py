@@ -1,28 +1,22 @@
 import argparse
 import json
+import os
 import socket
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import uuid
 from pathlib import Path
-
-import jwt
-
-
-ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PRIVATE_KEY = ROOT / "src" / "main" / "resources" / "keys" / "private.pem"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run full RAG Agent evaluation against the real QA stream endpoint.")
+    parser = argparse.ArgumentParser(
+        description="Run evaluation against the QA stream with a VIP account's access token in ACCESS_TOKEN."
+    )
     parser.add_argument("--base-url", default="http://localhost:8080")
     parser.add_argument("--questions", type=Path, default=Path(__file__).with_name("questions-relation-cache-100.json"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--user-id", type=int, default=1)
-    parser.add_argument("--private-key", type=Path, default=DEFAULT_PRIVATE_KEY)
     parser.add_argument("--label", default="rag-agent")
     parser.add_argument("--eval-run-id", default="")
     parser.add_argument("--limit", type=int, default=0)
@@ -31,23 +25,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--retry-delay", type=float, default=2.0)
     parser.add_argument("--post-id", type=int, default=0, help="Use post-scoped QA when provided.")
     return parser.parse_args()
-
-
-def jwt_headers(private_key: Path, user_id: int) -> dict[str, str]:
-    now = int(time.time())
-    token = jwt.encode(
-        {
-            "sub": str(user_id),
-            "uid": user_id,
-            "typ": "access",
-            "iat": now,
-            "exp": now + 3600,
-            "jti": str(uuid.uuid4()),
-        },
-        private_key.read_text(encoding="utf-8"),
-        algorithm="RS256",
-    )
-    return {"Authorization": f"Bearer {token}"}
 
 
 def request_agent_once(
@@ -129,12 +106,15 @@ def normalize_stream_text(raw: str) -> str:
 
 def main() -> None:
     args = parse_args()
+    access_token = os.environ.get("ACCESS_TOKEN", "").strip()
+    if not access_token:
+        raise SystemExit("Set ACCESS_TOKEN to the current access token of a VIP account.")
+    headers = {"Authorization": f"Bearer {access_token}"}
     questions = json.loads(args.questions.read_text(encoding="utf-8"))
     if args.limit > 0:
         questions = questions[:args.limit]
 
     eval_run_id = args.eval_run_id.strip() or f"{args.label}-{time.strftime('%Y%m%d-%H%M%S')}"
-    headers = jwt_headers(args.private_key, args.user_id)
     rows = []
     errors = []
 

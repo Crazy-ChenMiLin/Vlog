@@ -7,6 +7,7 @@ import com.tongji.llm.DTO.RagRetrievalDebugDTO;
 import com.tongji.llm.debugservice.RagDebugService;
 import com.tongji.llm.searchService.RagIndexService;
 import com.tongji.llm.chat.RagQueryService;
+import com.tongji.payment.VibePayService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -16,6 +17,7 @@ import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,7 +29,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
+
+import java.util.function.LongFunction;
 
 @RestController
 @RequestMapping("/api/v1/knowposts")
@@ -40,36 +45,56 @@ public class KnowPostRagController {
     private final RagDebugService ragDebugService;
     private final JwtService jwtService;
     private final AiRateLimiter rateLimiter;
+    private final VibePayService vibePayService;
 
     /**
      * 单篇知文 RAG 问答，保持默认 SSE message 以兼容现有前端。
      */
     @GetMapping(value = "/{id}/qa/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> qaStream(
+    public ResponseEntity<Flux<String>> qaStream(
             @PathVariable("id") @Positive long id,
             @RequestParam("question") @NotBlank @Size(max = 500) String question,
             @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK,
-            @RequestParam(value = "evalRunId", required = false) @Size(max = 80) String evalRunId) {
-        return ragQueryService.streamPostAnswerFlux(id, question.trim(), topK, evalRunId);
+            @RequestParam(value = "evalRunId", required = false) @Size(max = 80) String evalRunId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return streamForVip(jwt, buyerId -> ragQueryService.streamPostAnswerFlux(id, question.trim(), topK, evalRunId));
     }
 
     /**
      * 全知识库 RAG 问答，不限制具体知文。
      */
     @GetMapping(value = "/qa/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> globalQaStream(
+    public ResponseEntity<Flux<String>> globalQaStream(
             @RequestParam("question") @NotBlank @Size(max = 500) String question,
             @RequestParam(value = "topK", defaultValue = "5") @Min(1) @Max(20) int topK,
-            @RequestParam(value = "evalRunId", required = false) @Size(max = 80) String evalRunId) {
-        return ragQueryService.streamGlobalAnswerFlux(question.trim(), topK, evalRunId);
+            @RequestParam(value = "evalRunId", required = false) @Size(max = 80) String evalRunId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return streamForVip(jwt, buyerId -> ragQueryService.streamGlobalAnswerFlux(question.trim(), topK, evalRunId));
     }
 
     @PostMapping(value = "/qa/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> chatStream(
+    public ResponseEntity<Flux<ServerSentEvent<String>>> chatStream(
             @Valid @RequestBody RagChatStreamRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        long userId = jwtService.extractUserId(jwt);
+        return streamForVip(jwt, userId -> startChat(request, userId));
+    }
 
+    private <T> ResponseEntity<Flux<T>> streamForVip(Jwt jwt, LongFunction<Flux<T>> startStream) {
+        if (jwt == null || !"access".equals(jwt.getClaimAsString("token_type"))) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        long userId = jwtService.extractUserId(jwt);
+        try {
+            if (!vibePayService.hasVipAccess(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        } catch (ResponseStatusException exception) {
+            return ResponseEntity.status(exception.getStatusCode()).build();
+        }
+        return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(startStream.apply(userId));
+    }
+
+    private Flux<ServerSentEvent<String>> startChat(RagChatStreamRequest request, long userId) {
         // 三道闸门：全局令牌桶 → 信号量 → 每用户滑动窗口，任一失败 → emit SSE error 事件
         // 不抛 ResponseStatusException 走 GlobalExceptionHandler，否则 text/event-stream 媒体类型不匹配
         // 会抛 HttpMediaTypeNotAcceptableException（前端 EventSource 显示"暂时不可用"）

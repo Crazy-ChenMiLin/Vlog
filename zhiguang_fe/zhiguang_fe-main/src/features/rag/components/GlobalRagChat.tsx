@@ -2,7 +2,6 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowRightIcon, CloseIcon, MinimizeIcon } from "@/components/icons/Icon";
-import { useAuth } from "@/context/AuthContext";
 import { AgentStep, useRagStream } from "@/features/rag/hooks/useRagStream";
 import { resolveApiUrl } from "@/services/apiClient";
 import styles from "./GlobalRagChat.module.css";
@@ -22,12 +21,10 @@ const GlobalRagChat = () => {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(true);
-  const [localError, setLocalError] = useState<string | null>(null);
   const answerViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const activeTurnIdRef = useRef<string | null>(null);
   const { answer, agentSteps, loading, error, start, stop } = useRagStream();
-  const { tokens } = useAuth();
   const activeStep = agentSteps[agentSteps.length - 1];
 
   useEffect(() => {
@@ -68,13 +65,6 @@ const GlobalRagChat = () => {
   const ask = () => {
     const normalizedQuestion = question.trim();
     if (!normalizedQuestion || loading) return;
-    if (!tokens?.accessToken) {
-      setLocalError("请先登录后使用多轮问答。");
-      setExpanded(true);
-      return;
-    }
-
-    setLocalError(null);
     setAgentPanelOpen(true);
     setQuestion("");
 
@@ -136,7 +126,7 @@ const GlobalRagChat = () => {
               </span>
               <div>
                 <h2 id="global-rag-title" className={styles.title}>小马知识库</h2>
-                <span className={styles.scope}>陪你翻全库答案</span>
+                <span className={styles.scope}>VIP 全库问答</span>
               </div>
             </div>
 
@@ -251,7 +241,6 @@ const GlobalRagChat = () => {
                 </article>
               ))
             )}
-            {localError ? <div className={styles.error} role="alert">{localError}</div> : null}
           </div>
 
           <form className={styles.composer} onSubmit={handleSubmit}>
