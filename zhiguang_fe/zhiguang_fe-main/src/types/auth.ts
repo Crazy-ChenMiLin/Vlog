@@ -30,8 +30,8 @@ export type AuthUserResponse = {
   id: number;
   nickname: string;
   avatar?: string | null;
-  phone: string;
-  email?: string;
+  phone: string | null;
+  email?: string | null;
   // 新增字段，与后端 auth/me 响应保持一致
   zhId?: string;
   birthday?: string; // LocalDate → 期望 yyyy-MM-dd 字符串

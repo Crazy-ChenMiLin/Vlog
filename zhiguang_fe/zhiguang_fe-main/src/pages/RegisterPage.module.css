@@ -145,7 +145,7 @@
   color: var(--color-text-muted);
 }
 
-.emailWrapper {
+.passwordField {
   display: flex;
   flex-direction: column;
   gap: 6px;

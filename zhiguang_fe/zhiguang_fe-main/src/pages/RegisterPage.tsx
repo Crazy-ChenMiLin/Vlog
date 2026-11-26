@@ -12,19 +12,23 @@ const RegisterPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { register } = useAuth();
-  const [phone, setPhone] = useState("");
-  const [deliveryEmail, setDeliveryEmail] = useState("");
+  const [email, setEmail] = useState("");
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
-  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [lastCodeEmail, setLastCodeEmail] = useState("");
   const [countdown, setCountdown] = useState(0);
-  const redirectTimerRef = useRef<number | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
+  const from = (location.state as { from?: string } | undefined)?.from ?? "/";
+  const identifier = email.trim().toLowerCase();
+  const code = digits.join("");
+  const currentCountdown = lastCodeEmail === identifier ? countdown : 0;
+  const isDisabled = submitting || sendingCode || !identifier || code.length < OTP_LENGTH || !password.trim() || !agreeTerms;
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -32,47 +36,14 @@ const RegisterPage = () => {
     return () => window.clearTimeout(timer);
   }, [countdown]);
 
-  useEffect(() => {
-    return () => {
-      if (redirectTimerRef.current) {
-        window.clearTimeout(redirectTimerRef.current);
-      }
-    };
-  }, []);
-
-  const updateDigitsAndCode = (newDigits: string[]) => {
-    setDigits(newDigits);
-    const combined = newDigits.join("");
-    setCode(combined);
+  const handleEmailChange = (value: string) => {
+    if (value.trim().toLowerCase() !== identifier) {
+      setDigits(Array(OTP_LENGTH).fill(""));
+      setMessage(null);
+    }
+    setEmail(value);
+    setError(null);
   };
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !("OTPCredential" in window)) return;
-    const ac = new AbortController();
-
-    (navigator.credentials as unknown as { get: (options: unknown) => Promise<{ code?: string } | null> })
-      .get({
-        otp: { transport: ["sms"] },
-        signal: ac.signal
-      })
-      .then(otp => {
-        const otpCode = otp?.code;
-        if (otpCode) {
-          const clean = otpCode.replace(/\D/g, "").slice(0, OTP_LENGTH);
-          const newDigits = Array(OTP_LENGTH).fill("");
-          for (let i = 0; i < clean.length; i++) {
-            newDigits[i] = clean[i];
-          }
-          updateDigitsAndCode(newDigits);
-          inputsRef.current[Math.min(clean.length, OTP_LENGTH - 1)]?.focus();
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      ac.abort();
-    };
-  }, [sendingCode]);
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
@@ -84,7 +55,7 @@ const RegisterPage = () => {
     for (let i = 0; i < OTP_LENGTH; i++) {
       newDigits[i] = numericOnly[i] || "";
     }
-    updateDigitsAndCode(newDigits);
+    setDigits(newDigits);
 
     const focusTarget = Math.min(numericOnly.length, OTP_LENGTH - 1);
     inputsRef.current[focusTarget]?.focus();
@@ -96,10 +67,10 @@ const RegisterPage = () => {
       const newDigits = [...digits];
       if (newDigits[index]) {
         newDigits[index] = "";
-        updateDigitsAndCode(newDigits);
+        setDigits(newDigits);
       } else if (index > 0) {
         newDigits[index - 1] = "";
-        updateDigitsAndCode(newDigits);
+        setDigits(newDigits);
         inputsRef.current[index - 1]?.focus();
       }
     } else if (e.key === "ArrowLeft" && index > 0) {
@@ -122,7 +93,7 @@ const RegisterPage = () => {
     if (!numeric) {
       const newDigits = [...digits];
       newDigits[index] = "";
-      updateDigitsAndCode(newDigits);
+      setDigits(newDigits);
       return;
     }
 
@@ -134,7 +105,7 @@ const RegisterPage = () => {
           newDigits[i] = numeric[offset];
         }
       }
-      updateDigitsAndCode(newDigits);
+      setDigits(newDigits);
       const nextIndex = Math.min(index + numeric.length - 1, OTP_LENGTH - 1);
       inputsRef.current[nextIndex]?.focus();
       return;
@@ -143,7 +114,7 @@ const RegisterPage = () => {
     const singleDigit = numeric[numeric.length - 1];
     const newDigits = [...digits];
     newDigits[index] = singleDigit;
-    updateDigitsAndCode(newDigits);
+    setDigits(newDigits);
 
     if (index < OTP_LENGTH - 1) {
       inputsRef.current[index + 1]?.focus();
@@ -151,21 +122,18 @@ const RegisterPage = () => {
   };
 
   const handleSendCode = async () => {
-    if (!phone) {
-      setError("请先填写手机号");
-      return;
-    }
+    if (!emailInputRef.current?.reportValidity()) return;
     setError(null);
     setMessage(null);
     setSendingCode(true);
     try {
       await authService.sendCode({
         scene: "REGISTER",
-        identifierType: "PHONE",
-        identifier: phone,
-        deliveryEmail: deliveryEmail || undefined
+        identifierType: "EMAIL",
+        identifier
       });
-      setMessage(deliveryEmail ? "验证码已发送到接收邮箱，请注意查收" : "验证码已发送");
+      setMessage("验证码已发送，请查收邮件");
+      setLastCodeEmail(identifier);
       setCountdown(60);
       inputsRef.current[0]?.focus();
     } catch (err) {
@@ -178,8 +146,11 @@ const RegisterPage = () => {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (code.length < OTP_LENGTH) {
-      setError(`请输入完整的 ${OTP_LENGTH} 位验证码`);
+    if (isDisabled) return;
+    const trimmedPassword = password.trim();
+    if (trimmedPassword.length < 8 || !/\p{L}/u.test(trimmedPassword) || !/\p{Nd}/u.test(trimmedPassword)) {
+      setError("密码至少 8 位，并包含字母和数字");
+      setMessage(null);
       return;
     }
     setError(null);
@@ -187,18 +158,14 @@ const RegisterPage = () => {
     setSubmitting(true);
     try {
       const payload: RegisterRequest = {
-        identifierType: "PHONE",
-        identifier: phone,
+        identifierType: "EMAIL",
+        identifier,
         code,
         password,
         agreeTerms
       };
       await register(payload);
-      setMessage("注册成功，已自动登录");
-      const from = (location.state as { from?: string } | undefined)?.from ?? "/";
-      redirectTimerRef.current = window.setTimeout(() => {
-        navigate(from, { replace: true });
-      }, 400);
+      navigate(from, { replace: true });
     } catch (err) {
       const info = err instanceof Error ? err.message : "注册失败，请稍后重试";
       setError(info);
@@ -206,8 +173,6 @@ const RegisterPage = () => {
       setSubmitting(false);
     }
   };
-
-  const isDisabled = submitting || !phone || code.length < OTP_LENGTH || !password || !agreeTerms;
 
   return (
     <div className={styles.page}>
@@ -229,37 +194,23 @@ const RegisterPage = () => {
           <p className={styles.subtitle}>完成注册，与更多人分享你的知识</p>
         </div>
 
-        <form className={styles.form} onSubmit={handleSubmit} noValidate>
-          <div className={clsx(styles.floatingField, Boolean(phone) && styles.hasValue)}>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <div className={clsx(styles.floatingField, Boolean(email) && styles.hasValue)}>
             <input
-              id="phone"
+              id="registerEmail"
+              name="email"
+              ref={emailInputRef}
               className={styles.floatingInput}
-              value={phone}
-              onChange={event => setPhone(event.target.value)}
-              type="tel"
-              autoComplete="tel"
+              value={email}
+              onChange={event => handleEmailChange(event.target.value)}
+              type="email"
+              autoComplete="username"
+              readOnly={sendingCode || submitting}
               required
             />
-            <label className={styles.floatingLabel} htmlFor="phone">
-              手机号
+            <label className={styles.floatingLabel} htmlFor="registerEmail">
+              邮箱
             </label>
-          </div>
-
-          <div className={styles.emailWrapper}>
-            <div className={clsx(styles.floatingField, Boolean(deliveryEmail) && styles.hasValue)}>
-              <input
-                id="deliveryEmail"
-                className={styles.floatingInput}
-                value={deliveryEmail}
-                onChange={event => setDeliveryEmail(event.target.value)}
-                type="email"
-                autoComplete="email"
-              />
-              <label className={styles.floatingLabel} htmlFor="deliveryEmail">
-                接收邮箱 (选填)
-              </label>
-            </div>
-            <span className={styles.tips}>邮箱只用于接收本次验证码，不会写入账号身份</span>
           </div>
 
           <div className={styles.otpSection}>
@@ -268,10 +219,10 @@ const RegisterPage = () => {
               <button
                 type="button"
                 className={styles.codeButtonInline}
-                disabled={sendingCode || countdown > 0}
+                disabled={sendingCode || submitting || currentCountdown > 0}
                 onClick={handleSendCode}
               >
-                {countdown > 0 ? `${countdown}s 后重新获取` : "获取验证码"}
+                {sendingCode ? "发送中…" : currentCountdown > 0 ? `${currentCountdown}s 后重新获取` : "获取验证码"}
               </button>
             </div>
 
@@ -299,19 +250,24 @@ const RegisterPage = () => {
             </div>
           </div>
 
-          <div className={clsx(styles.floatingField, Boolean(password) && styles.hasValue)}>
-            <input
-              id="password"
-              className={styles.floatingInput}
-              type="password"
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              autoComplete="new-password"
-              required
-            />
-            <label className={styles.floatingLabel} htmlFor="password">
-              设置登录密码 (不少于 8 位)
-            </label>
+          <div className={styles.passwordField}>
+            <div className={clsx(styles.floatingField, Boolean(password) && styles.hasValue)}>
+              <input
+                id="password"
+                name="password"
+                className={styles.floatingInput}
+                type="password"
+                value={password}
+                onChange={event => setPassword(event.target.value)}
+                autoComplete="new-password"
+                aria-describedby="passwordRequirements"
+                required
+              />
+              <label className={styles.floatingLabel} htmlFor="password">
+                设置密码
+              </label>
+            </div>
+            <span className={styles.tips} id="passwordRequirements">至少 8 位，包含字母和数字</span>
           </div>
 
           <div className={styles.checkboxRow}>
@@ -330,8 +286,8 @@ const RegisterPage = () => {
             </label>
           </div>
 
-          {error ? <div className={styles.error}>{error}</div> : null}
-          {message ? <div className={styles.success}>{message}</div> : null}
+          {error ? <div className={styles.error} role="alert">{error}</div> : null}
+          {message ? <div className={styles.success} role="status">{message}</div> : null}
 
           <div className={styles.actions}>
             <button type="submit" className={styles.submitButton} disabled={isDisabled}>
@@ -342,7 +298,7 @@ const RegisterPage = () => {
               <button
                 type="button"
                 className={styles.linkButton}
-                onClick={() => navigate("/login")}
+                onClick={() => navigate("/login", { state: { from } })}
               >
                 前往登录
               </button>

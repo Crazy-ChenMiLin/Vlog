@@ -145,91 +145,6 @@
   color: var(--color-text-muted);
 }
 
-.otpSection {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.otpHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 2px;
-}
-
-.otpTitle {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.codeButtonInline {
-  background: none;
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-primary-strong);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
-  transition: opacity 0.15s ease, background 0.15s ease;
-}
-
-.codeButtonInline:hover:not(:disabled) {
-  opacity: 0.85;
-  background: rgba(159, 72, 35, 0.08);
-}
-
-.codeButtonInline:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-  color: var(--color-text-muted);
-}
-
-.otpGrid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.otpCell {
-  width: 100%;
-  min-width: 0;
-  height: 56px;
-  border-radius: 14px;
-  border: 1px solid var(--color-border);
-  background: rgba(255, 253, 247, 0.85);
-  font-size: 22px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--color-text-strong);
-  text-align: center;
-  outline: none;
-  box-sizing: border-box;
-  caret-color: var(--color-primary-strong);
-  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
-}
-
-.otpCell:hover {
-  border-color: rgba(83, 75, 64, 0.3);
-}
-
-.otpCell:focus {
-  border-color: var(--color-primary-strong);
-  box-shadow: 0 0 0 3px rgba(159, 72, 35, 0.14);
-  transform: translateY(-2px);
-  background: #fffdf7;
-}
-
-.otpCellFilled {
-  border-color: rgba(83, 75, 64, 0.28);
-  background: #fffdf7;
-}
-
 .actions {
   display: flex;
   flex-direction: column;
@@ -382,17 +297,6 @@
 
   .title {
     font-size: 26px;
-  }
-
-  .otpGrid {
-    gap: 5px;
-  }
-
-  .otpCell {
-    height: 46px;
-    font-size: 18px;
-    border-radius: 8px;
-    padding: 0;
   }
 
   .oauthRow {
