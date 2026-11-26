@@ -1,0 +1,33 @@
+services:
+  zhiguang-be:
+    build:
+      context: ../Vlog/zhiguang_be
+      dockerfile: Dockerfile
+      labels:
+        org.opencontainers.image.revision: ${ZHIGUANG_DEPLOY_REVISION:-local}
+    image: zhiguang-be:internal-latest
+    container_name: zhiguang-be
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:?Set NACOS_SERVER_ADDR}
+      NACOS_USERNAME: ${NACOS_USERNAME:-}
+      NACOS_PASSWORD: ${NACOS_PASSWORD:-}
+      NACOS_NAMESPACE: ${NACOS_NAMESPACE:-zhiguang-prod}
+      ZHIGUANG_SECRETS_IMPORT: file:/run/secrets/zhiguang-backend.yml
+      JAVA_OPTS: "@/run/secrets/zhiguang-java.options"
+    volumes:
+      - ./keys:/app/keys:ro
+      - ./arms/AliyunJavaAgent:/opt/arms/AliyunJavaAgent
+      - ./arms/arms-agent.properties:/opt/arms/arms-agent.properties:ro
+    secrets:
+      - source: backend-secrets
+        target: zhiguang-backend.yml
+      - source: java-options
+        target: zhiguang-java.options
+
+secrets:
+  backend-secrets:
+    file: ./backend-secrets.yml
+  java-options:
+    file: ./java.options

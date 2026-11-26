@@ -1,100 +1,43 @@
-# Zhiguang Nacos Runtime Configuration
+# 知光后端配置
 
-This directory contains the first Nacos configuration package for Zhiguang.
-It is deliberately limited to runtime RAG behavior. It does not contain any
-real password, API key, database address, Docker setting, or OIDC secret.
+本地和内网后端从同一个 Nacos 服务读取 YAML。配置入口是 Nacos 控制台的配置管理。
 
-## Target configuration
+| 环境 | 命名空间 ID | Group | Data ID |
+| --- | --- | --- | --- |
+| 本地 Maven、IDEA 或 Docker | `zhiguang-dev` | `ZHIGUANG_GROUP` | `zhiguang-runtime.yaml` |
+| 云端后端 | `zhiguang-prod` | `ZHIGUANG_GROUP` | `zhiguang-runtime.yaml` |
 
-| Item | Value |
-| --- | --- |
-| Namespace | `public` (temporary first-stage choice) |
-| Group | `ZHIGUANG_GROUP` |
-| Data ID | `zhiguang-runtime.yaml` |
-| Type | YAML |
-| Conflict policy | Abort import |
+修改模型、限流、功能开关、数据服务地址和 OAuth 回调时，在相应命名空间发布。GitHub Actions 只读验证生产配置，随后部署代码。已经支持刷新的 RAG 参数可以热更新。数据库、AI 客户端、鉴权凭据和监听端口在启动时加载，改动后重启对应后端。
 
-`public` is used only because the current Nacos server is empty. When the
-configuration becomes stable, create a separate `zhiguang-prod` namespace and
-import the same package there.
+Nacos 已启用客户端鉴权。数据库密码、API Key、JWT 密钥位置、OAuth Secret 等使用受限的 `backend-secrets.yml`。它只存凭据，放在仓库外。本机默认使用 `~/.zhiguang/backend-secrets.yml`。云端 Compose 将 `runtime/backend-secrets.yml` 和 `runtime/java.options` 以只读方式挂载。Nacos 地址、连接凭据和命名空间可由进程启动环境提供。
 
-## What this package owns
+## 本地启动
 
-- RAG node model routing and model names.
-- Retrieval, graph, rerank, answer, and observation switches or thresholds.
-- Existing counter rebuild thresholds and hot-key thresholds.
+已有 `zhiguang-dev` 配置和本机密钥文件时，由本机启动环境注入 `NACOS_USERNAME` 和 `NACOS_PASSWORD`，再执行 `mvn spring-boot:run` 或使用 IDEA 启动。默认监听 `8080`。Docker 可使用相同配置。
 
-## What must stay in server runtime .env
-
-- Database, Redis, Kafka, Elasticsearch, Neo4j, and MinIO connection details.
-- Server ports, Docker network settings, and Nacos server connection settings.
-- JWT private keys, OAuth/OIDC client secrets, and all real LLM or rerank API keys.
-
-The YAML uses environment variable placeholders for API keys on purpose. The
-current Spring AI client is created at application startup, so changing a base
-URL or API key needs a later code upgrade that rebuilds that client safely.
-Do not assume that putting a new key in Nacos will hot-swap an already-created
-Spring AI client.
-
-## Import steps after the application has Nacos support
-
-1. Run `build-nacos-import.ps1` from this directory. Do not create the ZIP by
-   hand: Nacos 3.x needs both its root metadata file and the content file.
-   Do not add an extra outer folder to the ZIP.
-
-   The ZIP must contain this exact structure:
-
-   ```text
-   .metadata.yml
-   ZHIGUANG_GROUP/zhiguang-runtime.yaml
-   ^ Group          ^ Data ID
-   ```
-
-   `.metadata.yml` declares the configuration's `dataId`, `group`, and `type`.
-   The second file carries its YAML content. Nacos rejects the package as empty
-   when the root metadata file is missing. The entry separator must be `/`, not
-   Windows `\\`; use the supplied script so the ZIP stays portable.
-2. Open Nacos Configuration Management -> Configuration List -> Import.
-3. Keep namespace as `public` and choose `Abort import` as the conflict policy.
-4. Upload `dist/zhiguang-nacos-import.zip`.
-5. Confirm that one configuration appears: `zhiguang-runtime.yaml` in
-   `ZHIGUANG_GROUP`.
-
-The import only saves the configuration in Nacos. It becomes active only after
-the backend is upgraded to load this Data ID with `refreshEnabled=true`.
-
-## Automated deployment
-
-After the first manual import, later updates do not need another ZIP upload.
-The GitHub Actions deployment publishes
-`nacos-import/ZHIGUANG_GROUP/zhiguang-runtime.yaml` to the same Data ID before
-restarting the backend.
-
-The repository must contain only non-sensitive runtime settings and environment
-variable placeholders. Configure these one-time GitHub values instead:
-
-| GitHub setting | Where | Purpose |
-| --- | --- | --- |
-| `NACOS_SERVER_ADDR` | Actions Variable (optional) | Nacos address; defaults to `100.83.242.114:8848` |
-| `NACOS_USERNAME` | Actions Secret | Nacos login username |
-| `NACOS_PASSWORD` | Actions Secret | Nacos login password |
-
-The deployment then follows one path:
-
-```text
-edit code or zhiguang-runtime.yaml
-  -> git push
-  -> Action publishes this Data ID to Nacos
-  -> Action writes bootstrap values to the internal runtime .env
-  -> backend starts and subscribes to the same Data ID
+```powershell
+$env:COMPOSE_DISABLE_ENV_FILE = '1'
+docker compose up -d --build zhiguang-be
 ```
 
-The runtime `.env` is still required, but Action maintains its Nacos bootstrap
-keys automatically. It is not a second hand-maintained configuration source.
+Compose 的 `middleware` profile 用于单独创建开发用 MySQL、Redis、Kafka、Elasticsearch 和 MinIO。只有需要启动这些服务时，才应给 Compose 进程提供各自的初始化凭据，并在 `zhiguang-dev` 中指向对应实例。Docker 的容器内地址和 Windows 上 Maven 可访问的地址要与各自的运行方式匹配。
 
-## Rollback
+## 一次性迁移
 
-- Before a later edit, use Nacos Configuration History to inspect and roll back
-  the previous version.
-- Keep each reviewed ZIP as a release artifact. Import with `Abort import`, not
-  overwrite, unless the exact changed Data ID has been reviewed.
+迁移工具需要 Python 和 PyYAML。它只创建目标 Data ID，读取原有 `public` RAG 配置并补齐环境参数，真实凭据写入指定的仓库外目录。`NACOS_NAMESPACE` 必须指定为 `zhiguang-dev` 或 `zhiguang-prod`，工具在 Data ID 已经存在时退出。
+
+本地可以从旧文件导入已有值。
+
+```powershell
+$env:NACOS_NAMESPACE = 'zhiguang-dev'
+python scripts/deploy/nacos-runtime.py migrate --legacy-env .env --output (Join-Path $HOME '.zhiguang')
+```
+
+生产可以在内网服务器上从当前运行的容器导入实际生效的值。
+
+```bash
+NACOS_NAMESPACE=zhiguang-prod python3 scripts/deploy/nacos-runtime.py migrate \
+  --container zhiguang-be --output /home/chenmilin/zhiguang-deploy/runtime
+```
+
+生产部署脚本要求上述两个挂载文件就绪，并在构建前验证目标 Nacos 配置。原运行目录可以保留用于回退。Benchmark 的运行端仍通过 GitHub Secrets 取 HTTP 请求凭据，后端使用挂载文件中与它一致的值。

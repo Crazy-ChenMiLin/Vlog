@@ -4,21 +4,11 @@ set -euo pipefail
 BASE="${ZHIGUANG_DEPLOY_BASE:-/home/chenmilin/zhiguang-deploy}"
 REPO="$BASE/Vlog"
 RUNTIME="$BASE/runtime"
-SOURCE="${GITHUB_WORKSPACE:-}"
-MODE="${1:-deploy}"
-MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://100.83.242.114:9000}"
-MINIO_PUBLIC_DOMAIN="${MINIO_PUBLIC_DOMAIN:-https://web.chenmilin.xyz}"
-OSS_PRESIGN_ENDPOINT="${OSS_PRESIGN_ENDPOINT:-$MINIO_PUBLIC_DOMAIN}"
-MINIO_BUCKET="${MINIO_BUCKET:-zhiguang}"
-
-if [[ -z "$SOURCE" ]]; then
-  SOURCE="$(git rev-parse --show-toplevel)"
-fi
-
-if [[ ! -d "$SOURCE/zhiguang_be" ]]; then
-  echo "Cannot find backend source at $SOURCE/zhiguang_be" >&2
-  exit 1
-fi
+SOURCE="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}"
+BACKEND="$SOURCE/zhiguang_be"
+REVISION="${GITHUB_SHA:-$(git -C "$SOURCE" rev-parse HEAD)}"
+export NACOS_NAMESPACE="${NACOS_NAMESPACE:-zhiguang-prod}"
+: "${NACOS_SERVER_ADDR:?Set NACOS_SERVER_ADDR}"
 
 sudo_cmd() {
   if sudo -n true 2>/dev/null; then
@@ -30,230 +20,45 @@ sudo_cmd() {
   fi
 }
 
-# Use this variant when the command must also receive data through stdin.
-# `printf password | sudo -S tee ...` replaces the caller's pipe with the
-# password pipe, which previously produced an empty Compose override file and
-# silently skipped new .env entries. Prefixing the password to the existing
-# stdin lets sudo consume the first line and forwards the remaining data to the
-# target command.
-sudo_stdin_cmd() {
-  if sudo -n true 2>/dev/null; then
-    sudo "$@"
-  elif [[ -n "${SUDO_PASSWORD:-}" ]]; then
-    {
-      printf '%s\n' "$SUDO_PASSWORD"
-      cat
-    } | sudo -S -p '' "$@"
-  else
-    sudo "$@"
-  fi
+compose() {
+  sudo_cmd env -u COMPOSE_ENV_FILES COMPOSE_DISABLE_ENV_FILE=1 \
+    NACOS_SERVER_ADDR="$NACOS_SERVER_ADDR" NACOS_USERNAME="${NACOS_USERNAME:-}" \
+    NACOS_PASSWORD="${NACOS_PASSWORD:-}" NACOS_NAMESPACE="$NACOS_NAMESPACE" \
+    ZHIGUANG_DEPLOY_REVISION="$REVISION" \
+    docker compose --project-directory "$RUNTIME" --project-name runtime \
+    -f "$BACKEND/docker-compose.prod.yml" "$@"
 }
 
-update_env_value() {
-  local file="$1"
-  local key="$2"
-  local value="$3"
-
-  if ! sudo_cmd test -f "$file"; then
-    echo "Runtime env file not found: $file" >&2
+for file in "$RUNTIME/backend-secrets.yml" "$RUNTIME/java.options"; do
+  if ! sudo_cmd test -s "$file"; then
+    echo "Missing production startup file: $file" >&2
     exit 1
   fi
-
-  if sudo_cmd grep -q "^${key}=" "$file"; then
-    local escaped_value="${value//\\/\\\\}"
-    escaped_value="${escaped_value//&/\\&}"
-    escaped_value="${escaped_value//|/\\|}"
-    sudo_cmd sed -i "s|^${key}=.*|${key}=${escaped_value}|" "$file"
-  else
-    printf '%s=%s\n' "$key" "$value" | sudo_stdin_cmd tee -a "$file" >/dev/null
-  fi
-}
-
-read_env_value() {
-  local file="$1"
-  local key="$2"
-
-  sudo_cmd awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
-}
-
-require_env_value() {
-  local key="$1"
-  local value="$2"
-
-  if [[ -z "$value" ]]; then
-    echo "Required deploy environment variable is missing: $key" >&2
-    exit 1
-  fi
-}
-
-if [[ "$MODE" == "inject-benchmark-token" ]]; then
-  require_env_value "BENCHMARK_TOKEN" "${BENCHMARK_TOKEN:-}"
-  update_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN" "$BENCHMARK_TOKEN"
-  if [[ "$(read_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN")" != "$BENCHMARK_TOKEN" ]]; then
-    echo "BENCHMARK_TOKEN was not persisted to the runtime env file" >&2
-    exit 1
-  fi
-  echo "Benchmark credential was injected into the server runtime environment"
-  exit 0
-fi
-
-if [[ "$MODE" != "deploy" ]]; then
-  echo "Unknown deployment mode: $MODE" >&2
-  exit 1
-fi
+done
+python3 "$BACKEND/scripts/deploy/nacos-runtime.py" check
+compose config --quiet
 
 sudo_cmd mkdir -p "$REPO"
 sudo_cmd rsync -a --delete \
   --exclude '.git' \
+  --exclude '.env' \
   --exclude 'zhiguang_fe/zhiguang_fe-main/node_modules' \
   --exclude 'zhiguang_fe/zhiguang_fe-main/dist' \
   "$SOURCE"/ "$REPO"/
 
-if [[ -n "${SMTP:-}" ]]; then
-  update_env_value "$RUNTIME/.env" "AUTH_MAIL_ENABLED" "true"
-  update_env_value "$RUNTIME/.env" "SPRING_MAIL_HOST" "${SPRING_MAIL_HOST:-smtp.resend.com}"
-  update_env_value "$RUNTIME/.env" "SPRING_MAIL_PORT" "${SPRING_MAIL_PORT:-465}"
-  update_env_value "$RUNTIME/.env" "SPRING_MAIL_USERNAME" "${SPRING_MAIL_USERNAME:-resend}"
-  update_env_value "$RUNTIME/.env" "SPRING_MAIL_PASSWORD" "$SMTP"
-  update_env_value "$RUNTIME/.env" "AUTH_MAIL_FROM" "${AUTH_MAIL_FROM:-service@chenmilin.xyz}"
-fi
+compose build zhiguang-be
+expected_image="$(sudo_cmd docker image inspect --format '{{.Id}}' zhiguang-be:internal-latest)"
+compose up -d --no-build --no-deps zhiguang-be
 
-require_env_value "GITHUB_CLIENT_ID" "${GITHUB_CLIENT_ID:-}"
-require_env_value "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET:-}"
-update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_ID" "$GITHUB_CLIENT_ID"
-update_env_value "$RUNTIME/.env" "GITHUB_CLIENT_SECRET" "$GITHUB_CLIENT_SECRET"
-
-# The preceding Action job persists this credential on the internal server.
-# Loading it here proves that the value survives the Job boundary and makes the
-# deployment consume the server-side source of truth.
-BENCHMARK_TOKEN="$(read_env_value "$RUNTIME/.env" "BENCHMARK_TOKEN")"
-require_env_value "BENCHMARK_TOKEN in runtime env" "$BENCHMARK_TOKEN"
-
-# Nacos is part of the application's bootstrap path: the container needs these
-# values before it can load the hot-reloadable runtime configuration from Nacos.
-# Keep the values in GitHub Secrets/Variables and materialize them only on the
-# internal server's runtime .env during deployment.
-require_env_value "NACOS_SERVER_ADDR" "${NACOS_SERVER_ADDR:-}"
-require_env_value "NACOS_USERNAME" "${NACOS_USERNAME:-}"
-require_env_value "NACOS_PASSWORD" "${NACOS_PASSWORD:-}"
-# The import query is authoritative here. If group is omitted, Spring Cloud
-# Nacos falls back to DEFAULT_GROUP even when NACOS_CONFIG_GROUP is exported.
-update_env_value "$RUNTIME/.env" "SPRING_CONFIG_IMPORT" "${SPRING_CONFIG_IMPORT:-nacos:zhiguang-runtime.yaml?group=${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}&refreshEnabled=true}"
-update_env_value "$RUNTIME/.env" "NACOS_SERVER_ADDR" "$NACOS_SERVER_ADDR"
-update_env_value "$RUNTIME/.env" "NACOS_USERNAME" "$NACOS_USERNAME"
-update_env_value "$RUNTIME/.env" "NACOS_PASSWORD" "$NACOS_PASSWORD"
-update_env_value "$RUNTIME/.env" "NACOS_CONFIG_GROUP" "${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}"
-update_env_value "$RUNTIME/.env" "NACOS_NAMESPACE" "${NACOS_NAMESPACE:-}"
-
-if [[ -n "${GITHUB_REDIRECT_URI:-}" ]]; then
-  update_env_value "$RUNTIME/.env" "GITHUB_REDIRECT_URI" "$GITHUB_REDIRECT_URI"
-fi
-if [[ -n "${CAMPUS_REDIRECT_URI:-}" ]]; then
-  update_env_value "$RUNTIME/.env" "CAMPUS_REDIRECT_URI" "$CAMPUS_REDIRECT_URI"
-fi
-
-# Optional read-only credential used only by the external Go knowledge provider.
-# Keep it in GitHub Actions Secrets and the server runtime .env, never in source.
-if [[ -n "${GITHUB_EXTERNAL_SEARCH_TOKEN:-}" ]]; then
-  update_env_value "$RUNTIME/.env" "GITHUB_EXTERNAL_SEARCH_TOKEN" "$GITHUB_EXTERNAL_SEARCH_TOKEN"
-fi
-
-# Payment secrets are optional so an existing server-side configuration is preserved.
-for key in ALIPAY_APP_ID ALIPAY_PRIVATE_KEY ALIPAY_PUBLIC_KEY VIBE_PAY_CALLBACK_URL; do
-  if [[ -n "${!key:-}" ]]; then
-    update_env_value "$RUNTIME/.env" "$key" "${!key}"
-  fi
-done
-
-MINIO_ACCESS_KEY_VALUE="${MINIO_ACCESS_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_ACCESS_KEY")}"
-MINIO_SECRET_KEY_VALUE="${MINIO_SECRET_KEY:-$(read_env_value "$RUNTIME/.env" "MINIO_SECRET_KEY")}"
-
-update_env_value "$RUNTIME/.env" "MINIO_ENDPOINT" "$MINIO_ENDPOINT"
-update_env_value "$RUNTIME/.env" "MINIO_PUBLIC_DOMAIN" "$MINIO_PUBLIC_DOMAIN"
-update_env_value "$RUNTIME/.env" "MINIO_BUCKET" "$MINIO_BUCKET"
-update_env_value "$RUNTIME/.env" "OSS_ENDPOINT" "$MINIO_ENDPOINT"
-update_env_value "$RUNTIME/.env" "OSS_PUBLIC_DOMAIN" "$MINIO_PUBLIC_DOMAIN"
-update_env_value "$RUNTIME/.env" "OSS_PRESIGN_ENDPOINT" "$OSS_PRESIGN_ENDPOINT"
-update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_ID" "$MINIO_ACCESS_KEY_VALUE"
-update_env_value "$RUNTIME/.env" "OSS_ACCESS_KEY_SECRET" "$MINIO_SECRET_KEY_VALUE"
-update_env_value "$RUNTIME/.env" "OSS_BUCKET" "$MINIO_BUCKET"
-
-cat <<EOF | sudo_stdin_cmd tee "$RUNTIME/docker-compose.zhiguang-env.yml" >/dev/null
-services:
-  zhiguang-be:
-    env_file:
-      - $RUNTIME/.env
-    environment:
-      MINIO_ENDPOINT: \${MINIO_ENDPOINT}
-      MINIO_PUBLIC_DOMAIN: \${MINIO_PUBLIC_DOMAIN}
-      MINIO_ACCESS_KEY: \${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: \${MINIO_SECRET_KEY}
-      MINIO_BUCKET: \${MINIO_BUCKET}
-      OSS_ENDPOINT: \${OSS_ENDPOINT}
-      OSS_PUBLIC_DOMAIN: \${OSS_PUBLIC_DOMAIN}
-      OSS_PRESIGN_ENDPOINT: \${OSS_PRESIGN_ENDPOINT}
-      OSS_ACCESS_KEY_ID: \${OSS_ACCESS_KEY_ID}
-      OSS_ACCESS_KEY_SECRET: \${OSS_ACCESS_KEY_SECRET}
-      OSS_BUCKET: \${OSS_BUCKET}
-      # The runtime compose file is intentionally stable; explicitly forward
-      # Nacos bootstrap settings so a later code deployment cannot drop them.
-      SPRING_CONFIG_IMPORT: \${SPRING_CONFIG_IMPORT:-nacos:zhiguang-runtime.yaml?group=ZHIGUANG_GROUP&refreshEnabled=true}
-      SPRING_CLOUD_NACOS_SERVER_ADDR: \${NACOS_SERVER_ADDR}
-      SPRING_CLOUD_NACOS_USERNAME: \${NACOS_USERNAME}
-      SPRING_CLOUD_NACOS_PASSWORD: \${NACOS_PASSWORD}
-      SPRING_CLOUD_NACOS_CONFIG_GROUP: \${NACOS_CONFIG_GROUP:-ZHIGUANG_GROUP}
-      SPRING_CLOUD_NACOS_CONFIG_NAMESPACE: \${NACOS_NAMESPACE}
-      GITHUB_CLIENT_ID: \${GITHUB_CLIENT_ID}
-      GITHUB_CLIENT_SECRET: \${GITHUB_CLIENT_SECRET}
-      GITHUB_REDIRECT_URI: \${GITHUB_REDIRECT_URI:-https://web.chenmilin.xyz/callback}
-      GITHUB_EXTERNAL_SEARCH_TOKEN: \${GITHUB_EXTERNAL_SEARCH_TOKEN:-}
-      BENCHMARK_TOKEN: \${BENCHMARK_TOKEN}
-      ALIPAY_APP_ID: \${ALIPAY_APP_ID:-}
-      ALIPAY_PRIVATE_KEY: \${ALIPAY_PRIVATE_KEY:-}
-      ALIPAY_PUBLIC_KEY: \${ALIPAY_PUBLIC_KEY:-}
-      VIBE_PAY_PRODUCT_ID: \${VIBE_PAY_PRODUCT_ID:-DIRECT_235811fb77c636e2a1a45d5d1ff0594f}
-      VIBE_PAY_CALLBACK_URL: \${VIBE_PAY_CALLBACK_URL:-}
-      CAMPUS_CLIENT_ID: \${CAMPUS_CLIENT_ID}
-      CAMPUS_CLIENT_SECRET: \${CAMPUS_CLIENT_SECRET}
-      CAMPUS_REDIRECT_URI: \${CAMPUS_REDIRECT_URI:-https://web.chenmilin.xyz/callback/campus}
-      CAMPUS_AUTHORIZATION_ENDPOINT: \${CAMPUS_AUTHORIZATION_ENDPOINT}
-      CAMPUS_TOKEN_ENDPOINT: \${CAMPUS_TOKEN_ENDPOINT}
-      CAMPUS_JWKS_URI: \${CAMPUS_JWKS_URI}
-      CAMPUS_SCOPES: \${CAMPUS_SCOPES:-openid profile}
-      AUTH_MAIL_ENABLED: \${AUTH_MAIL_ENABLED:-true}
-      SPRING_MAIL_HOST: \${SPRING_MAIL_HOST:-smtp.resend.com}
-      SPRING_MAIL_PORT: \${SPRING_MAIL_PORT:-465}
-      SPRING_MAIL_USERNAME: \${SPRING_MAIL_USERNAME:-resend}
-      SPRING_MAIL_PASSWORD: \${SPRING_MAIL_PASSWORD}
-      AUTH_MAIL_FROM: \${AUTH_MAIL_FROM:-service@chenmilin.xyz}
-EOF
-
-if ! sudo_cmd test -s "$RUNTIME/docker-compose.zhiguang-env.yml"; then
-  echo "Generated Docker Compose environment override is empty" >&2
-  exit 1
-fi
-if ! sudo_cmd grep -q '^[[:space:]]*BENCHMARK_TOKEN:' "$RUNTIME/docker-compose.zhiguang-env.yml"; then
-  echo "Generated Docker Compose environment override does not forward BENCHMARK_TOKEN" >&2
-  exit 1
-fi
-
-sudo_cmd docker compose \
-  -f "$RUNTIME/docker-compose.yml" \
-  -f "$RUNTIME/docker-compose.zhiguang-env.yml" \
-  --env-file "$RUNTIME/.env" \
-  up -d --build
-
-CONTAINER_BENCHMARK_TOKEN="$(
-  sudo_cmd docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' zhiguang-be \
-    | awk -F= '$1 == "BENCHMARK_TOKEN" { sub(/^[^=]*=/, ""); print; exit }'
-)"
-if [[ "$CONTAINER_BENCHMARK_TOKEN" != "$BENCHMARK_TOKEN" ]]; then
-  echo "Running backend container did not receive the expected BENCHMARK_TOKEN" >&2
+running_image="$(sudo_cmd docker inspect --format '{{.Image}}' zhiguang-be)"
+if [[ "$running_image" != "$expected_image" ]]; then
+  echo "The running backend does not use the image built for $REVISION" >&2
   exit 1
 fi
 
 for _ in $(seq 1 40); do
-  if curl -fsS http://127.0.0.1:18080/actuator/health >/dev/null; then
+  if curl -fsS --max-time 5 http://127.0.0.1:18080/actuator/health >/dev/null; then
+    echo "Backend for $REVISION passed its health check."
     sudo_cmd docker ps --filter name=zhiguang-be --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
     exit 0
   fi

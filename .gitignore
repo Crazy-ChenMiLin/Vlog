@@ -12,6 +12,7 @@
 
 # Local config / secrets
 **/application.yml
+!zhiguang_be/src/main/resources/application.yml
 **/application-*.yml
 !**/application-example.yml
 

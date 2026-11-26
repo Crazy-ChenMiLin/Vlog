@@ -8,10 +8,9 @@ target/
 #2
 .env
 .env.*
-!.env.example
-src/main/resources/application.yml
+backend-secrets.yml
+java.options
 src/main/resources/application-*.yml
-!src/main/resources/application-example.yml
 
 # IntelliJ IDEA
 #3

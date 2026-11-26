@@ -65,8 +65,8 @@ public class CanalKafkaBridge implements SmartLifecycle {
                             @Value("${canal.username}") String username,
                             @Value("${canal.password}") String password,
                             @Value("${canal.filter}") String filter,
-                            @Value("${canal.batchSize}") int batchSize,
-                            @Value("${canal.intervalMs}") long intervalMs) {
+                            @Value("${canal.batch-size:${canal.batchSize:1000}}") int batchSize,
+                            @Value("${canal.interval-ms:${canal.intervalMs:1000}}") long intervalMs) {
         this.kafka = kafka;
         this.objectMapper = objectMapper;
         this.taskExecutor = taskExecutor;

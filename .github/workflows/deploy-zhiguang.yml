@@ -10,33 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inject-benchmark-token:
-    name: Inject Benchmark credential
-    runs-on: self-hosted
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout deployment script
-        uses: actions/checkout@v4
-        env:
-          GIT_CONFIG_COUNT: 2
-          GIT_CONFIG_KEY_0: url.https://v4.gh-proxy.org/https://github.com/.insteadOf
-          GIT_CONFIG_VALUE_0: https://github.com/
-          GIT_CONFIG_KEY_1: http.version
-          GIT_CONFIG_VALUE_1: HTTP/1.1
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Inject and verify Benchmark credential
-        env:
-          SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
-          BENCHMARK_TOKEN: ${{ secrets.BENCHMARK_TOKEN }}
-        run: bash zhiguang_be/scripts/deploy/internal-backend.sh inject-benchmark-token
-
   deploy:
     name: Deploy backend and frontend
-    needs: inject-benchmark-token
     runs-on: self-hosted
     timeout-minutes: 30
 
@@ -53,41 +28,18 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Publish runtime configuration to Nacos
-        env:
-          NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
-          NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
-          NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
-          NACOS_CONFIG_GROUP: ZHIGUANG_GROUP
-        run: bash zhiguang_be/scripts/deploy/sync-nacos-config.sh zhiguang_be/nacos-config/nacos-import/ZHIGUANG_GROUP/zhiguang-runtime.yaml
-
       - name: Deploy backend on internal server
         env:
           SUDO_PASSWORD: ${{ secrets.INTERNAL_SUDO_PASSWORD }}
-          SMTP: ${{ secrets.SMTP }}
-          ALIPAY_APP_ID: ${{ secrets.ALIPAY_APP_ID }}
-          ALIPAY_PRIVATE_KEY: ${{ secrets.ALIPAY_PRIVATE_KEY }}
-          ALIPAY_PUBLIC_KEY: ${{ secrets.ALIPAY_PUBLIC_KEY }}
-          VIBE_PAY_CALLBACK_URL: ${{ vars.VIBE_PAY_CALLBACK_URL || 'https://web.chenmilin.xyz/vip' }}
-          MINIO_PUBLIC_DOMAIN: ${{ vars.MINIO_PUBLIC_DOMAIN || 'https://web.chenmilin.xyz' }}
-          OSS_PRESIGN_ENDPOINT: ${{ vars.OSS_PRESIGN_ENDPOINT || 'https://web.chenmilin.xyz' }}
-          GITHUB_CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.CLIENT_SECRETS }}
-          GITHUB_REDIRECT_URI: ${{ vars.PUBLIC_GITHUB_REDIRECT_URI || 'https://web.chenmilin.xyz/callback' }}
-          CAMPUS_REDIRECT_URI: ${{ vars.CAMPUS_REDIRECT_URI || 'https://web.chenmilin.xyz/callback/campus' }}
-          GITHUB_EXTERNAL_SEARCH_TOKEN: ${{ secrets.GITHUB_EXTERNAL_SEARCH_TOKEN }}
           NACOS_SERVER_ADDR: ${{ vars.NACOS_SERVER_ADDR || '100.83.242.114:8848' }}
           NACOS_USERNAME: ${{ secrets.NACOS_USERNAME }}
           NACOS_PASSWORD: ${{ secrets.NACOS_PASSWORD }}
-          NACOS_CONFIG_GROUP: ZHIGUANG_GROUP
+          NACOS_NAMESPACE: zhiguang-prod
         run: bash zhiguang_be/scripts/deploy/internal-backend.sh
 
       - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: zhiguang_fe/zhiguang_fe-main/package-lock.json
+        timeout-minutes: 5
+        run: bash zhiguang_be/scripts/deploy/setup-frontend-node.sh
 
       - name: Build frontend
         working-directory: zhiguang_fe/zhiguang_fe-main

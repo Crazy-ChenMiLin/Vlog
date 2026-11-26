@@ -154,7 +154,7 @@ $env:VITE_API_BASE_URL="http://localhost:8080"
 
 开发环境下，如果不配置 `VITE_API_BASE_URL`，Vite 会把 `/api` 代理到 `http://localhost:8080`。
 
-> 注意：不要把真实数据库密码、对象存储密钥、模型 API Key、JWT 私钥提交到公开仓库。建议为团队协作准备 `application-example.yml`，真实配置只保留在本地或部署平台的环境变量中。
+后端环境配置在 Nacos 维护。首次启动需要准备 Nacos 命名空间和本机密钥文件，见 [配置与迁移说明](zhiguang_be/nacos-config/README.md)。
 
 ## 数据库初始化
 
@@ -346,18 +346,17 @@ T2Retrieval 专题、真实 qrels Gold、检索漏斗报告和答案裁判。传
 
 ## Docker 与自动部署
 
-后端提供 `zhiguang_be/Dockerfile`、`docker-compose.yml` 和 `.env.example`：
+本地 Docker 运行后端需要 [已配置的 Nacos 和本机密钥文件](zhiguang_be/nacos-config/README.md)。
 
-```bash
+```powershell
 cd zhiguang_be
-cp .env.example .env
-docker compose up -d --build
+$env:COMPOSE_DISABLE_ENV_FILE = '1'
+docker compose up -d --build zhiguang-be
 docker compose logs -f zhiguang-be
 ```
 
-真实 `.env`、数据库密码、模型 API Key 和私钥不得提交到 Git。生产环境采用
-“内网资源服务器运行后端和中间件、公网轻量服务器提供前端与反向代理”的拓扑，
-两台服务器通过 Tailscale 通信；运行时配置由 Nacos 配置中心下发并监听热更新。
+生产环境采用“内网资源服务器运行后端和中间件、公网轻量服务器提供前端与反向代理”的拓扑。
+两台服务器通过 Tailscale 通信。后端从 `zhiguang-prod` 命名空间加载配置，支持刷新的 RAG 参数可在 Nacos 修改后生效。
 
 GitHub OAuth 与校园 OIDC 的登录回跳依赖一个公网可达的 HTTPS 地址，生产部署需
 在对应平台把 `Redirect URL` 指向前端 `{域名}/callback`（校园端为 `/callback/campus`）。

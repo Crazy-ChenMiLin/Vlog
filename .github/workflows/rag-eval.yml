@@ -85,6 +85,8 @@ jobs:
 
       - name: Run RAG BM25 A/B evaluation
         shell: pwsh
+        env:
+          SPRING_PROFILES_ACTIVE: standalone
         run: |
           $runName = "${{ inputs.run_name }}"
           if ($runName -eq "") {

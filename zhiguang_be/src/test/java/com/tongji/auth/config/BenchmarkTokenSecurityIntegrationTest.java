@@ -16,6 +16,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Verifies that the CI token is authenticated inside the real Security filter chain. */
 @WebMvcTest(controllers = BenchmarkController.class, properties = "BENCHMARK_TOKEN=expected-token")
+@ActiveProfiles("test")
 @Import(SecurityConfig.class)
 class BenchmarkTokenSecurityIntegrationTest {
 
