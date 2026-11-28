@@ -10,7 +10,6 @@ import CourseDetailPage from "./pages/CourseDetailPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import GitHubCallbackPage from "./pages/GitHubCallbackPage";
-import GitHubProjectsPage from "./pages/GitHubProjectsPage";
 import CampusCallbackPage from "./pages/CampusCallbackPage";
 
 import VipPage from "./pages/VipPage";
@@ -23,7 +22,6 @@ function App() {
       <Route path="/create" element={<CreatePage />} />
       <Route path="/learn" element={<LearningPage />} />
       <Route path="/sites" element={<SitesPage />} />
-      <Route path="/github" element={<GitHubProjectsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/edit" element={<EditProfilePage />} />
       <Route path="/post/:id" element={<CourseDetailPage />} />

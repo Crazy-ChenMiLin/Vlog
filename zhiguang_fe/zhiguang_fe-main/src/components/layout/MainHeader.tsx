@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
 import UserBadge from "@/components/common/UserBadge";
+import { GitHubIcon } from "@/components/icons/Icon";
 import styles from "./MainHeader.module.css";
 
 export type HeaderTab = {
@@ -53,9 +53,16 @@ const MainHeader = ({ headline, subtitle, tabs, filters, rightSlot, children, us
           {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
         </div>
         <div className={styles.extras}>
-          <NavLink className={styles.githubLink} to="/github" end aria-label="GitHub 项目导览">
-            GitHub
-          </NavLink>
+          <a
+            className={styles.githubLink}
+            href="https://github.com/caigg188/LDStatusPro"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="在新标签页打开 LDStatusPro 的 GitHub 仓库"
+            title="LDStatusPro · GitHub"
+          >
+            <GitHubIcon width={20} height={20} aria-hidden="true" />
+          </a>
           {rightSlot}
           {user ? <UserBadge name={user.name} alias={user.alias} avatarUrl={user.avatarUrl} /> : null}
         </div>
