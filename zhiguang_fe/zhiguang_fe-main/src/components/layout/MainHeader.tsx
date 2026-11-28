@@ -55,11 +55,11 @@ const MainHeader = ({ headline, subtitle, tabs, filters, rightSlot, children, us
         <div className={styles.extras}>
           <a
             className={styles.githubLink}
-            href="https://github.com/caigg188/LDStatusPro"
+            href="https://github.com/Crazy-ChenMiLin/Vlog"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="在新标签页打开 LDStatusPro 的 GitHub 仓库"
-            title="LDStatusPro · GitHub"
+            aria-label="在新标签页打开知光的 GitHub 仓库"
+            title="知光 · GitHub"
           >
             <GitHubIcon width={20} height={20} aria-hidden="true" />
           </a>
