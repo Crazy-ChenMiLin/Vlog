@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { NavLink } from "react-router-dom";
 import UserBadge from "@/components/common/UserBadge";
 import styles from "./MainHeader.module.css";
 
@@ -52,6 +53,9 @@ const MainHeader = ({ headline, subtitle, tabs, filters, rightSlot, children, us
           {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
         </div>
         <div className={styles.extras}>
+          <NavLink className={styles.githubLink} to="/github" end aria-label="GitHub 项目导览">
+            GitHub
+          </NavLink>
           {rightSlot}
           {user ? <UserBadge name={user.name} alias={user.alias} avatarUrl={user.avatarUrl} /> : null}
         </div>

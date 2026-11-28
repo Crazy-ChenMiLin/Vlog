@@ -111,6 +111,29 @@
   gap: 16px;
 }
 
+.githubLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.githubLink:hover,
+.githubLink[aria-current="page"] {
+  color: var(--color-text-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.githubLink:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
 @media (max-width: 900px) and (min-width: 769px) {
   .header {
     padding: 0 0 14px;
